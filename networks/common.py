@@ -25,3 +25,4 @@ class MLP(nn.Module):
                 x = nn.Dropout(reate=self.dropout_rate)(
                     x, deterministic=not training
                 )
+        return x

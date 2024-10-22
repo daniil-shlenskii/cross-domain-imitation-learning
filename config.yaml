@@ -1,0 +1,28 @@
+seed: &seed 0
+max_steps: 2000
+start_training_after: 100
+
+environment:
+  _target_: gymnasium.make
+  id: Hopper-v4
+  render_mode: human
+
+replay_buffer:
+  _target_: flashbax.make_item_buffer
+  max_length: 150
+  min_length: 50
+  sample_batch_size: 16
+  add_batches: False
+  
+agent:
+  _target_: experts.sac_agent.SACAgent
+  seed: *seed
+  actor_module_config:
+    _target_: networks.policy.NormalTanhPolicy
+    hidden_dims: [64, 64]
+  critic_module_config:
+    _target_: networks.critic.Critic
+    hidden_dims: [64, 64]
+  value_critic_module_config:
+    _target_: networks.critic.ValueCritic
+    hidden_dims: [64, 64]

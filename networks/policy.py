@@ -10,7 +10,7 @@ from tensorflow_probability.substrates import jax as tfp
 tfd = tfp.distributions
 tfb = tfp.bijectors
 
-from CDIL.networks.common import MLP, default_init
+from networks.common import MLP, default_init
 
 
 LOG_STD_MIN = -5.0
@@ -50,18 +50,17 @@ class NormalTanhPolicy(nn.Module):
         temperature: float = 1.0,
         training: bool = False,
     ) -> tfd.Distribution:
-        outputs = MLP(
+        features = MLP(
             self.hidden_dims, dropout_rate=self.dropout_rate
         )(observations, training=training)
-
         means = nn.Dense(
             self.action_dim, kernel_init=default_init()
-        )(outputs)
+        )(features)
 
         if self.train_std:
             log_stds = nn.Dense(
                 self.action_dim, kernel_init=default_init()
-            )(outputs)
+            )(features)
         else:
             log_stds = self.param(
                 'log_stds', nn.initializers.zeros, (self.action_dim,)

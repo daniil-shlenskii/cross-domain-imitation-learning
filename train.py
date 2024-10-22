@@ -11,53 +11,69 @@ from omegaconf import OmegaConf
 config = OmegaConf.load("config.yaml")
 print(type(config))
 
+# reprodicibility
+rng = jax.random.PRNGKey(config.seed)
+
+# environment init
 env = instantiate(config.environment)
 
 # buffer init
-obs, info = env.reset()
+observations, info = env.reset()
 action = env.action_space.sample()
-obs, reward, terminated, truncated, info = env.step(action)
+observation, reward, done, truncated, info = env.step(action)
 
 buffer = instantiate(config.replay_buffer)
 state = buffer.init(
     dict(
-        obs=jnp.array(obs),
-        reward=jnp.array(reward),
-        obs_next=jnp.array(obs),
+        observations=jnp.array(observation),
+        actions=jnp.array(action),
+        rewards=jnp.array(reward),
+        observations_next=jnp.array(observation),
     )
 )
-###
 
-obs, _, done  = *env.reset(seed=config.seed), False
+# agent init
+agent = instantiate(
+    config.agent,
+    observation_space=env.observation_space,
+    action_space=env.action_space,
+    _recursive_=False,
+)
+
+# training
+observation, _, done  = *env.reset(seed=config.seed), False
 for i in range(config.max_steps):
-
-
+    print(i)
     # sample actions
     if i < config.start_training_after:
-        action = env.action_space.sample()
+        actions = env.action_space.sample()
     else:
-        action = agent.sample_actions(obs)
+        actions = agent.sample_actions(observations)
 
     # do step in the environment
-    obs_next, reward, terminated, truncated, info = env.step(action)
+    observations_next, rewards, done, truncated, info = env.step(actions)
 
     # update buffer
     state = buffer.add(
         state, 
         dict(
-            obs=jnp.array(obs),
-            reward=jnp.array(reward),
-            obs_next=jnp.array(obs_next),
+            observations=jnp.array(observation),
+            actions=jnp.array(action),
+            rewards=jnp.array(reward),
+            observations_next=jnp.array(observation),
         )
     )
-    obs = obs_next
+    observations = observations_next
 
-    if terminated or truncated:
-        obs, info = env.reset(...)
+    # update env if terminated
+    if done or truncated:
+        observations, info = env.reset(seed=config.seed+i)
 
     # do RL optimization step
     if i >= config.start_training_after:
-        batch = buffer.sample(state, ...)
+        rng, key = jax.random.split(rng)
+        batch = buffer.sample(state, key)
 
 env.close()
 
+print("finish")
