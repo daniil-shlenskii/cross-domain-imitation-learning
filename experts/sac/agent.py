@@ -45,7 +45,8 @@ class SACLearner:
     ):
         # reproducability keys
         rng = jax.random.key(seed)
-        actor_key, critic1_key, critic2_key, state_value_fn_key = jax.random.split(rng, 4)
+        rng, actor_key, critic1_key, critic2_key, state_value_fn_key = jax.random.split(rng, 5)
+        self._rng = rng
 
         # actor and critic initialization
         observations = observation_space.sample()
@@ -95,17 +96,22 @@ class SACLearner:
         self.discount = discount
         self.tau = tau
 
-    def update(self, batch):
+    def update(self, batch: ...):
         (
+            self._rng,
             self.actor,
-            self.critic,
-            self.target_critic_params,
+            self.critic1,
+            self.critic2,
+            self.target_state_value_fn_params,
             info,
-        ) = self._update_jit(batch)
+        ) = self._update_jit(batch, rng=self._rng)
         return info
 
     @jax.jit(static_argnames="self")
-    def _update(self, batch):
+    def _update(self, batch, rng: PRNGKey):
+        # reproducibility
+        rng, key = jax.random.split(rng)
+
         # state_action_value
         state_action_value = jnp.min(
             critic.apply_fn({"params": critic.params}, batch["obs"], batch["action"])
@@ -118,17 +124,25 @@ class SACLearner:
 
         # state_value_fn update
         state_value_target = state_action_value + entropy
-        new_state_value_fn = self.state_value_fn.update(state_value_target)
+        new_state_value_fn, state_value_fn_info = self.state_value_fn.update(
+            batch=batch, target=state_value_target
+        )
 
         # critic update
         critic_target = batch["reward"] + self.discount * self.state_value_fn.apply_fn(
             {"params": self.target_state_value_fn_params}, batch["obs_next"]
         )
-        new_critic1 = self.critic1.update(critic_target)
-        new_critic2 = self.critic2.update(critic_target)
+        new_critic1, critic1_info = self.critic1.update(
+            batch=batch, target=critic_target, critic_idx=1
+        )
+        new_critic2, critic2_info = self.critic2.update(
+            batch=batch, target=critic_target, critic_idx=2
+        )
 
         # actor update
-        new_actor = self.actor.update(batch["obs"])
+        new_actor, actor_info = self.actor.update(
+            batch=batch, critic1=self.critic1, critic2=self.critic2, key=key
+        )
 
         # target_state_value_fn update
         new_target_state_value_fn_params = (
@@ -136,9 +150,10 @@ class SACLearner:
             self.target_state_value_fn_params * (1 - self.tau)
         )
 
-        info = None
 
+        info = {**state_value_fn_info, **critic1_info, **critic2_info, **actor_info}
         return (
+            rng,
             new_actor,
             new_critic1,
             new_critic2,
@@ -152,21 +167,22 @@ class SACLearner:
         apply_fn: Callable,
         batch: ...,
         target: jnp.ndarray,
-        key: PRNGKey,
     ):
         pred = apply_fn({"params": params}, batch["obs"])
-        return optax.l2_loss(pred, target)
+        loss = optax.l2_loss(pred, target).mean()
+        return loss, {"state_value_fn_loss": loss}
     
     @staticmethod
     def _critic_loss_fn(
-        params: ...,
+        params: Params,
         apply_fn: TrainState,
         batch: ...,
         target: jnp.ndarray,
-        key: PRNGKey,
+        critic_idx: int,
     ):
         pred = apply_fn({"params": params}, batch["obs"], batch["action"])
-        return optax.l2_loss(pred, target)
+        loss = optax.l2_loss(pred, target).mean()
+        return loss, {f"critic{critic_idx}_loss": loss}
     
     @staticmethod
     def _actor_loss_fn(
@@ -185,4 +201,5 @@ class SACLearner:
             for critic in [critic1, critic2]
         )
 
-        return (log_prob - state_action_value).mean()
+        loss = (log_prob - state_action_value).mean()
+        return loss, {"actor_loss": loss, "entropy": -log_prob.mean()}
