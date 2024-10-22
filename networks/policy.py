@@ -13,7 +13,7 @@ tfb = tfp.bijectors
 from CDIL.networks.common import MLP, default_init
 
 
-LOG_STD_MIN = -10.0
+LOG_STD_MIN = -5.0
 LOG_STD_MAX = 2.0
 
 
@@ -26,17 +26,16 @@ class DeterministicPolicy(nn.Module):
     def __call__(
         self, observations: jnp.ndarray, training: bool=False
     ) -> jnp.ndarray:
-        outputs = MLP(
-            self.hidden_dims,
-            dropout_rate = self.dropout_rate,
+        features = MLP(
+            self.hidden_dims, dropout_rate=self.dropout_rate,
         )(observations, training=training)
 
         actions = nn.Dense(
-            self.action_dim,
-            kernel_init = default_init(),
-        )(outputs)
+            self.action_dim, kernel_init=default_init(),
+        )(features)
 
         return nn.tanh(actions)
+
 
 class NormalTanhPolicy(nn.Module):
     hidden_dims: Sequence[int]
@@ -52,19 +51,16 @@ class NormalTanhPolicy(nn.Module):
         training: bool = False,
     ) -> tfd.Distribution:
         outputs = MLP(
-            self.hidden_dims,
-            dropout_rate=self.dropout_rate
+            self.hidden_dims, dropout_rate=self.dropout_rate
         )(observations, training=training)
 
         means = nn.Dense(
-            self.action_dim,
-            kernel_init = default_init()
+            self.action_dim, kernel_init=default_init()
         )(outputs)
 
         if self.train_std:
             log_stds = nn.Dense(
-                self.action_dim,
-                kernel_init=default_init()
+                self.action_dim, kernel_init=default_init()
             )(outputs)
         else:
             log_stds = self.param(
@@ -72,11 +68,9 @@ class NormalTanhPolicy(nn.Module):
             )
         log_stds = jnp.clip(log_stds, LOG_STD_MIN, LOG_STD_MAX)
 
-        norma_dist = tfd.MultivariateNormalDiag(
-            loc=means,
-            scale_diag=jnp.exp(log_stds) / temperature
+        normal_dist = tfd.MultivariateNormalDiag(
+            loc=means, scale_diag=jnp.exp(log_stds) / temperature
         )
         return tfd.TransformedDistribution(
-            distribution = norma_dist,
-            bijector = tfb.Tanh(),
+            distribution=normal_dist, bijector=tfb.Tanh(),
         )
