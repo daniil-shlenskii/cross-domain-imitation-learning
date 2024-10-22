@@ -113,18 +113,22 @@ class SACAgent(Agent):
         return info
 
     @functools.partial(jax.jit, static_argnames="self")
-    def _update(self, batch, rng: PRNGKey):
+    def _update_jit(self, batch, rng: PRNGKey):
+        print(f"{batch.keys() = }")
         # reproducibility
         rng, key = jax.random.split(rng)
 
         # state_action_value
         state_action_value = jnp.min(
-            critic.apply_fn({"params": critic.params}, batch["observations"], batch["actions"])
-            for critic in [self.critic1, self.critic2]
+            jnp.stack([
+                critic.apply_fn({"params": critic.params}, batch["observations"], batch["actions"])
+                for critic in [self.critic1, self.critic2]
+            ]),
+            axis=0,
         )
         # entropy
         dist = self.actor.apply_fn({"params": self.actor.params}, batch["observations"])
-        entropy = -dist.log_prob(batch["observations"]).mean()
+        entropy = -dist.log_prob(batch["actions"]).mean()
 
 
         # value_critic update
@@ -150,11 +154,11 @@ class SACAgent(Agent):
         )
 
         # target_value_critic update
-        new_target_value_critic_params = (
-            new_value_critic.params * self.tau +
-            self.target_value_critic_params * (1 - self.tau)
+        new_target_value_critic_params = jax.tree.map(
+            lambda t1, t2: t1 * self.tau + t2 * (1 - self.tau),
+            new_value_critic.params,
+            self.target_value_critic_params,
         )
-
 
         info = {**value_critic_info, **critic1_info, **critic2_info, **actor_info}
         return (
@@ -199,11 +203,15 @@ class SACAgent(Agent):
         key: PRNGKey,
     ):
         dist = apply_fn({"params": params}, batch["observations"])
-        action, log_prob = dist.sample_and_log_prob(seed=key)
+        actions = dist.sample(seed=key)
+        log_prob = dist.log_prob(actions)
 
         state_action_value = jnp.min(
-            critic.apply_fn({"params": critic.params}, batch["observations"], action)
-            for critic in [critic1, critic2]
+            jnp.stack([
+                critic.apply_fn({"params": critic.params}, batch["observations"], actions)
+                for critic in [critic1, critic2]
+            ]),
+            axis=0
         )
 
         loss = (log_prob - state_action_value).mean()

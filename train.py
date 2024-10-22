@@ -1,12 +1,15 @@
 import gymnasium as gym
-import flashbax as fbx
 
 import jax
 import jax.numpy as jnp
 
+import wandb
+
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
+
+wandb.init(project="test_jax_rl")
 
 config = OmegaConf.load("config.yaml")
 print(type(config))
@@ -51,7 +54,7 @@ for i in range(config.max_steps):
         actions = agent.sample_actions(observations)
 
     # do step in the environment
-    observations_next, rewards, done, truncated, info = env.step(actions)
+    observation_next, reward, done, truncated, info = env.step(actions)
 
     # update buffer
     state = buffer.add(
@@ -60,19 +63,24 @@ for i in range(config.max_steps):
             observations=jnp.array(observation),
             actions=jnp.array(action),
             rewards=jnp.array(reward),
-            observations_next=jnp.array(observation),
+            observations_next=jnp.array(observation_next),
         )
     )
-    observations = observations_next
+    observation = observation_next
 
     # update env if terminated
     if done or truncated:
-        observations, info = env.reset(seed=config.seed+i)
+        observation, info = env.reset(seed=config.seed+i)
 
     # do RL optimization step
     if i >= config.start_training_after:
         rng, key = jax.random.split(rng)
-        batch = buffer.sample(state, key)
+        batch = buffer.sample(state, key).experience
+        update_info = agent.update(batch)
+
+        if i % config.log_every == 0:
+            for k, v in update_info.items():
+                wandb.log({f"training/{k}": v}, step=i)
 
 env.close()
 

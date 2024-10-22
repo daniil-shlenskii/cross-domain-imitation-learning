@@ -142,5 +142,7 @@ class TrainState(struct.PyTreeNode):
         )
     
     def update(self, **loss_kwargs):
-        grads, info = jax.grad(self.loss_fn, has_aux=True)(params=self.params, **loss_kwargs)
+        grads, info = jax.grad(self.loss_fn, has_aux=True)(
+            self.params, apply_fn=self.apply_fn, **loss_kwargs
+        )
         return self.apply_gradients(grads=grads), info
