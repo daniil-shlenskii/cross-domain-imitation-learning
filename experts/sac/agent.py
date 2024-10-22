@@ -12,6 +12,8 @@ import gymnasium as gym
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
+import functools
+
 from nn.train_state import TrainState
 
 from utils import DataType, Params, PRNGKey
@@ -105,7 +107,7 @@ class SACLearner:
         ) = self._update_jit(batch, rng=self._rng)
         return info
 
-    @jax.jit(static_argnames="self")
+    @functools.partial(jax.jit, static_argnames="self")
     def _update(self, batch, rng: PRNGKey):
         # reproducibility
         rng, key = jax.random.split(rng)
