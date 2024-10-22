@@ -14,9 +14,7 @@ from omegaconf.dictconfig import DictConfig
 
 from nn.train_state import TrainState
 
-
-PRNGKey = Any
-Params = flax.core.FrozenDict[str, Any]
+from utils import DataType, Params, PRNGKey
 
 
 class SACLearner:
@@ -96,7 +94,7 @@ class SACLearner:
         self.discount = discount
         self.tau = tau
 
-    def update(self, batch: ...):
+    def update(self, batch: DataType):
         (
             self._rng,
             self.actor,
@@ -114,12 +112,12 @@ class SACLearner:
 
         # state_action_value
         state_action_value = jnp.min(
-            critic.apply_fn({"params": critic.params}, batch["obs"], batch["action"])
+            critic.apply_fn({"params": critic.params}, batch["observations"], batch["actions"])
             for critic in [self.critic1, self.critic2]
         )
         # entropy
-        dist = self.actor.apply_fn({"params": self.actor.params}, batch["obs"])
-        entropy = -dist.log_prob(batch["obs"]).mean()
+        dist = self.actor.apply_fn({"params": self.actor.params}, batch["observations"])
+        entropy = -dist.log_prob(batch["observations"]).mean()
 
 
         # state_value_fn update
@@ -129,8 +127,8 @@ class SACLearner:
         )
 
         # critic update
-        critic_target = batch["reward"] + self.discount * self.state_value_fn.apply_fn(
-            {"params": self.target_state_value_fn_params}, batch["obs_next"]
+        critic_target = batch["rewards"] + self.discount * self.state_value_fn.apply_fn(
+            {"params": self.target_state_value_fn_params}, batch["observations_next"]
         )
         new_critic1, critic1_info = self.critic1.update(
             batch=batch, target=critic_target, critic_idx=1
@@ -165,10 +163,10 @@ class SACLearner:
     def _state_value_fn_loss_fn(
         params: Params,
         apply_fn: Callable,
-        batch: ...,
+        batch: DataType,
         target: jnp.ndarray,
     ):
-        pred = apply_fn({"params": params}, batch["obs"])
+        pred = apply_fn({"params": params}, batch["observations"])
         loss = optax.l2_loss(pred, target).mean()
         return loss, {"state_value_fn_loss": loss}
     
@@ -176,11 +174,11 @@ class SACLearner:
     def _critic_loss_fn(
         params: Params,
         apply_fn: TrainState,
-        batch: ...,
+        batch: DataType,
         target: jnp.ndarray,
         critic_idx: int,
     ):
-        pred = apply_fn({"params": params}, batch["obs"], batch["action"])
+        pred = apply_fn({"params": params}, batch["observations"], batch["actions"])
         loss = optax.l2_loss(pred, target).mean()
         return loss, {f"critic{critic_idx}_loss": loss}
     
@@ -188,16 +186,16 @@ class SACLearner:
     def _actor_loss_fn(
         params: Params,
         apply_fn: Callable,
-        batch: ...,
+        batch: DataType,
         critic1: TrainState,
         critic2: TrainState,
         key: PRNGKey,
     ):
-        dist = apply_fn({"params": params}, batch["obs"])
+        dist = apply_fn({"params": params}, batch["observations"])
         action, log_prob = dist.sample_and_log_prob(seed=key)
 
         state_action_value = jnp.min(
-            critic.apply_fn({"params": critic.params}, batch["obs"], action)
+            critic.apply_fn({"params": critic.params}, batch["observations"], action)
             for critic in [critic1, critic2]
         )
 
