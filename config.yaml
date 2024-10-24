@@ -1,7 +1,7 @@
 seed: &seed 0
-max_steps: 2000
-start_training_after: 100
-log_every: 50
+max_steps: 10_000
+start_training_after: 3_000
+log_every: 500
 
 environment:
   _target_: gymnasium.make
@@ -10,9 +10,9 @@ environment:
 
 replay_buffer:
   _target_: flashbax.make_item_buffer
-  max_length: 150
-  min_length: 50
-  sample_batch_size: 16
+  max_length: 4_000
+  min_length: 3_000
+  sample_batch_size: 1024
   add_batches: False
   
 agent:
@@ -20,10 +20,10 @@ agent:
   seed: *seed
   actor_module_config:
     _target_: networks.policy.NormalTanhPolicy
-    hidden_dims: [64, 64]
+    hidden_dims: [64, 64, 64]
   critic_module_config:
     _target_: networks.critic.Critic
-    hidden_dims: [64, 64]
+    hidden_dims: [64, 64, 64]
   value_critic_module_config:
     _target_: networks.critic.ValueCritic
-    hidden_dims: [64, 64]
+    hidden_dims: [64, 64, 64]
