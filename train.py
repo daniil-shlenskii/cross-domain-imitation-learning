@@ -3,6 +3,8 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 
+from tqdm import tqdm
+
 import wandb
 
 from hydra.utils import instantiate
@@ -45,8 +47,7 @@ agent = instantiate(
 
 # training
 observation, _, done  = *env.reset(seed=config.seed), False
-for i in range(config.max_steps):
-    print(i)
+for i in tqdm(range(config.max_steps)):
     # sample actions
     if i < config.start_training_after:
         actions = env.action_space.sample()
