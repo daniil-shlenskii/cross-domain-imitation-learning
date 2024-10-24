@@ -3,6 +3,7 @@ import jax.numpy as jnp
 
 from tqdm import tqdm
 from loguru import logger
+from pathlib import Path
 
 import wandb
 
@@ -12,95 +13,100 @@ from omegaconf import OmegaConf
 from utils.save import save_buffer, load_buffer
 
 
-wandb.init(project="test_jax_rl")
+def main():
+    # wandb.init(project="test_jax_rl")
 
-config = OmegaConf.load("config.yaml")
+    config = OmegaConf.load("config.yaml")
 
-# reprodicibility
-rng = jax.random.PRNGKey(config.seed)
+    # reprodicibility
+    rng = jax.random.PRNGKey(config.seed)
 
-# environment init
-env = instantiate(config.environment)
+    # environment init
+    env = instantiate(config.environment)
 
-# buffer init
-observations, info = env.reset()
-action = env.action_space.sample()
-observation, reward, done, truncated, info = env.step(action)
+    # buffer init
+    observation, info = env.reset()
+    action = env.action_space.sample()
+    observation, reward, done, truncated, info = env.step(action)
 
-buffer = instantiate(config.replay_buffer)
-state = buffer.init(
-    dict(
-        observations=jnp.array(observation),
-        actions=jnp.array(action),
-        rewards=jnp.array(reward),
-        observations_next=jnp.array(observation),
-    )
-)
-
-# agent init
-agent = instantiate(
-    config.agent,
-    observation_space=env.observation_space,
-    action_space=env.action_space,
-    _recursive_=False,
-)
-
-# buffer collection
-def do_environment_step(action):
-    # do step in the environment
-    observation_next, reward, done, truncated, info = env.step(action)
-
-    # update buffer
-    state = buffer.add(
-        state, 
+    buffer = instantiate(config.replay_buffer)
+    state = buffer.init(
         dict(
             observations=jnp.array(observation),
             actions=jnp.array(action),
             rewards=jnp.array(reward),
-            observations_next=jnp.array(observation_next),
+            observations_next=jnp.array(observation),
         )
     )
 
-    observation = observation_next
+    # agent init
+    agent = instantiate(
+        config.agent,
+        observation_space=env.observation_space,
+        action_space=env.action_space,
+        _recursive_=False,
+    )
 
-    # update env if terminated
-    if done or truncated:
-        observation, _ = env.reset(seed=config.seed+i)
+    # buffer collection
+    def do_environment_step(action):
+        nonlocal state, observation
+    
+        # do step in the environment
+        observation_next, reward, done, truncated, info = env.step(action)
 
-    return observation
+        # update buffer
+        state = buffer.add(
+            state, 
+            dict(
+                observations=jnp.array(observation),
+                actions=jnp.array(action),
+                rewards=jnp.array(reward),
+                observations_next=jnp.array(observation_next),
+            )
+        )
+
+        observation = observation_next
+
+        # update env if terminated
+        if done or truncated:
+            observation, _ = env.reset(seed=config.seed+i)
 
 
-n_iters_collect_buffer = config.n_iters_collect_buffer
-precollected_data_path = config.get("precollected_data_path")
-if precollected_data_path is not None:
-    state = load_buffer(state, precollected_data_path)
-    n_iters_collect_buffer -= state.current_index
-    n_iters_collect_buffer = max(0, n_iters_collect_buffer)
-    logger.info(f"{state.current_index} samples already collected. {n_iters_collect_buffer} are left.")
+    n_iters_collect_buffer = config.n_iters_collect_buffer
+    precollected_data_dir = Path(config.get("precollected_data_dir", "tmp_data_storage"))
+    precollected_data_path = precollected_data_dir / f"{config.environment.id}.npy"
+    precollected_data_dir.mkdir(exist_ok=True)
+    if precollected_data_path.exists():
+        state = load_buffer(state, precollected_data_path)
+        n_iters_collect_buffer -= state.current_index
+        n_iters_collect_buffer = max(0, n_iters_collect_buffer)
+        logger.info(f"{state.current_index} samples already collected. {n_iters_collect_buffer} are left.")
 
-observation, _, done  = *env.reset(seed=config.seed), False
-for i in tqdm(range(n_iters_collect_buffer)):
-    action = agent.sample_actions(observation)
-    observation = do_environment_step(action)
+    observation, _, done  = *env.reset(seed=config.seed), False
+    for i in tqdm(range(n_iters_collect_buffer)):
+        action = actions = env.action_space.sample()
+        observation = do_environment_step(action)
 
-if precollected_data_path is not None:
-    state = load_buffer(state, precollected_data_path)
+    save_buffer(state, precollected_data_path, logger)
 
-# training
-observation, _, done  = *env.reset(seed=config.seed), False
-for i in tqdm(range(config.max_steps)):
-    # sample actions
-    action = agent.sample_actions(observation)
+    # training
+    observation, _, done  = *env.reset(seed=config.seed), False
+    for i in tqdm(range(config.n_iters_training)):
+        # sample actions
+        action = agent.sample_actions(observation[None])
 
-    # do step in the environment
-    observation = do_environment_step(action)
+        # do step in the environment
+        observation = do_environment_step(action[0])
 
-    # do RL optimization step
-    if i >= config.start_training_after:
+        # do RL optimization step
         rng, key = jax.random.split(rng)
         batch = buffer.sample(state, key).experience
         update_info = agent.update(batch)
 
-        if i % config.log_every == 0:
-            for k, v in update_info.items():
-                wandb.log({f"training/{k}": v}, step=i)
+        # if i % config.log_every == 0:
+        #     for k, v in update_info.items():
+                # wandb.log({f"training/{k}": v}, step=i)
+
+
+if __name__ == "__main__":
+    main()
