@@ -18,7 +18,7 @@ def load_buffer(state: Buffer, path: str):
     else:
         warnings.warn(
             "Given data is incompatible with the Buffer!\n" +
-            f"Buffer fiels: {', '.join(sorted(list(state.experience.key())))}"
+            f"Buffer fiels: {', '.join(sorted(list(state.experience.key())))}\n" +
             f"Data fiels: {', '.join(sorted(list(experience.key())))}"
         )
 
