@@ -114,7 +114,6 @@ class SACAgent(Agent):
 
     @functools.partial(jax.jit, static_argnames="self")
     def _update_jit(self, batch, rng: PRNGKey):
-        print(f"{batch.keys() = }")
         # reproducibility
         rng, key = jax.random.split(rng)
 
@@ -126,20 +125,26 @@ class SACAgent(Agent):
             ]),
             axis=0,
         )
-        # entropy
+        # log_prob
         dist = self.actor.apply_fn({"params": self.actor.params}, batch["observations"])
-        entropy = -dist.log_prob(batch["actions"]).mean()
-
+        log_prob = dist.log_prob(batch["actions"]).mean()
 
         # value_critic update
-        state_value_target = state_action_value + entropy
+        state_value_target = state_action_value - log_prob
         new_value_critic, value_critic_info = self.value_critic.update(
             batch=batch, target=state_value_target
         )
 
+        # target_value_critic update
+        new_target_value_critic_params = jax.tree.map(
+            lambda t1, t2: t1 * self.tau + t2 * (1 - self.tau),
+            new_value_critic.params,
+            self.target_value_critic_params,
+        )
+
         # critic update
         critic_target = batch["rewards"] + self.discount * self.value_critic.apply_fn(
-            {"params": self.target_value_critic_params}, batch["observations_next"]
+            {"params": new_target_value_critic_params}, batch["observations_next"]
         )
         new_critic1, critic1_info = self.critic1.update(
             batch=batch, target=critic_target, critic_idx=1
@@ -150,14 +155,7 @@ class SACAgent(Agent):
 
         # actor update
         new_actor, actor_info = self.actor.update(
-            batch=batch, critic1=self.critic1, critic2=self.critic2, key=key
-        )
-
-        # target_value_critic update
-        new_target_value_critic_params = jax.tree.map(
-            lambda t1, t2: t1 * self.tau + t2 * (1 - self.tau),
-            new_value_critic.params,
-            self.target_value_critic_params,
+            batch=batch, critic1=new_critic1, critic2=new_critic2, key=key
         )
 
         info = {**value_critic_info, **critic1_info, **critic2_info, **actor_info}
