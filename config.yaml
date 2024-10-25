@@ -1,6 +1,6 @@
 seed: &seed 0
-max_steps: 10_000
-start_training_after: 3_000
+n_iters_collect_buffer: 3_000
+n_iters_training: 7_000
 log_every: 500
 
 environment:
