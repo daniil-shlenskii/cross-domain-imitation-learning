@@ -10,6 +10,7 @@ import wandb
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
+from evaluate import evaluate
 from utils.save import save_buffer, load_buffer
 
 
@@ -23,11 +24,12 @@ def main():
 
     # environment init
     env = instantiate(config.environment)
+    eval_env = instantiate(config.environment)
 
     # buffer init
-    observation, info = env.reset()
+    observation, _ = env.reset()
     action = env.action_space.sample()
-    observation, reward, _, _, _ = env.step(action)
+    observation, reward, done, _, _ = env.step(action)
 
     buffer = instantiate(config.replay_buffer)
     state = buffer.init(
@@ -35,6 +37,7 @@ def main():
             observations=jnp.array(observation),
             actions=jnp.array(action),
             rewards=jnp.array(reward),
+            dones=jnp.array(done),
             observations_next=jnp.array(observation),
         )
     )
@@ -61,6 +64,7 @@ def main():
                 observations=jnp.array(observation),
                 actions=jnp.array(action),
                 rewards=jnp.array(reward),
+                dones=jnp.array(done),
                 observations_next=jnp.array(observation_next),
             )
         )
@@ -74,7 +78,7 @@ def main():
     # download buffer if needed
     n_iters_collect_buffer = config.n_iters_collect_buffer
     precollected_data_dir = Path(config.get("precollected_data_dir", "tmp_data_storage"))
-    precollected_data_path = precollected_data_dir / f"{config.environment.id}.pickle"
+    precollected_data_path = precollected_data_dir / f"{config.env_name}.pickle"
     precollected_data_dir.mkdir(exist_ok=True)
     if precollected_data_path.exists():
         state = load_buffer(state, precollected_data_path)
@@ -88,7 +92,8 @@ def main():
         action = env.action_space.sample()
         do_environment_step(action)
 
-    save_buffer(state, precollected_data_path, logger)
+    if config.store_random_buffer:
+        save_buffer(state, precollected_data_path, logger)
 
     # training
     observation, _  = env.reset(seed=config.seed)
@@ -107,6 +112,12 @@ def main():
         if i % config.log_every == 0:
             for k, v in update_info.items():
                 wandb.log({f"training/{k}": v}, step=i)
+
+        if i % config.eval_every == 0:
+            eval_info = evaluate(agent, eval_env, num_episodes=config.evaluation.num_episodes)
+            for k, v in eval_info.items():
+                wandb.log({f"evaluation/{k}": v}, step=i)
+        
 
 
 if __name__ == "__main__":

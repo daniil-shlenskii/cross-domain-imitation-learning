@@ -125,6 +125,7 @@ class SACAgent(Agent):
             ]),
             axis=0,
         )
+
         # log_prob
         dist = self.actor.apply_fn({"params": self.actor.params}, batch["observations"])
         log_prob = dist.log_prob(batch["actions"]).mean()
@@ -143,7 +144,7 @@ class SACAgent(Agent):
         )
 
         # critic update
-        critic_target = batch["rewards"] + self.discount * self.value_critic.apply_fn(
+        critic_target = batch["rewards"] + (1 - batch["dones"]) * self.discount * self.value_critic.apply_fn(
             {"params": new_target_value_critic_params}, batch["observations_next"]
         )
         new_critic1, critic1_info = self.critic1.update(

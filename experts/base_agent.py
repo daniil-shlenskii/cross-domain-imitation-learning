@@ -25,14 +25,19 @@ class Agent:
         dist = self.actor.apply_fn({"params": self.actor.params}, observations)
         return _rng, dist.sample(seed=key)
 
-    # def eval_actions(self, observations: np.ndarray) -> np.ndarray:
-    #     actions = self.eval_actions_jit(
-    #         self.actor.apply_fn, self.actor.params, observations
-    #     )
-    #     return np.asarray(actions)
-
-    # def eval_log_probs(self, batch: DataType) -> float:
-    #     return self.eval_log_prob_jit(self._actor.apply_fn, self._actor.params, batch)
+    def eval_actions(self, observations: np.ndarray) -> np.ndarray:
+        actions = self._eval_actions_jit(jnp.asarray(observations))
+        return np.asarray(actions)
     
-    # partial@jax.jit(static_argnames="self")
-    # def _eval_actions_jit(self,)
+    @functools.partial(jax.jit, static_argnames="self")
+    def _eval_actions_jit(self, observations: np.ndarray) -> np.ndarray:
+        dist = self.actor.apply_fn({"params": self.actor.params}, observations)
+        return dist.mean()
+
+    def eval_log_probs(self, observations: np.ndarray, actions: np.ndarray) -> float:
+        return self._eval_log_prob_jit(observations, actions)
+    
+    @functools.partial(jax.jit, static_argnames="self")
+    def _eval_log_probs_jit(self, observations: np.ndarray, actions: np.ndarray) -> float:
+        dist = self.actor.apply_fn({"params": self.actor.params}, observations)
+        return dist.log_probs(actions).mean()
