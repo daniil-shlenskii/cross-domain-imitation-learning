@@ -1,6 +1,8 @@
 import jax
 import jax.numpy as jnp
 
+import numpy as np
+
 from tqdm import tqdm
 from loguru import logger
 from pathlib import Path
@@ -34,11 +36,11 @@ def main():
     buffer = instantiate(config.replay_buffer)
     state = buffer.init(
         dict(
-            observations=jnp.array(observation),
-            actions=jnp.array(action),
-            rewards=jnp.array(reward),
-            dones=jnp.array(done),
-            observations_next=jnp.array(observation),
+            observations=np.array(observation),
+            actions=np.array(action),
+            rewards=np.array(reward),
+            dones=np.array(done),
+            observations_next=np.array(observation),
         )
     )
 
@@ -61,11 +63,11 @@ def main():
         state = buffer.add(
             state, 
             dict(
-                observations=jnp.array(observation),
-                actions=jnp.array(action),
-                rewards=jnp.array(reward),
-                dones=jnp.array(done),
-                observations_next=jnp.array(observation_next),
+                observations=np.array(observation),
+                actions=np.array(action),
+                rewards=np.array(reward),
+                dones=np.array(done),
+                observations_next=np.array(observation_next),
             )
         )
 
@@ -88,7 +90,7 @@ def main():
 
     # collect the rest of the data
     observation, _  = env.reset(seed=config.seed)
-    for i in tqdm(range(n_iters_collect_buffer)):
+    for _ in tqdm(range(n_iters_collect_buffer)):
         action = env.action_space.sample()
         do_environment_step(action)
 

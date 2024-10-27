@@ -146,3 +146,6 @@ class TrainState(struct.PyTreeNode):
             self.params, apply_fn=self.apply_fn, **loss_kwargs
         )
         return self.apply_gradients(grads=grads), info
+    
+    def __call__(self, *args, **kwargs):
+        return self.apply_fn({"params": self.params}, *args, **kwargs)
