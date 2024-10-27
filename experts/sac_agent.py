@@ -68,7 +68,7 @@ class SACAgent(Agent):
         if critic2_params is None:
             critic2_params = critic_module.init(critic2_key, observation, action)["params"]
         if temperature_params is None:
-            temperature_params = temp_module.init(temp_key)["params"]
+            temperature_params = critic_module.init(temp_key)["params"]
 
         self.target_critic1_params = critic1_params
         self.target_critic2_params = critic2_params
