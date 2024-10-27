@@ -21,6 +21,8 @@ import jax
 from flax import core, struct
 from flax.linen.fp8_ops import OVERWRITE_WITH_GRADIENT
 
+import functools
+
 
 class TrainState(struct.PyTreeNode):
     """Simple train state for the common case with a single Optax optimizer.
@@ -115,6 +117,7 @@ class TrainState(struct.PyTreeNode):
             }
         else:
             new_params = new_params_with_opt
+        
         return self.replace(
             step=self.step + 1,
             params=new_params,
@@ -143,7 +146,7 @@ class TrainState(struct.PyTreeNode):
     
     def update(self, **loss_kwargs):
         grads, info = jax.grad(self.loss_fn, has_aux=True)(
-            self.params, apply_fn=self.apply_fn, **loss_kwargs
+            self.params, state=self, **loss_kwargs
         )
         return self.apply_gradients(grads=grads), info
     

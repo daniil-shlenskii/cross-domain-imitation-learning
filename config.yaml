@@ -3,18 +3,19 @@ seed: &seed 0
 n_iters_collect_buffer: &n_iters_collect_buffer 5_000
 n_iters_training: 1_000_000
 store_random_buffer: False
-log_every: 1_000
-eval_every: 1_000
+log_every: 500
+eval_every: 500
 
 evaluation:
   num_episodes: 10
 
 environment:
-  _target_: gymnasium.wrappers.NormalizeReward
+  _target_: gymnasium.wrappers.TimeLimit
+  max_episode_steps: 1000
   env:
-    _target_: gymnasium.make
-    id: *env_name
-    # render_mode: human
+      _target_: gymnasium.make
+      id: *env_name
+      # render_mode: human
 
 replay_buffer:
   _target_: flashbax.make_item_buffer
@@ -28,6 +29,7 @@ agent:
   seed: *seed
   actor_lr: 3e-4
   critic_lr: 1e-3
+  temperature_lr: 1e-4
   actor_module_config:
     _target_: networks.policy.NormalTanhPolicy
     hidden_dims: [256, 256]

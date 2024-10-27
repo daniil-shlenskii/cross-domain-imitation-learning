@@ -54,7 +54,7 @@ def main():
 
     # buffer collection
     def do_environment_step(action):
-        nonlocal state, observation, env
+        nonlocal env, state, observation
     
         # do step in the environment
         observation_next, reward, done, truncated, _ = env.step(action)

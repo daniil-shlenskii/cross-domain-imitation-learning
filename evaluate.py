@@ -7,7 +7,7 @@ from experts.base_agent import Agent
 
 
 def evaluate(agent: Agent, env: gym.Env, num_episodes: int) -> Dict[str, float]:
-    env = gym.wrappers.RecordEpisodeStatistics(env, deque_size=num_episodes)
+    env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=num_episodes)
     for _ in range(num_episodes):
         observation, _, done = *env.reset(), False
         while not done:
