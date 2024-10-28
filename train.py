@@ -26,7 +26,7 @@ def main():
 
     # environment init
     env = instantiate(config.environment)
-    eval_env = instantiate(config.environment)
+    eval_env = instantiate(config.evaluation.environment)
 
     # buffer init
     observation, _ = env.reset()
@@ -115,10 +115,10 @@ def main():
             for k, v in update_info.items():
                 wandb.log({f"training/{k}": v}, step=i)
 
-        if i % config.eval_every == 0:
-            eval_info = evaluate(agent, eval_env, num_episodes=config.evaluation.num_episodes)
-            for k, v in eval_info.items():
-                wandb.log({f"evaluation/{k}": v}, step=i)
+        # if i % config.eval_every == 0:
+        #     eval_info = evaluate(agent, eval_env, num_episodes=config.evaluation.num_episodes)
+        #     for k, v in eval_info.items():
+        #         wandb.log({f"evaluation/{k}": v}, step=i)
         
 
 

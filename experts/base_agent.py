@@ -22,7 +22,7 @@ class Agent:
     @functools.partial(jax.jit, static_argnames="self")
     def _sample_actions_jit(self, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
         _rng, key = jax.random.split(self._rng)
-        dist = self.actor.apply_fn({"params": self.actor.params}, observations)
+        dist = self.actor(observations)
         return _rng, dist.sample(seed=key)
 
     def eval_actions(self, observations: np.ndarray) -> np.ndarray:
@@ -31,7 +31,7 @@ class Agent:
     
     @functools.partial(jax.jit, static_argnames="self")
     def _eval_actions_jit(self, observations: np.ndarray) -> np.ndarray:
-        dist = self.actor.apply_fn({"params": self.actor.params}, observations)
+        dist = self.actor(observations)
         return dist.mean()
 
     def eval_log_probs(self, observations: np.ndarray, actions: np.ndarray) -> float:
@@ -39,5 +39,5 @@ class Agent:
     
     @functools.partial(jax.jit, static_argnames="self")
     def _eval_log_probs_jit(self, observations: np.ndarray, actions: np.ndarray) -> float:
-        dist = self.actor.apply_fn({"params": self.actor.params}, observations)
+        dist = self.actor(observations)
         return dist.log_probs(actions).mean()

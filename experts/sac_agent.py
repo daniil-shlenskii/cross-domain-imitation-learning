@@ -43,8 +43,9 @@ class SACAgent(Agent):
         critic_lr: float = 3e-4,
         temperature_lr: float = 3e-4,
         #
+        update_temperature: bool = True,
         target_entropy: float = None,
-        backup_entropy: bool = False,
+        backup_entropy: bool = True,
         discount: float = 0.99,
         tau = 0.005,
     ):
@@ -107,6 +108,7 @@ class SACAgent(Agent):
 
         #
         self.seed = seed
+        self.update_temperature = update_temperature
         self.backup_entropy = backup_entropy
         self.discount = discount
         self.tau = tau
@@ -121,9 +123,9 @@ class SACAgent(Agent):
             self.actor,
             self.critic1,
             self.critic2,
-            self.temperature,
-            self.new_target_critic1_params,
-            self.new_target_critic2_params,
+            new_temperature,
+            self.target_critic1_params,
+            self.target_critic2_params,
             info,
         ) = _update_jit(
             batch,
@@ -139,6 +141,10 @@ class SACAgent(Agent):
             discount=self.discount,
             tau=self.tau,
         )
+
+        if self.update_temperature:
+            self.temperature = new_temperature
+
         return info
 
 @functools.partial(jax.jit, static_argnames="backup_entropy")
@@ -168,16 +174,16 @@ def _update_jit(
     actions_next = dist.sample(seed=key)
     log_prob_next = dist.log_prob(actions_next)
 
-    # state-action values
-    state_action_value1_next = critic1(batch["observations_next"], actions_next)
-    state_action_value2_next = critic2(batch["observations_next"], actions_next)
+    # state action values
+    state_action_value1_next = critic1.apply_fn({"params": target_critic1_params}, batch["observations_next"], actions_next)
+    state_action_value2_next = critic2.apply_fn({"params": target_critic2_params}, batch["observations_next"], actions_next)
 
     # critic target
     state_action_value_next = jnp.min(
         jnp.stack([state_action_value1_next, state_action_value2_next]),
         axis=0
     )
-    state_value_next = state_action_value_next - log_prob_next
+    state_value_next = state_action_value_next - log_prob_next * temp
     critic_target = batch["rewards"] + (1 - batch["dones"]) * discount * state_value_next
     if backup_entropy:
         critic_target -= (1 - batch["dones"]) * discount * temp * log_prob_next

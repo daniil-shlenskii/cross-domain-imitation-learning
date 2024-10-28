@@ -21,8 +21,6 @@ import jax
 from flax import core, struct
 from flax.linen.fp8_ops import OVERWRITE_WITH_GRADIENT
 
-import functools
-
 
 class TrainState(struct.PyTreeNode):
     """Simple train state for the common case with a single Optax optimizer.

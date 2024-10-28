@@ -1,13 +1,11 @@
-env_name: &env_name Hopper-v4
+# env_name: &env_name Hopper-v4
+env_name: &env_name HalfCheetah-v5
 seed: &seed 0
 n_iters_collect_buffer: &n_iters_collect_buffer 5_000
-n_iters_training: 1_000_000
-store_random_buffer: False
+n_iters_training: 100_000
+store_random_buffer: True
 log_every: 500
 eval_every: 500
-
-evaluation:
-  num_episodes: 10
 
 environment:
   _target_: gymnasium.wrappers.TimeLimit
@@ -15,7 +13,17 @@ environment:
   env:
       _target_: gymnasium.make
       id: *env_name
-      # render_mode: human
+      render_mode: human
+
+evaluation:
+  num_episodes: 3
+  environment:
+    _target_: gymnasium.wrappers.TimeLimit
+    max_episode_steps: 100
+    env:
+        _target_: gymnasium.make
+        id: *env_name
+        # render_mode: human
 
 replay_buffer:
   _target_: flashbax.make_item_buffer
@@ -27,9 +35,10 @@ replay_buffer:
 agent:
   _target_: experts.sac_agent.SACAgent
   seed: *seed
+  update_temperature: False
   actor_lr: 3e-4
   critic_lr: 1e-3
-  temperature_lr: 1e-4
+  temperature_lr: 1e-3
   actor_module_config:
     _target_: networks.policy.NormalTanhPolicy
     hidden_dims: [256, 256]
@@ -38,4 +47,4 @@ agent:
     hidden_dims: [256, 256]
   temperature_module_config:
     _target_: networks.extra.Temperature
-    initial_temperature: 0.2
+    initial_temperature: 1.0
