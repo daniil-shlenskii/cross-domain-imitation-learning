@@ -1,4 +1,4 @@
-from typing import Callable, Sequence, Tuple
+from typing import Sequence
 
 import jax.numpy as jnp
 from flax import linen as nn

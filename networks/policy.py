@@ -12,7 +12,6 @@ tfb = tfp.bijectors
 
 from networks.common import MLP, default_init
 
-
 LOG_STD_MIN = -5.0
 LOG_STD_MAX = 2.0
 
