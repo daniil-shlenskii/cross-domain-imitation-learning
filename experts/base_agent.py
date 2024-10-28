@@ -5,18 +5,15 @@ import jax.numpy as jnp
 import numpy as np
 from flax.training.train_state import TrainState
 
-import functools
-
-from utils.types import DataType, PRNGKey
+from utils.types import PRNGKey
 
 
 class Agent:
     actor: TrainState
-    critic: TrainState
     _rng: PRNGKey
 
     def sample_actions(self, observations: np.ndarray) -> np.ndarray:
-        self._rng, actions = _sample_actions_jit(self.actor, observations, rng=self._rng)
+        self._rng, actions = _sample_actions_jit(self._rng, self.actor, observations)
         return np.asarray(actions)
 
     def eval_actions(self, observations: np.ndarray) -> np.ndarray:
@@ -28,7 +25,7 @@ class Agent:
     
 
 @jax.jit
-def _sample_actions_jit(actor: TrainState, observations: np.ndarray, rng: PRNGKey) -> Tuple[PRNGKey, jnp.ndarray]:
+def _sample_actions_jit(rng: PRNGKey, actor: TrainState, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
     _rng, key = jax.random.split(rng)
     dist = actor(observations)
     return _rng, dist.sample(seed=key)
