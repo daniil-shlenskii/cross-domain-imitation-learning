@@ -143,12 +143,11 @@ def _update_jit(
     discount: float,
     tau: float,
 ):
-    rng, key = jax.random.split(rng)
-
     # temperature
     temp = temperature()
 
     # log prob
+    rng, key = jax.random.split(rng)
     dist = actor(batch["observations_next"])
     actions_next = dist.sample(seed=key)
     log_prob_next = dist.log_prob(actions_next)
@@ -162,9 +161,10 @@ def _update_jit(
         critic_target -= (1 - batch["dones"]) * discount * temp * log_prob_next
 
     # critic update
-    new_critic, critic_info = critic.update(batch=batch, target=critic_target, critic_idx=1)
+    new_critic, critic_info = critic.update(batch=batch, target=critic_target)
 
     # actor update
+    rng, key = jax.random.split(rng)
     new_actor, actor_info = actor.update(batch=batch, critic=new_critic, temp=temp, key=key)
 
     # temperature update
@@ -205,11 +205,10 @@ def _critic_loss_fn(
     state: TrainState,
     batch: DataType,
     target: jnp.ndarray,
-    critic_idx: int,
 ) -> Tuple[TrainState, Dict[str, float]]:
     pred = state.apply_fn({"params": params}, batch["observations"], batch["actions"])
     loss = optax.l2_loss(pred, target).mean()
-    return loss, {f"critic{critic_idx}_loss": loss}
+    return loss, {f"critic_loss": loss}
 
 def _temperature_loss_fn(
     params: Params,

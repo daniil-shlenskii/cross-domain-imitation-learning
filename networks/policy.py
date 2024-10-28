@@ -70,6 +70,4 @@ class NormalTanhPolicy(nn.Module):
         normal_dist = tfd.MultivariateNormalDiag(
             loc=means, scale_diag=jnp.exp(log_stds) / temperature
         )
-        return tfd.TransformedDistribution(
-            distribution=normal_dist, bijector=tfb.Tanh(),
-        )
+        return tfd.TransformedDistribution(distribution=normal_dist, bijector=tfb.Tanh())

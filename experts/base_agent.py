@@ -16,28 +16,29 @@ class Agent:
     _rng: PRNGKey
 
     def sample_actions(self, observations: np.ndarray) -> np.ndarray:
-        self._rng, actions = self._sample_actions_jit(observations)
+        self._rng, actions = _sample_actions_jit(self.actor, observations, rng=self._rng)
         return np.asarray(actions)
-
-    @functools.partial(jax.jit, static_argnames="self")
-    def _sample_actions_jit(self, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
-        _rng, key = jax.random.split(self._rng)
-        dist = self.actor(observations)
-        return _rng, dist.sample(seed=key)
 
     def eval_actions(self, observations: np.ndarray) -> np.ndarray:
-        actions = self._eval_actions_jit(jnp.asarray(observations))
+        actions = _eval_actions_jit(self.actor, observations)
         return np.asarray(actions)
-    
-    @functools.partial(jax.jit, static_argnames="self")
-    def _eval_actions_jit(self, observations: np.ndarray) -> np.ndarray:
-        dist = self.actor(observations)
-        return dist.mean()
 
     def eval_log_probs(self, observations: np.ndarray, actions: np.ndarray) -> float:
-        return self._eval_log_prob_jit(observations, actions)
+        return _eval_log_probs_jit(self.actor, observations, actions)
     
-    @functools.partial(jax.jit, static_argnames="self")
-    def _eval_log_probs_jit(self, observations: np.ndarray, actions: np.ndarray) -> float:
-        dist = self.actor(observations)
-        return dist.log_probs(actions).mean()
+
+@jax.jit
+def _sample_actions_jit(actor: TrainState, observations: np.ndarray, rng: PRNGKey) -> Tuple[PRNGKey, jnp.ndarray]:
+    _rng, key = jax.random.split(rng)
+    dist = actor(observations)
+    return _rng, dist.sample(seed=key)
+
+@jax.jit
+def _eval_actions_jit(actor: TrainState, observations: np.ndarray) -> np.ndarray:
+    dist = actor(observations)
+    return dist.mean()
+
+@jax.jit
+def _eval_log_probs_jit(actor: TrainState, observations: np.ndarray, actions: np.ndarray) -> float:
+    dist = actor(observations)
+    return dist.log_probs(actions).mean()

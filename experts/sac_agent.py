@@ -119,13 +119,22 @@ class SACAgent(Agent):
 
     def update(self, batch: DataType):
         (
-            self._rng,
-            self.actor,
-            self.critic1,
-            self.critic2,
+            # self._rng,
+            # self.actor,
+            # self.critic1,
+            # self.critic2,
+            # new_temperature,
+            # self.target_critic1_params,
+            # self.target_critic2_params,
+            # info,
+
+            new_rng,
+            new_actor,
+            new_critic1,
+            new_critic2,
             new_temperature,
-            self.target_critic1_params,
-            self.target_critic2_params,
+            new_target_critic1_params,
+            new_target_critic2_params,
             info,
         ) = _update_jit(
             batch,
@@ -141,6 +150,13 @@ class SACAgent(Agent):
             discount=self.discount,
             tau=self.tau,
         )
+
+        self._rng = new_rng
+        self.actor = new_actor
+        self.critic1 = new_critic1
+        self.critic2 = new_critic2
+        self.target_critic1_params = new_target_critic1_params
+        self.target_critic2_params = new_target_critic2_params
 
         if self.update_temperature:
             self.temperature = new_temperature
@@ -164,12 +180,11 @@ def _update_jit(
     discount: float,
     tau: float,
 ):
-    rng, key = jax.random.split(rng)
-
     # temperature
     temp = temperature()
 
-    # log_prob
+    # log prob
+    rng, key = jax.random.split(rng)
     dist = actor(batch["observations_next"])
     actions_next = dist.sample(seed=key)
     log_prob_next = dist.log_prob(actions_next)
@@ -179,12 +194,8 @@ def _update_jit(
     state_action_value2_next = critic2.apply_fn({"params": target_critic2_params}, batch["observations_next"], actions_next)
 
     # critic target
-    state_action_value_next = jnp.min(
-        jnp.stack([state_action_value1_next, state_action_value2_next]),
-        axis=0
-    )
-    state_value_next = state_action_value_next - log_prob_next * temp
-    critic_target = batch["rewards"] + (1 - batch["dones"]) * discount * state_value_next
+    state_action_value_next = jnp.minimum(state_action_value1_next, state_action_value2_next)
+    critic_target = batch["rewards"] + (1 - batch["dones"]) * discount * state_action_value_next
     if backup_entropy:
         critic_target -= (1 - batch["dones"]) * discount * temp * log_prob_next
 
@@ -193,6 +204,7 @@ def _update_jit(
     new_critic2, critic2_info = critic2.update(batch=batch, target=critic_target, critic_idx=2)
 
     # actor update
+    rng, key = jax.random.split(rng)
     new_actor, actor_info = actor.update(batch=batch, critic1=new_critic1, critic2=new_critic2, temp=temp, key=key)
 
     # temperature update
@@ -227,12 +239,9 @@ def _actor_loss_fn(
     actions = dist.sample(seed=key)
     log_prob = dist.log_prob(actions)
 
-    state_action_value = jnp.min(
-        jnp.stack([
-            critic.apply_fn({"params": critic.params}, batch["observations"], actions)
-            for critic in [critic1, critic2]
-        ]),
-        axis=0
+    state_action_value = jnp.minimum(
+        critic1.apply_fn({"params": critic1.params}, batch["observations"], actions),
+        critic2.apply_fn({"params": critic2.params}, batch["observations"], actions),
     )
 
     loss = (log_prob * temp - state_action_value).mean()

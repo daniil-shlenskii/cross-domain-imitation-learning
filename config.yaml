@@ -1,5 +1,5 @@
-# env_name: &env_name Hopper-v4
-env_name: &env_name HalfCheetah-v5
+env_name: &env_name Hopper-v4
+# env_name: &env_name HalfCheetah-v5
 seed: &seed 0
 n_iters_collect_buffer: &n_iters_collect_buffer 5_000
 n_iters_training: 100_000
@@ -31,14 +31,15 @@ replay_buffer:
   min_length: *n_iters_collect_buffer
   sample_batch_size: 256
   add_batches: False
-  
+
+
 agent:
   _target_: experts.sac_agent.SACAgent
   seed: *seed
-  update_temperature: False
-  actor_lr: 3e-4
-  critic_lr: 1e-3
-  temperature_lr: 1e-3
+  update_temperature: True
+  # actor_lr: 2e-4
+  # critic_lr: 1e-4
+  # temperature_lr: 1e-4
   actor_module_config:
     _target_: networks.policy.NormalTanhPolicy
     hidden_dims: [256, 256]
@@ -48,3 +49,20 @@ agent:
   temperature_module_config:
     _target_: networks.extra.Temperature
     initial_temperature: 1.0
+  
+# agent:
+#   _target_: experts.sac_agent_v2.SACAgent
+#   seed: *seed
+#   update_temperature: False
+#   actor_lr: 3e-4
+#   critic_lr: 3e-4
+#   temperature_lr: 3e-4
+#   actor_module_config:
+#     _target_: networks.policy.NormalTanhPolicy
+#     hidden_dims: [256, 256]
+#   critic_module_config:
+#     _target_: networks.critic.CriticEnsemble
+#     hidden_dims: [256, 256]
+#   temperature_module_config:
+#     _target_: networks.extra.Temperature
+#     initial_temperature: 1.0
