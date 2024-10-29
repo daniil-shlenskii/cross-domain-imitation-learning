@@ -43,6 +43,6 @@ class CriticEnsemble(nn.Module):
             axis_size=self.n_modules,
         )
         q_values = critic_ensemble(self.hidden_dims)(
-            observations, actions, training=training
+            observations, actions, training
         )
         return jnp.min(q_values, axis=0)
