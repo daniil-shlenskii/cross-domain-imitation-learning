@@ -1,10 +1,7 @@
-from typing import Any, Callable, Optional, Sequence, Tuple
+from typing import Optional, Sequence
 
 import flax.linen as nn
-import jax
 import jax.numpy as jnp
-import numpy as np
-from flax.linen.module import init
 from tensorflow_probability.substrates import jax as tfp
 
 tfd = tfp.distributions
