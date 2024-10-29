@@ -39,7 +39,7 @@ agent:
     _target_: networks.policy.NormalTanhPolicy
     hidden_dims: [256, 256]
   critic_module_config:
-    _target_: networks.critic.CriticEnsemble
+    _target_: networks.critic.Critic
     hidden_dims: [256, 256]
   temperature_module_config:
     _target_: networks.extra.Temperature
