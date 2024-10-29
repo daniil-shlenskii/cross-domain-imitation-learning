@@ -44,7 +44,7 @@ class SACAgent(Agent):
         discount: float = 0.99,
         tau = 0.005,
     ):
-        # reproducability keys
+        # reproducibility keys
         rng = jax.random.key(seed)
         rng, actor_key, critic_key, temperature_key = jax.random.split(rng, 4)
         self._rng = rng
@@ -127,7 +127,7 @@ class SACAgent(Agent):
 
 @functools.partial(jax.jit, static_argnames="backup_entropy")
 def _update_jit(
-    batch,
+    batch: DataType,
     rng: PRNGKey,
     #
     actor: TrainState,
