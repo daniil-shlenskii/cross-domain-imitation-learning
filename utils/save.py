@@ -5,10 +5,9 @@ import pickle
 from utils.types import Buffer
 
 
-def save_buffer(state: Buffer, path: str, logger):
+def save_buffer(state: Buffer, path: str):
     with open(path, "wb") as file:
         pickle.dump(state, file)
-    logger.info(f"Buffer is saved into {path}")
 
 def load_buffer(state: Buffer, path: str):
     with open(path, "rb") as file:
