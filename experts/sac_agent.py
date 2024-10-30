@@ -144,6 +144,8 @@ class SACAgent(Agent):
         return info
 
     def save(self, dir_path: str) -> None:
+        super().save(dir_path)
+
         dir_path = Path(dir_path)
         for attr in self._non_train_state_attrs_to_save:
             save_pickle(

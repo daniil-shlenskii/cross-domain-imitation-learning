@@ -29,7 +29,7 @@ class Agent:
     def save(self, dir_path: str) -> None:
         dir_path = Path(dir_path)
         for k, v in self.__dict__.items():
-            if type(v) == TrainState:
+            if isinstance(v, TrainState):
                 v.save(dir_path / f"{k}.pickle")
 
     def load(self, dir_path: str) -> None:
