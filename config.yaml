@@ -1,11 +1,16 @@
-env_name: &env_name Hopper-v4
-# env_name: &env_name HalfCheetah-v5
 seed: &seed 0
+# env_name: &env_name Hopper-v5
+env_name: &env_name HalfCheetah-v5
 n_iters_collect_buffer: &n_iters_collect_buffer 5_000
-n_iters_training: 100_000
-store_random_buffer: True
+n_iters_training: 8_000
 log_every: 500
 eval_every: 500
+
+archive:
+  load_random_buffer_dir: archive/random_buffers
+  save_random_buffer_dir: archive/random_buffers
+  load_agent_dir: archive/agents/sac
+  save_agent_dir: archive/agents/sac
 
 environment:
   _target_: gymnasium.wrappers.TimeLimit
@@ -23,7 +28,6 @@ evaluation:
     env:
         _target_: gymnasium.make
         id: *env_name
-        # render_mode: human
 
 replay_buffer:
   _target_: flashbax.make_item_buffer

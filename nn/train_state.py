@@ -15,6 +15,8 @@
 from typing import Any, Union
 from collections.abc import Callable
 
+import pickle
+
 import optax
 
 import jax
@@ -150,3 +152,17 @@ class TrainState(struct.PyTreeNode):
     
     def __call__(self, *args, **kwargs):
         return self.apply_fn({"params": self.params}, *args, **kwargs)
+
+    def save(self, path: str) -> None:
+        data = {
+            "step": self.step,
+            "params": self.params,
+            "opt_state": self.opt_state,
+        }
+        with open(path, "wb") as file:
+            pickle.dump(data, file)
+    
+    def load(self, path: str) -> "TrainState":
+        with open(path, "rb") as file:
+            data = pickle.load(file)
+        return self.replace(**data)
