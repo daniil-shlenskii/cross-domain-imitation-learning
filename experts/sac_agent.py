@@ -56,9 +56,8 @@ class SACAgent(Agent):
         # actor and critic initialization
         observation = observation_space.sample()
         action = action_space.sample()
-        action_dim = action.shape[-1]
 
-        actor_module = instantiate(actor_module_config, action_dim=action_dim)
+        actor_module = self.instantiate_actor_module(actor_module_config, action_space=action_space)
         critic1_module = instantiate(critic_module_config)
         critic2_module = instantiate(critic_module_config)
         temperature_module = instantiate(temperature_module_config)
@@ -97,6 +96,7 @@ class SACAgent(Agent):
         )
 
         # target entropy init
+        action_dim = action.shape[-1]
         if target_entropy is None:
             self.target_entropy = -action_dim / 2
         else:

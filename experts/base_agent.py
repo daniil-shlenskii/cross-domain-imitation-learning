@@ -1,12 +1,18 @@
 from typing import Tuple, Sequence
 from pathlib import Path
 
+import gym
+
+import numpy as np
+
 import jax
 import jax.numpy as jnp
+import flax.linen as nn
 import numpy as np
 from nn.train_state import TrainState
 
-from utils.utils import save_pickle, load_pickle
+from hydra.utils import instantiate
+from omegaconf.dictconfig import DictConfig
 
 from utils.types import PRNGKey
 
@@ -25,6 +31,23 @@ class Agent:
 
     def eval_log_probs(self, observations: np.ndarray, actions: np.ndarray) -> float:
         return _eval_log_probs_jit(self.actor, observations, actions)
+    
+    def instantiate_actor_module(
+        self,
+        actor_module_config: DictConfig,
+        *,
+        action_space: gym.Space,
+        **kwargs,
+    ) -> nn.Module:
+        action_dim = action_space.sample().shape[0]
+
+        low, high = None, None
+        if np.any(action_space.low != -1) or np.any(action_space.high != 1):
+            low, high = action_space.low, action_space.high
+        
+        return instantiate(
+            actor_module_config, action_dim=action_dim, low=low, high=high, **kwargs
+        )
     
     def save(self, dir_path: str) -> None:
         dir_path = Path(dir_path)
