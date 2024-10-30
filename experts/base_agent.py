@@ -54,7 +54,7 @@ def _sample_actions_jit(rng: PRNGKey, actor: TrainState, observations: np.ndarra
 @jax.jit
 def _eval_actions_jit(actor: TrainState, observations: np.ndarray) -> np.ndarray:
     dist = actor(observations)
-    return dist.mean()
+    return dist.mode()
 
 @jax.jit
 def _eval_log_probs_jit(actor: TrainState, observations: np.ndarray, actions: np.ndarray) -> float:
