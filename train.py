@@ -61,7 +61,7 @@ def main(args):
         loaded_keys = agent.load(agent_load_dir)
         logger.info(
             f"Agent is initialized with data under the path: {agent_load_dir}. " +
-            f"Loaded keys: {loaded_keys}."
+            f"Loaded keys:\n{' '.join(loaded_keys)}."
         )
 
     # prepare path to save agent params
@@ -158,6 +158,18 @@ def main(args):
     observation, _  = env.reset(seed=config.seed)
     best_return = None
     for i in tqdm(range(config.n_iters_training)):
+        # evaluate model
+        if i % config.eval_every == 0:
+            eval_info = evaluate(agent, eval_env, num_episodes=config.evaluation.num_episodes)
+            for k, v in eval_info.items():
+                wandb.log({f"evaluation/{k}": v}, step=i)
+            if (best_return is None or eval_info["return"] >= best_return):
+                # save agent
+                agent.save(agent_save_dir)
+                # save agent buffer
+                save_pickle(state, agent_buffer_load_path)
+                best_return = eval_info["return"]
+
         # sample actions
         action = agent.sample_actions(observation[None])
 
@@ -173,17 +185,6 @@ def main(args):
         if i % config.log_every == 0:
             for k, v in update_info.items():
                 wandb.log({f"training/{k}": v}, step=i)
-
-        if i % config.eval_every == 0:
-            eval_info = evaluate(agent, eval_env, num_episodes=config.evaluation.num_episodes)
-            for k, v in eval_info.items():
-                wandb.log({f"evaluation/{k}": v}, step=i)
-            if (best_return is None or eval_info["return"] >= best_return):
-                # save agent
-                agent.save(agent_save_dir)
-                # save agent buffer
-                save_pickle(state, agent_buffer_load_path)
-                best_return = eval_info["return"]
 
     logger.info(
         f"Agent is stored under the path: {agent_save_dir}. " +

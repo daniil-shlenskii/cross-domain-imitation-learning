@@ -2,6 +2,8 @@ import functools
 from copy import deepcopy
 from typing import Dict, Tuple
 
+from pathlib import Path
+
 import flax
 import flax.linen as nn
 import gymnasium as gym
@@ -13,11 +15,17 @@ from hydra.utils import instantiate
 from nn.train_state import TrainState
 from omegaconf.dictconfig import DictConfig
 from utils.types import DataType, Params, PRNGKey
+from utils.utils import save_pickle, load_pickle
 
 from experts.base_agent import Agent
 
 
 class SACAgent(Agent):
+    _non_train_state_attrs_to_save = [
+        "target_critic1_params",
+        "target_critic2_params",
+    ]
+
     def __init__(
         self,
         *,
@@ -134,6 +142,27 @@ class SACAgent(Agent):
             self.temperature = new_temperature
 
         return info
+
+    def save(self, dir_path: str) -> None:
+        dir_path = Path(dir_path)
+        for attr in self._non_train_state_attrs_to_save:
+            save_pickle(
+                getattr(self, attr),
+                dir_path / f"{attr}.pickle"
+            )
+
+    def load(self, dir_path: str) -> list:        
+        loaded_attrs = super().load(dir_path)
+
+        dir_path = Path(dir_path)
+        for attr in self._non_train_state_attrs_to_save:
+            path = dir_path / f"path.pickle"
+            if path.exists():
+                attr_value = load_pickle(dir_path / f"{attr}.pickle")
+                setattr(self, attr, attr_value)
+                loaded_attrs.append(attr)
+
+        return loaded_attrs
 
 @functools.partial(jax.jit, static_argnames="backup_entropy")
 def _update_jit(

@@ -1,7 +1,7 @@
 seed: &seed 0
-env_name: &env_name HalfCheetah-v5
+env_name: &env_name Hopper-v5 # HalfCheetah-v5
 precollect_buffer_size: &precollect_buffer_size 5_000
-n_iters_training: 8_000
+n_iters_training: 4_000
 log_every: 500
 eval_every: 500
 
@@ -27,7 +27,7 @@ environment:
       render_mode: human
 
 evaluation:
-  num_episodes: 5
+  num_episodes: 10
   environment:
     _target_: gymnasium.wrappers.TimeLimit
     max_episode_steps: 1000
