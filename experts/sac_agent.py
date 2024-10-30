@@ -158,7 +158,7 @@ class SACAgent(Agent):
 
         dir_path = Path(dir_path)
         for attr in self._non_train_state_attrs_to_save:
-            path = dir_path / f"path.pickle"
+            path = dir_path / f"{attr}.pickle"
             if path.exists():
                 attr_value = load_pickle(dir_path / f"{attr}.pickle")
                 setattr(self, attr, attr_value)
