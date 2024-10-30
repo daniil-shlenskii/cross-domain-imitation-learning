@@ -20,6 +20,7 @@ from utils.utils import save_pickle, load_buffer
 
 TMP_RANDOM_BUFFER_STORAGE_DIR = "_tmp_data_storage"
 TMP_AGENT_STORAGE_DIR = "_tmp_agent_storage"
+AGENT_BUFFER_FILENAME = "buffer"
 
 
 def init() -> argparse.Namespace:
@@ -28,8 +29,6 @@ def init() -> argparse.Namespace:
     )
     parser.add_argument("--config_path",        type=str)
     parser.add_argument("--wandb_project_name", type=str,  default="default_wandb_project_name")
-    parser.add_argument("--save_random_buffer", type=bool, default=True)
-    parser.add_argument("--save_agent",         type=bool, default=True)
     return parser.parse_args()
 
 
@@ -57,19 +56,22 @@ def main(args):
     )
 
     # load agent params if given
-    load_agent_dir = Path(config_archive.get("load_agent_dir", TMP_AGENT_STORAGE_DIR)) / config.env_name
-    if load_agent_dir.exists():
-        loaded_keys = agent.load(load_agent_dir)
+    agent_load_dir = Path(config_archive.get("agent_load_dir", TMP_AGENT_STORAGE_DIR)) / config.env_name
+    if agent_load_dir.exists():
+        loaded_keys = agent.load(agent_load_dir)
         logger.info(
-            f"Agent is initialized with data under the path: {load_agent_dir}. " +
+            f"Agent is initialized with data under the path: {agent_load_dir}. " +
             f"Loaded keys: {loaded_keys}."
         )
 
     # prepare path to save agent params
-    if args.save_agent:
-        save_agent_dir = Path(config_archive.get("save_agent_dir", TMP_AGENT_STORAGE_DIR))
-        save_agent_dir = save_agent_dir / config.env_name
-        save_agent_dir.mkdir(exist_ok=True, parents=True)
+    agent_save_dir = Path(config_archive.get("agent_save_dir", TMP_AGENT_STORAGE_DIR)) / config.env_name
+    agent_save_dir.mkdir(exist_ok=True, parents=True)
+
+    # prepare path to save agent buffer
+    agent_buffer_load_dir = Path(config_archive.get("agent_buffer_load_dir", TMP_AGENT_STORAGE_DIR)) / config.env_name
+    agent_buffer_load_dir.mkdir(exist_ok=True, parents=True)
+    agent_buffer_load_path = AGENT_BUFFER_FILENAME
 
     # buffer init
     observation, _ = env.reset()
@@ -87,7 +89,7 @@ def main(args):
         )
     )
 
-    # collect random buffer
+    # load precollected agent buffer or collect random buffer
     def do_environment_step(action, i):
         nonlocal env, state, observation
     
@@ -112,34 +114,43 @@ def main(args):
         if done or truncated:
             observation, _ = env.reset(seed=config.seed + i)
 
-    # download random buffer if given
-    n_iters_collect_buffer = config.n_iters_collect_buffer
+    agent_buffer_load_path = Path(config_archive.get("agent_buffer_load_dir", TMP_AGENT_STORAGE_DIR)) / config.env_name / "buffer"
+    if agent_buffer_load_path.exists():
+        # load precollected agent buffer
+        state = load_buffer(state, agent_buffer_load_path)
+        logger.info(f"Loading precollected Agent Buffer from {agent_buffer_load_path}.")
+    else:
+        # collect random buffer
+        # download random buffer if given
+        n_iters_collect_buffer = config.n_iters_collect_buffer
 
-    load_random_buffer_path = Path(config.archive.get("load_random_buffer_dir", TMP_RANDOM_BUFFER_STORAGE_DIR)) / config.env_name
-    if load_random_buffer_path.exists():
-        state = load_buffer(state, load_random_buffer_path)
-        n_iters_collect_buffer -= state.current_index
-        n_iters_collect_buffer = max(0, n_iters_collect_buffer)
+        random_buffer_load_path = Path(config.archive.get("random_buffer_load_dir", TMP_RANDOM_BUFFER_STORAGE_DIR)) / config.env_name
+        if random_buffer_load_path.exists():
+            state = load_buffer(state, random_buffer_load_path)
+            n_iters_collect_buffer -= state.current_index
+            n_iters_collect_buffer = max(0, n_iters_collect_buffer)
 
-        logger.info(f"Loading Random Buffer from {load_random_buffer_path}")
-        logger.info(f"{state.current_index} samples already collected. {n_iters_collect_buffer} are left.")
+            logger.info(f"Loading Random Buffer from {random_buffer_load_path}.")
+            logger.info(f"{state.current_index} samples already collected. {n_iters_collect_buffer} are left.")
 
-    # collect the rest amount of the data
-    logger.info("Random Buffer collecting..")
+        # collect the rest amount of the data
+        if n_iters_collect_buffer > 0:
+            logger.info("Random Buffer collecting..")
 
-    observation, _  = env.reset(seed=config.seed)
-    for i in tqdm(range(n_iters_collect_buffer)):
-        action = env.action_space.sample()
-        do_environment_step(action, i)
+            observation, _  = env.reset(seed=config.seed)
+            for i in tqdm(range(n_iters_collect_buffer)):
+                action = env.action_space.sample()
+                do_environment_step(action, i)
 
-    logger.info("Random Buffer is collected.")
+            logger.info("Random Buffer is collected.")
 
-    # save random buffer
-    if args.save_random_buffer:
-        save_random_buffer_path = Path(config_archive.get("save_random_buffer_dir", TMP_RANDOM_BUFFER_STORAGE_DIR)) / config.env_name
-        save_random_buffer_path.parent.mkdir(exist_ok=True, parents=True)
-        save_pickle(state, save_random_buffer_path)
-        logger.info(f"Random Buffer is stored under the following path: {save_random_buffer_path}")
+        # save random buffer
+        random_buffer_save_path = Path(config_archive.get("random_buffer_save_dir", TMP_RANDOM_BUFFER_STORAGE_DIR)) / config.env_name
+        random_buffer_save_path.parent.mkdir(exist_ok=True, parents=True)
+        save_pickle(state, random_buffer_save_path)
+        logger.info(f"Random Buffer is stored under the following path: {random_buffer_save_path}.")
+
+    logger.info(f"There are {state.current_index} items in the Buffer.")
 
     # training
     logger.info("Training..")
@@ -167,16 +178,17 @@ def main(args):
             eval_info = evaluate(agent, eval_env, num_episodes=config.evaluation.num_episodes)
             for k, v in eval_info.items():
                 wandb.log({f"evaluation/{k}": v}, step=i)
-            if args.save_agent and (best_return is None or eval_info["return"] >= best_return):
-                agent.save(save_agent_dir)
+            if (best_return is None or eval_info["return"] >= best_return):
+                # save agent
+                agent.save(agent_save_dir)
+                # save agent buffer
+                save_pickle(state, agent_buffer_load_path)
                 best_return = eval_info["return"]
-                logger.info(f"Best Return: {best_return}") # TODO: remove
-                
-    if args.save_agent:
-        logger.info(
-            f"Agent is stored under the path: {save_agent_dir}. " +
-            f"Best Return: {np.round(best_return, 3)}"
-        )
+
+    logger.info(
+        f"Agent is stored under the path: {agent_save_dir}. " +
+        f"Best Return: {np.round(best_return, 3)}"
+    )
 
     env.close()
 
