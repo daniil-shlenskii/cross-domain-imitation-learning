@@ -122,7 +122,7 @@ def main(args):
     else:
         # collect random buffer
         # download random buffer if given
-        n_iters_collect_buffer = config.n_iters_collect_buffer
+        n_iters_collect_buffer = config.precollect_buffer_size
 
         random_buffer_load_path = Path(config.archive.get("random_buffer_load_dir", TMP_RANDOM_BUFFER_STORAGE_DIR)) / config.env_name
         if random_buffer_load_path.exists():
