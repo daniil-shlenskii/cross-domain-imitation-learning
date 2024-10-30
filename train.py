@@ -28,7 +28,8 @@ def init() -> argparse.Namespace:
         description="RL agent training script"
     )
     parser.add_argument("--config_path",        type=str)
-    parser.add_argument("--wandb_project_name", type=str,  default="default_wandb_project_name")
+    parser.add_argument("--wandb_project_name", type=str, default="default_wandb_project_name")
+    parser.add_argument("--from_scratch",       action="store_true")
     return parser.parse_args()
 
 
@@ -57,11 +58,11 @@ def main(args):
 
     # load agent params if given
     agent_load_dir = Path(config_archive.get("agent_load_dir", TMP_AGENT_STORAGE_DIR)) / config.env_name
-    if agent_load_dir.exists():
+    if not args.from_scratch and agent_load_dir.exists():
         loaded_keys = agent.load(agent_load_dir)
         logger.info(
-            f"Agent is initialized with data under the path: {agent_load_dir}. " +
-            f"Loaded keys:\n{' '.join(loaded_keys)}."
+            f"Agent is initialized with data under the path: {agent_load_dir}.\n" +
+            f"Loaded keys: {' '.join(loaded_keys)}."
         )
 
     # prepare path to save agent params
@@ -115,7 +116,7 @@ def main(args):
             observation, _ = env.reset(seed=config.seed + i)
 
     agent_buffer_load_path = Path(config_archive.get("agent_buffer_load_dir", TMP_AGENT_STORAGE_DIR)) / config.env_name / "buffer"
-    if agent_buffer_load_path.exists():
+    if not args.from_scratch and agent_buffer_load_path.exists():
         # load precollected agent buffer
         state = load_buffer(state, agent_buffer_load_path)
         logger.info(f"Loading precollected Agent Buffer from {agent_buffer_load_path}.")
@@ -159,8 +160,13 @@ def main(args):
     best_return = None
     for i in tqdm(range(config.n_iters_training)):
         # evaluate model
-        if i % config.eval_every == 0:
-            eval_info = evaluate(agent, eval_env, num_episodes=config.evaluation.num_episodes)
+        if i == 0 or (i + 1) % config.eval_every == 0:
+            eval_info = evaluate(
+                agent,
+                eval_env,
+                num_episodes=config.evaluation.num_episodes,
+                seed=config.evaluation.seed,
+            )
             for k, v in eval_info.items():
                 wandb.log({f"evaluation/{k}": v}, step=i)
             if (best_return is None or eval_info["return"] >= best_return):
@@ -168,6 +174,7 @@ def main(args):
                 agent.save(agent_save_dir)
                 # save agent buffer
                 save_pickle(state, agent_buffer_load_path)
+                #update best return
                 best_return = eval_info["return"]
 
         # sample actions
@@ -182,7 +189,7 @@ def main(args):
         update_info = agent.update(batch)
 
         # logging
-        if i % config.log_every == 0:
+        if (i + 1) % config.log_every == 0:
             for k, v in update_info.items():
                 wandb.log({f"training/{k}": v}, step=i)
 
