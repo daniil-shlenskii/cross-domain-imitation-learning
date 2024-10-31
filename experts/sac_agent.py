@@ -192,8 +192,7 @@ def _update_jit(
     # critic target
     rng, key = jax.random.split(rng)
     dist = actor(batch["observations_next"])
-    actions_next = dist.sample(seed=key)
-    log_prob_next = dist.log_prob(actions_next)
+    actions_next, log_prob_next = dist.sample_and_log_prob(seed=key)
 
     state_action_value_next = jnp.minimum(
         critic1.apply_fn({"params": target_critic1_params}, batch["observations_next"], actions_next),
@@ -243,8 +242,7 @@ def _actor_loss_fn(
     key: PRNGKey,
 ) -> Tuple[TrainState, Dict[str, float]]:
     dist = state.apply_fn({"params": params}, batch["observations"], train=True)
-    actions = dist.sample(seed=key)
-    log_prob = dist.log_prob(actions)
+    actions, log_prob = dist.sample_and_log_prob(seed=key)
 
     state_action_value = jnp.minimum(
         critic1(batch["observations"], actions),
