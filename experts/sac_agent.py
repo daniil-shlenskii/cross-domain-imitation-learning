@@ -196,8 +196,8 @@ def _update_jit(
     log_prob_next = dist.log_prob(actions_next)
 
     state_action_value_next = jnp.minimum(
-        critic1.apply_fn({"params": target_critic1_params}, batch["observations_next"], actions_next),
-        critic2.apply_fn({"params": target_critic2_params}, batch["observations_next"], actions_next)
+        critic1.apply_fn({"params": target_critic1_params}, batch["observations_next"], actions_next, train=False),
+        critic2.apply_fn({"params": target_critic2_params}, batch["observations_next"], actions_next, train=False)
     )
 
     critic_target = batch["rewards"] + (1 - batch["dones"]) * discount * state_action_value_next
@@ -247,8 +247,8 @@ def _actor_loss_fn(
     log_prob = dist.log_prob(actions)
 
     state_action_value = jnp.minimum(
-        critic1(batch["observations"], actions),
-        critic2(batch["observations"], actions)
+        critic1(batch["observations"], actions, train=False),
+        critic2(batch["observations"], actions, train=False)
     )
 
     loss = (log_prob * temp - state_action_value).mean()
