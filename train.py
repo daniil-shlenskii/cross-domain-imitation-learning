@@ -28,7 +28,7 @@ def init() -> argparse.Namespace:
         description="RL agent training script"
     )
     parser.add_argument("--config_path",        type=str)
-    parser.add_argument("--wandb_project_name", type=str, default="default_wandb_project_name")
+    parser.add_argument("--wandb_project_name", type=str, default="_default_wandb_project_name")
     parser.add_argument("--from_scratch",       action="store_true")
     return parser.parse_args()
 
@@ -68,6 +68,9 @@ def main(args):
     # prepare path to save agent params
     agent_save_dir = Path(config_archive.get("agent_save_dir", TMP_AGENT_STORAGE_DIR)) / config.env_name
     agent_save_dir.mkdir(exist_ok=True, parents=True)
+
+    # save agent config
+    OmegaConf.save(config, agent_save_dir / "config.yaml")
 
     # prepare path to save agent buffer
     agent_buffer_load_dir = Path(config_archive.get("agent_buffer_load_dir", TMP_AGENT_STORAGE_DIR)) / config.env_name
@@ -180,18 +183,24 @@ def main(args):
         # sample actions
         action = agent.sample_actions(observation[None])
 
+        if np.isnan(action).any():
+            print(i, observation, action)
+            assert False
+
         # do step in the environment
         do_environment_step(action[0], i)
 
         # do RL optimization step
         rng, key = jax.random.split(rng)
         batch = buffer.sample(state, key).experience
-        update_info = agent.update(batch)
+        update_info, stats_info = agent.update(batch)
 
         # logging
         if (i + 1) % config.log_every == 0:
             for k, v in update_info.items():
                 wandb.log({f"training/{k}": v}, step=i)
+            for k, v in stats_info.items():
+                wandb.log({f"training_stats/{k}": v}, step=i)
 
     logger.info(
         f"Agent is stored under the path: {agent_save_dir}. " +
