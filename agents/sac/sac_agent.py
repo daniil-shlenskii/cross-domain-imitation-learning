@@ -15,7 +15,7 @@ from omegaconf.dictconfig import DictConfig
 
 from nn.train_state import TrainState
 
-from experts.base_agent import Agent
+from agents.base_agent import Agent
 
 from utils.types import DataType, Params, PRNGKey
 from utils.utils import instantiate_optimizer, save_pickle, load_pickle
