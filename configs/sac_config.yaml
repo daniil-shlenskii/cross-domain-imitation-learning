@@ -1,12 +1,12 @@
 seed: &seed 42
-env_name: &env_name Hopper-v5 # HalfCheetah-v5
+env_name: &env_name HalfCheetah-v5 # Hopper-v5
 precollect_buffer_size: &precollect_buffer_size 5_000
 n_iters_training: 1_500_000
 log_every: 1_000
 eval_every: 5_000
 
 agent:
-  _target_: agents.sac.SACAgent
+  _target_: agents.sac.SACAgent.create
   seed: *seed
   actor_module_config:
     _target_: networks.policy.NormalTanhPolicy

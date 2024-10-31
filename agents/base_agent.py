@@ -21,19 +21,9 @@ class Agent:
     actor: TrainState
     _rng: PRNGKey
 
-    def sample_actions(self, observations: np.ndarray) -> np.ndarray:
-        self._rng, actions = _sample_actions_jit(self._rng, self.actor, observations)
-        return np.asarray(actions)
-
-    def eval_actions(self, observations: np.ndarray) -> np.ndarray:
-        actions = _eval_actions_jit(self.actor, observations)
-        return np.asarray(actions)
-
-    def eval_log_probs(self, observations: np.ndarray, actions: np.ndarray) -> float:
-        return _eval_log_probs_jit(self.actor, observations, actions)
-    
+    @classmethod
     def instantiate_actor_module(
-        self,
+        cls,
         actor_module_config: DictConfig,
         *,
         action_space: gym.Space,
@@ -48,6 +38,17 @@ class Agent:
         return instantiate(
             actor_module_config, action_dim=action_dim, low=low, high=high, **kwargs
         )
+
+    def sample_actions(self, observations: np.ndarray) -> np.ndarray:
+        self._rng, actions = _sample_actions_jit(self._rng, self.actor, observations)
+        return np.asarray(actions)
+
+    def eval_actions(self, observations: np.ndarray) -> np.ndarray:
+        actions = _eval_actions_jit(self.actor, observations)
+        return np.asarray(actions)
+
+    def eval_log_probs(self, observations: np.ndarray, actions: np.ndarray) -> float:
+        return _eval_log_probs_jit(self.actor, observations, actions)
     
     def save(self, dir_path: str) -> None:
         dir_path = Path(dir_path)

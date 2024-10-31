@@ -28,8 +28,9 @@ class SACAgent(Agent):
         "target_critic2_params",
     ]
 
-    def __init__(
-        self,
+    @classmethod
+    def create(
+        cls,
         *,
         seed: int,
         observation_space: gym.Space,
@@ -48,17 +49,16 @@ class SACAgent(Agent):
         #
         discount: float = 0.99,
         tau = 0.005,
-    ):
+    ) -> "SACAgent":
         # reproducibility keys
         rng = jax.random.key(seed)
-        rng, actor_key, critic1_key, critic2_key, temperature_key = jax.random.split(rng, 5)
-        self._rng = rng
+        actor_key, critic1_key, critic2_key, temperature_key = jax.random.split(rng, 4)
 
-        # actor and critic initialization
+        # actor, critic and temperature initialization
         observation = observation_space.sample()
         action = action_space.sample()
 
-        actor_module = self.instantiate_actor_module(actor_module_config, action_space=action_space)
+        actor_module = cls.instantiate_actor_module(actor_module_config, action_space=action_space)
         critic1_module = instantiate(critic_module_config)
         critic2_module = instantiate(critic_module_config)
         temperature_module = instantiate(temperature_module_config)
@@ -68,28 +68,25 @@ class SACAgent(Agent):
         critic2_params = critic2_module.init(critic2_key, observation, action)["params"]
         temperature_params = temperature_module.init(temperature_key)["params"]
 
-        self.target_critic1_params = deepcopy(critic1_params)
-        self.target_critic2_params = deepcopy(critic2_params)
-
-        self.actor = TrainState.create(
+        actor = TrainState.create(
             loss_fn=_actor_loss_fn,
             apply_fn=actor_module.apply,
             params=actor_params,
             tx=instantiate_optimizer(actor_optimizer_config),
         )
-        self.critic1 = TrainState.create(
+        critic1 = TrainState.create(
             loss_fn=_critic_loss_fn,
             apply_fn=critic1_module.apply,
             params=critic1_params,
             tx=instantiate_optimizer(critic_optimizer_config),
         )
-        self.critic2 = TrainState.create(
+        critic2 = TrainState.create(
             loss_fn=_critic_loss_fn,
             apply_fn=critic2_module.apply,
             params=critic2_params,
             tx=instantiate_optimizer(critic_optimizer_config),
         )
-        self.temperature = TrainState.create(
+        temperature = TrainState.create(
             loss_fn=_temperature_loss_fn,
             apply_fn=temperature_module.apply,
             params=temperature_params,
@@ -99,12 +96,48 @@ class SACAgent(Agent):
         # target entropy init
         action_dim = action.shape[-1]
         if target_entropy is None:
-            self.target_entropy = -action_dim
+            target_entropy = -action_dim
         else:
-            self.target_entropy = target_entropy
+            target_entropy = target_entropy
 
+        return cls(
+            seed=seed,
+            actor=actor,
+            critic1=critic1,
+            critic2=critic2,
+            temperature=temperature,
+            target_entropy=target_entropy,
+            backup_entropy=backup_entropy,
+            discount=discount,
+            tau=tau,
+        )
+
+    def __init__(
+        self,
+        *,
+        seed: int,
         #
-        self.seed = seed
+        actor: TrainState,
+        critic1: TrainState,
+        critic2: TrainState,
+        temperature: TrainState,
+        #
+        target_entropy: float,
+        backup_entropy: bool,
+        discount: float,
+        tau: float,
+    ):
+        self._rng = jax.random.key(seed)
+
+        self.actor = actor
+        self.critic1 = critic1
+        self.critic2 = critic2
+        self.temperature = temperature
+
+        self.target_critic1_params = deepcopy(critic1.params)
+        self.target_critic2_params = deepcopy(critic2.params)
+
+        self.target_entropy = target_entropy
         self.backup_entropy = backup_entropy
         self.discount = discount
         self.tau = tau
