@@ -4,7 +4,19 @@ import warnings
 
 import pickle
 
+import optax
+from hydra.utils import instantiate
+from omegaconf.dictconfig import DictConfig
+
 from utils.types import Buffer
+
+
+def instantiate_optimizer(config: DictConfig):
+    transforms = [
+        instantiate(transform_config)
+        for transform_config in config.transforms
+    ]
+    return optax.chain(*transforms)
 
 
 def save_pickle(data: Any, path: str):
