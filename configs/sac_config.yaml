@@ -1,14 +1,13 @@
-seed: &seed 0
+seed: &seed 42
 env_name: &env_name Hopper-v5 # HalfCheetah-v5
 precollect_buffer_size: &precollect_buffer_size 5_000
-n_iters_training: 100_000
+n_iters_training: 1_500_000
 log_every: 1_000
 eval_every: 5_000
 
 agent:
   _target_: agents.sac.SACAgent
   seed: *seed
-  update_temperature: False
   actor_module_config:
     _target_: networks.policy.NormalTanhPolicy
     hidden_dims: [256, 256]
@@ -25,7 +24,10 @@ agent:
       - _target_: optax.adamw
         learning_rate: 3e-4
   critic_optimizer_config: *optimizer_config
-  temperature_optimizer_config: *optimizer_config
+  temperature_optimizer_config:
+    transforms:
+      - _target_: optax.sgd
+        learning_rate: 0.
 
 environment:
   _target_: gymnasium.wrappers.TimeLimit
@@ -36,8 +38,8 @@ environment:
       render_mode: human
 
 evaluation:
-  seed: 0
-  num_episodes: 30
+  seed: 42
+  num_episodes: 50
   environment:
     _target_: gymnasium.wrappers.TimeLimit
     max_episode_steps: 1000
@@ -49,7 +51,7 @@ replay_buffer:
   _target_: flashbax.make_item_buffer
   max_length: 1_000_000
   min_length: *precollect_buffer_size
-  sample_batch_size: 64
+  sample_batch_size: 256
   add_batches: False
 
 archive:

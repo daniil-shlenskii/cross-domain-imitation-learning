@@ -43,7 +43,6 @@ class SACAgent(Agent):
         critic_optimizer_config: DictConfig,
         temperature_optimizer_config: DictConfig,
         #
-        update_temperature: bool = True,
         target_entropy: float = None,
         backup_entropy: bool = True,
         #
@@ -106,7 +105,6 @@ class SACAgent(Agent):
 
         #
         self.seed = seed
-        self.update_temperature = update_temperature
         self.backup_entropy = backup_entropy
         self.discount = discount
         self.tau = tau
@@ -123,7 +121,7 @@ class SACAgent(Agent):
             self.critic2,
             self.target_critic1_params,
             self.target_critic2_params,
-            new_temperature,
+            self.temperature,
             info,
             stats_info,
         ) = _update_jit(
@@ -140,9 +138,6 @@ class SACAgent(Agent):
             discount=self.discount,
             tau=self.tau,
         )
-
-        if self.update_temperature:
-            self.temperature = new_temperature
 
         return info, stats_info
 
