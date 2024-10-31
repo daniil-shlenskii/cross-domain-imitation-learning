@@ -29,11 +29,11 @@ class DeterministicPolicy(nn.Module):
 
     @nn.compact
     def __call__(
-        self, observations: jnp.ndarray, training: bool=False
+        self, observations: jnp.ndarray, train: bool=False
     ) -> jnp.ndarray:
         features = MLP(
             self.hidden_dims, dropout_rate=self.dropout_rate,
-        )(observations, training=training)
+        )(observations, train=train)
         features = nn.Dense(
             self.action_dim, kernel_init=default_init(),
         )(features)
@@ -55,11 +55,11 @@ class NormalTanhPolicy(nn.Module):
     def __call__(
         self,
         observations: jnp.ndarray,
-        training: bool = False,
+        train: bool = False,
     ) -> distrax.Distribution:
         features = MLP(
             self.hidden_dims, dropout_rate=self.dropout_rate
-        )(observations, training=training)
+        )(observations, train=train)
         means = nn.Dense(
             self.action_dim, kernel_init=default_init()
         )(features)

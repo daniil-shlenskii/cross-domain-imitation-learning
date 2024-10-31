@@ -25,12 +25,12 @@ class Critic(nn.Module):
 
     @nn.compact
     def __call__(
-        self, observations: jnp.ndarray, actions: jnp.ndarray, training: bool = False
+        self, observations: jnp.ndarray, actions: jnp.ndarray, train: bool = False
     ) -> jnp.ndarray:
         input_array = jnp.concatenate([observations, actions], axis=-1)
         values = MLP(
             (*self.hidden_dims, 1), self.activation, self.dropout_rate
-        )(input_array, training=training)
+        )(input_array, train=train)
         return values.squeeze(-1)
 
 class CriticEnsemble(nn.Module):
@@ -41,7 +41,7 @@ class CriticEnsemble(nn.Module):
 
     @nn.compact
     def __call__(
-        self, observations: jnp.ndarray, actions: jnp.ndarray, training: bool = False
+        self, observations: jnp.ndarray, actions: jnp.ndarray, train: bool = False
     ) -> jnp.ndarray:
         critic_ensemble = nn.vmap(
             Critic,
@@ -53,5 +53,5 @@ class CriticEnsemble(nn.Module):
         )
         q_values = critic_ensemble(
             self.hidden_dims, self.activation, self.dropout_rate
-        )(observations, actions, training)
+        )(observations, actions, train)
         return q_values

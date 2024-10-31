@@ -14,13 +14,13 @@ class MLP(nn.Module):
 
     @nn.compact
     def __call__(
-        self, x: jnp.ndarray, training: bool=False
+        self, x: jnp.ndarray, train: bool=False
     ) -> jnp.ndarray:
         for hid_dim in self.hidden_dims:
             x = nn.Dense(hid_dim, kernel_init=default_init())(x)
             x = self.activation(x)
             if self.dropout_rate is not None:
                 x = nn.Dropout(reate=self.dropout_rate)(
-                    x, deterministic=not training
+                    x, deterministic=not train
                 )
         return x

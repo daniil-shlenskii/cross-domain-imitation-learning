@@ -71,15 +71,15 @@ class Agent:
 @jax.jit
 def _sample_actions_jit(rng: PRNGKey, actor: TrainState, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
     _rng, key = jax.random.split(rng)
-    dist = actor(observations)
+    dist = actor(observations, training=False)
     return _rng, dist.sample(seed=key)
 
 @jax.jit
 def _eval_actions_jit(actor: TrainState, observations: np.ndarray) -> np.ndarray:
-    dist = actor(observations)
+    dist = actor(observations, training=False)
     return dist.mode()
 
 @jax.jit
 def _eval_log_probs_jit(actor: TrainState, observations: np.ndarray, actions: np.ndarray) -> float:
-    dist = actor(observations)
+    dist = actor(observations, training=False)
     return dist.log_probs(actions).mean()
