@@ -125,7 +125,7 @@ class SACAgent(Agent):
             info,
             stats_info,
         ) = _update_jit(
-            batch,
+            batch=batch,
             rng=self._rng,
             actor=self.actor,
             critic1=self.critic1,
@@ -166,8 +166,8 @@ class SACAgent(Agent):
 
 @functools.partial(jax.jit, static_argnames="backup_entropy")
 def _update_jit(
-    batch: DataType,
     rng: PRNGKey,
+    batch: DataType,
     #
     actor: TrainState,
     critic1: TrainState,
