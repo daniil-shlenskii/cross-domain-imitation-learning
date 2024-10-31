@@ -196,8 +196,8 @@ def _update_jit(
     log_prob_next = dist.log_prob(actions_next)
 
     state_action_value_next = jnp.minimum(
-        critic1.apply_fn({"params": target_critic1_params}, batch["observations_next"], actions_next, train=False),
-        critic2.apply_fn({"params": target_critic2_params}, batch["observations_next"], actions_next, train=False)
+        critic1.apply_fn({"params": target_critic1_params}, batch["observations_next"], actions_next),
+        critic2.apply_fn({"params": target_critic2_params}, batch["observations_next"], actions_next)
     )
 
     critic_target = batch["rewards"] + (1 - batch["dones"]) * discount * state_action_value_next
@@ -242,13 +242,13 @@ def _actor_loss_fn(
     temp: float,
     key: PRNGKey,
 ) -> Tuple[TrainState, Dict[str, float]]:
-    dist = state.apply_fn({"params": params}, batch["observations"])
+    dist = state.apply_fn({"params": params}, batch["observations"], train=True)
     actions = dist.sample(seed=key)
     log_prob = dist.log_prob(actions)
 
     state_action_value = jnp.minimum(
-        critic1(batch["observations"], actions, train=False),
-        critic2(batch["observations"], actions, train=False)
+        critic1(batch["observations"], actions),
+        critic2(batch["observations"], actions)
     )
 
     loss = (log_prob * temp - state_action_value).mean()
@@ -261,7 +261,7 @@ def _critic_loss_fn(
     target: jnp.ndarray,
     critic_idx: int = 1,
 ) -> Tuple[TrainState, Dict[str, float]]:
-    preds = state.apply_fn({"params": params}, batch["observations"], batch["actions"])
+    preds = state.apply_fn({"params": params}, batch["observations"], batch["actions"], train=True)
     loss = ((preds - target)**2).mean()
     return loss, {f"critic{critic_idx}_loss": loss}
 
