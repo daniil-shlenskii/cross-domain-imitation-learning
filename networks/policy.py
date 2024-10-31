@@ -11,7 +11,7 @@ import distrax
 
 from networks.common import MLP, default_init
 
-LOG_STD_MIN = -5.0
+LOG_STD_MIN = -10.0
 LOG_STD_MAX = 2.0
 
 
@@ -43,11 +43,11 @@ class DeterministicPolicy(nn.Module):
         return _rescale_from_tanh(actions)
     
 
+import jax
 class NormalTanhPolicy(nn.Module):
     hidden_dims: Sequence[int]
     action_dim: int
     dropout_rate: Optional[float] = None
-    train_std: Optional[bool] = True
     low: Optional[float] = None
     high: Optional[float] = None
 
@@ -60,18 +60,10 @@ class NormalTanhPolicy(nn.Module):
         features = MLP(
             self.hidden_dims, dropout_rate=self.dropout_rate
         )(observations, train=train)
-        means = nn.Dense(
-            self.action_dim, kernel_init=default_init()
-        )(features)
 
-        if self.train_std:
-            log_stds = nn.Dense(
-                self.action_dim, kernel_init=default_init()
-            )(features)
-        else:
-            log_stds = self.param(
-                'log_stds', nn.initializers.zeros, (self.action_dim,)
-            )
+        means = nn.Dense(self.action_dim, kernel_init=default_init())(features)
+
+        log_stds = nn.Dense(self.action_dim, kernel_init=default_init())(features)
         log_stds = jnp.clip(log_stds, LOG_STD_MIN, LOG_STD_MAX)
 
         return TanhMultivariateNormalDiag(
