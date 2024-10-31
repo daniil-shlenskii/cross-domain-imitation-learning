@@ -20,6 +20,7 @@ import pickle
 import optax
 
 import jax
+import jax.numpy as jnp
 from flax import core, struct
 from flax.linen.fp8_ops import OVERWRITE_WITH_GRADIENT
 
@@ -144,11 +145,16 @@ class TrainState(struct.PyTreeNode):
             **kwargs,
         )
     
-    def update(self, **loss_kwargs):
+    def update(self, model_name: str, **loss_kwargs):
         grads, info = jax.grad(self.loss_fn, has_aux=True)(
             self.params, state=self, **loss_kwargs
         )
-        return self.apply_gradients(grads=grads), info
+
+        stats_info = {}
+        stats_info[f"{model_name}/max_grad_norm"] = _compute_norms(grads)
+        stats_info[f"{model_name}/max_weight_norm"] = _compute_norms(self.params)
+
+        return self.apply_gradients(grads=grads), info, stats_info
     
     def __call__(self, *args, **kwargs):
         return self.apply_fn({"params": self.params}, *args, **kwargs)
@@ -166,3 +172,8 @@ class TrainState(struct.PyTreeNode):
         with open(path, "rb") as file:
             data = pickle.load(file)
         return self.replace(**data)
+    
+def _compute_norms(pytree):
+    norms = jax.tree.map(jnp.linalg.norm, pytree, is_leaf=lambda x: isinstance(x, jnp.ndarray))
+    flatten_norms, _ = jax.tree.flatten(norms)
+    return jnp.max(jnp.asarray(flatten_norms))
