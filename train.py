@@ -128,7 +128,7 @@ def main(args):
         # download random buffer if given
         n_iters_collect_buffer = config.precollect_buffer_size
 
-        random_buffer_load_path = Path(config.archive.get("random_buffer_load_dir", TMP_RANDOM_BUFFER_STORAGE_DIR)) / config.env_name
+        random_buffer_load_path = Path(config_archive.get("random_buffer_load_dir", TMP_RANDOM_BUFFER_STORAGE_DIR)) / config.env_name
         if random_buffer_load_path.exists():
             state = load_buffer(state, random_buffer_load_path)
             n_iters_collect_buffer -= state.current_index
@@ -172,7 +172,9 @@ def main(args):
             )
             for k, v in eval_info.items():
                 wandb.log({f"evaluation/{k}": v}, step=i)
-            if (best_return is None or eval_info["return"] >= best_return):
+            if best_return is None:
+               best_return = eval_info["return"]
+            if eval_info["return"] > best_return:
                 # save agent
                 agent.save(agent_save_dir)
                 # save agent buffer
