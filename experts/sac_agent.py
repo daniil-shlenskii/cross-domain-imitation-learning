@@ -10,14 +10,16 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
-import optax
 from hydra.utils import instantiate
-from nn.train_state import TrainState
 from omegaconf.dictconfig import DictConfig
-from utils.types import DataType, Params, PRNGKey
-from utils.utils import save_pickle, load_pickle
+
+from nn.train_state import TrainState
 
 from experts.base_agent import Agent
+
+from utils.types import DataType, Params, PRNGKey
+from utils.utils import instantiate_optimizer, save_pickle, load_pickle
+
 
 
 class SACAgent(Agent):
@@ -37,9 +39,9 @@ class SACAgent(Agent):
         critic_module_config: DictConfig,
         temperature_module_config: DictConfig,
         #
-        actor_lr: float = 3e-4,
-        critic_lr: float = 3e-4,
-        temperature_lr: float = 3e-4,
+        actor_optimizer_config: DictConfig,
+        critic_optimizer_config: DictConfig,
+        temperature_optimizer_config: DictConfig,
         #
         update_temperature: bool = True,
         target_entropy: float = None,
@@ -74,25 +76,25 @@ class SACAgent(Agent):
             loss_fn=_actor_loss_fn,
             apply_fn=actor_module.apply,
             params=actor_params,
-            tx=optax.adam(learning_rate=actor_lr)
+            tx=instantiate_optimizer(actor_optimizer_config),
         )
         self.critic1 = TrainState.create(
             loss_fn=_critic_loss_fn,
             apply_fn=critic1_module.apply,
             params=critic1_params,
-            tx=optax.adam(learning_rate=critic_lr)
+            tx=instantiate_optimizer(critic_optimizer_config),
         )
         self.critic2 = TrainState.create(
             loss_fn=_critic_loss_fn,
             apply_fn=critic2_module.apply,
             params=critic2_params,
-            tx=optax.adam(learning_rate=critic_lr)
+            tx=instantiate_optimizer(critic_optimizer_config),
         )
         self.temperature = TrainState.create(
             loss_fn=_temperature_loss_fn,
             apply_fn=temperature_module.apply,
             params=temperature_params,
-            tx=optax.adam(learning_rate=temperature_lr)
+            tx=instantiate_optimizer(temperature_optimizer_config),
         )
 
         # target entropy init
@@ -123,6 +125,7 @@ class SACAgent(Agent):
             self.target_critic2_params,
             new_temperature,
             info,
+            stats_info,
         ) = _update_jit(
             batch,
             rng=self._rng,
@@ -141,7 +144,7 @@ class SACAgent(Agent):
         if self.update_temperature:
             self.temperature = new_temperature
 
-        return info
+        return info, stats_info
 
     def save(self, dir_path: str) -> None:
         super().save(dir_path)
@@ -202,21 +205,22 @@ def _update_jit(
         critic_target -= (1 - batch["dones"]) * discount * temp * log_prob_next
 
     # critic update
-    new_critic1, critic1_info = critic1.update(batch=batch, target=critic_target, critic_idx=1)
-    new_critic2, critic2_info = critic2.update(batch=batch, target=critic_target, critic_idx=2)
+    new_critic1, critic1_info, critic1_stats_info = critic1.update("critic1", batch=batch, target=critic_target, critic_idx=1)
+    new_critic2, critic2_info, critic2_stats_info = critic2.update("critic2", batch=batch, target=critic_target, critic_idx=2)
 
     # actor update
     rng, key = jax.random.split(rng)
-    new_actor, actor_info = actor.update(batch=batch, critic1=new_critic1, critic2=new_critic2, temp=temp, key=key)
+    new_actor, actor_info, actor_stats_info = actor.update("actor", batch=batch, critic1=new_critic1, critic2=new_critic2, temp=temp, key=key)
 
     # temperature update
-    new_temperature, temperature_info = temperature.update(entropy=actor_info["entropy"], target_entropy=target_entropy)
+    new_temperature, temperature_info, temperature_stats_info = temperature.update("temperature", entropy=actor_info["entropy"], target_entropy=target_entropy)
 
     # target_critic update
     new_target_critic1_params = _update_target_net(new_critic1.params, target_critic1_params, tau)
     new_target_critic2_params = _update_target_net(new_critic2.params, target_critic1_params, tau)
 
     info = {**critic1_info, **critic2_info, **actor_info, **temperature_info}
+    stats_info = {**critic1_stats_info, **critic2_stats_info, **actor_stats_info, **temperature_stats_info}
     return (
         rng,
         new_actor,
@@ -226,6 +230,7 @@ def _update_jit(
         new_target_critic2_params,
         new_temperature,
         info,
+        stats_info,
     )
 
 def _actor_loss_fn(
@@ -258,7 +263,7 @@ def _critic_loss_fn(
 ) -> Tuple[TrainState, Dict[str, float]]:
     preds = state.apply_fn({"params": params}, batch["observations"], batch["actions"])
     loss = ((preds - target)**2).mean()
-    return loss, {f"critic_loss{critic_idx}": loss}
+    return loss, {f"critic{critic_idx}_loss": loss}
 
 def _temperature_loss_fn(
     params: Params,
