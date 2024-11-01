@@ -1,5 +1,5 @@
 import argparse
-from pprint import pformat
+import warnings
 
 import jax
 
@@ -27,9 +27,10 @@ def init() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="RL agent training script"
     )
-    parser.add_argument("--config_path",        type=str)
-    parser.add_argument("--wandb_project_name", type=str, default="_default_wandb_project_name")
-    parser.add_argument("--from_scratch",       action="store_true")
+    parser.add_argument("--config_path",           type=str)
+    parser.add_argument("--wandb_project_name",    type=str, default="_default_wandb_project_name")
+    parser.add_argument("--from_scratch",          action="store_true")
+    parser.add_argument("-w", "--ignore_warnings", action="store_true")
     return parser.parse_args()
 
 
@@ -214,4 +215,8 @@ def main(args):
 
 if __name__ == "__main__":
     args = init()
+
+    if args.ignore_warnings:
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+
     main(args)
