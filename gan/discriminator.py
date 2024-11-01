@@ -71,4 +71,8 @@ def _discr_loss_fn(
     disc_grad_fn = jax.grad(lambda x: state.apply_fn({"params": params}, x))
     penalty = gradient_penalty(key=key, real_batch=real_batch, fake_batch=fake_batch, discriminator_grad_fn=disc_grad_fn)
 
-    return loss + penalty * gradient_penalty_coef
+    info = {
+        f"{state.info_key}_loss": loss,
+        f"{state.info_key}_gradient_penalty": penalty
+    }
+    return loss + penalty * gradient_penalty_coef, info

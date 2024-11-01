@@ -3,18 +3,17 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 
-from gan.discriminator import Discriminator
 from utils.types import PRNGKey
 
+
+def g_nonsaturating_loss(fake_logits: jnp.ndarray):
+    loss = jax.nn.softplus(-fake_logits) 
+    return loss
 
 def d_logistic_loss(real_logits: jnp.ndarray, fake_logits: jnp.ndarray):
     real_loss = jax.nn.softplus(-real_logits)
     fake_loss = jax.nn.softplus(fake_logits)
     return real_loss.mean() + fake_loss.mean()
-
-def g_nonsaturating_loss(fake_logits: jnp.ndarray):
-    loss = jax.nn.softplus(-fake_logits) 
-    return loss
 
 def gradient_penalty(
     key: PRNGKey,
