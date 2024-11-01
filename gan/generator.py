@@ -15,6 +15,7 @@ from utils.types import Params
 from gan.discriminator import Discriminator
 from gan.losses import g_nonsaturating_loss
 
+
 class Generator(PyTreeNode):
     state: TrainState
 
@@ -41,16 +42,20 @@ class Generator(PyTreeNode):
         )
         return cls(state=state)
 
-    def update(self, *, batch: jnp.ndarray):
-        self.state, info, stats_info = _update_jit(batch, self.state)
+    def update(self, *, batch: jnp.ndarray, discriminator: Discriminator):
+        self.state, info, stats_info = _update_jit(
+            batch=batch,
+            state=self.state,
+            discriminator=discriminator,
+        )
         return info, stats_info
     
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
     
 @jax.jit
-def _update_jit(batch: jnp.ndarray, state: TrainState):
-    new_state, info, stats_info = state.update(batch)
+def _update_jit(batch: jnp.ndarray, state: TrainState, discriminator: Discriminator):
+    new_state, info, stats_info = state.update(batch=batch, discriminator=discriminator)
     return new_state, info, stats_info
 
 def _gan_loss_fn(

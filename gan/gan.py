@@ -71,7 +71,7 @@ def _update_jit(
     generator: Generator,
     discriminator: Discriminator,
 ):
-    new_gen, gen_info, gen_stats_info = generator.update(batch=batch)
+    new_gen, gen_info, gen_stats_info = generator.update(batch=batch, discriminator=discriminator)
     new_disc, disc_info, disc_stats_info = discriminator.update(real_batch=batch, fake_batch=gen_info.pop("fake_batch"))
 
     info = {**gen_info, **disc_info}
