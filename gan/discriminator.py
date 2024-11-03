@@ -48,8 +48,8 @@ class Discriminator(PyTreeNode):
 
     def update(self, *, real_batch: jnp.ndarray, fake_batch: jnp.ndarray):
         (
-            self.rng,
-            self.state,
+            new_rng,
+            new_state,
             info,
             stats_info
         ) = _update_jit(
@@ -59,7 +59,8 @@ class Discriminator(PyTreeNode):
             gradient_penalty_coef=self.gradient_penalty_coef,
             rng=self.rng,
         )
-        return info, stats_info
+        self = self.replace(rng=new_rng, state=new_state)
+        return self, info, stats_info
     
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
@@ -84,11 +85,11 @@ def _discr_loss_fn(
     gradient_penalty_coef: float,
     key: PRNGKey,
 ):
-    real_logits = state.apply_fn({"params": params}, real_batch)
-    fake_logits = state.apply_fn({"params": params}, fake_batch)
+    real_logits = state.apply_fn({"params": params}, real_batch, train=True)
+    fake_logits = state.apply_fn({"params": params}, fake_batch, train=True)
     loss = d_logistic_loss(real_logits=real_logits, fake_logits=fake_logits)
 
-    disc_grad_fn = jax.grad(lambda x: state.apply_fn({"params": params}, x))
+    disc_grad_fn = jax.grad(lambda x: state.apply_fn({"params": params}, x, train=True))
     penalty = gradient_penalty(key=key, real_batch=real_batch, fake_batch=fake_batch, discriminator_grad_fn=disc_grad_fn)
 
     info = {
