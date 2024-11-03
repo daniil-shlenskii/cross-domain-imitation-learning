@@ -30,8 +30,10 @@ class Generator(PyTreeNode):
         module_config: DictConfig,
         optimizer_config: DictConfig,
     ):
+        module_config.hidden_dims.append(output_dim)
+
         key = jax.random.key(seed)
-        module = instantiate(module_config, output_dim=output_dim)
+        module = instantiate(module_config)
         params = module.init(key, input_sample)["params"]
         state = TrainState.create(
             loss_fn=_gan_loss_fn,
@@ -43,12 +45,13 @@ class Generator(PyTreeNode):
         return cls(state=state)
 
     def update(self, *, batch: jnp.ndarray, discriminator: Discriminator):
-        self.state, info, stats_info = _update_jit(
+        new_state, info, stats_info = _update_jit(
             batch=batch,
             state=self.state,
             discriminator=discriminator,
         )
-        return info, stats_info
+        self = self.replace(state=new_state)
+        return self, info, stats_info
     
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
@@ -64,7 +67,7 @@ def _gan_loss_fn(
     batch: jnp.ndarray,
     discriminator: Discriminator,
 ):
-    fake_batch = state.apply_fn({"params": params}, batch)
+    fake_batch = state.apply_fn({"params": params}, batch, train=True)
     fake_logits = discriminator(fake_batch)
     loss = g_nonsaturating_loss(fake_logits)
 
