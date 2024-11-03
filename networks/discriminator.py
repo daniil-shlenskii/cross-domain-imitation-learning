@@ -12,8 +12,8 @@ class Discriminator(nn.Module):
     dropout_rate: Optional[float] = None
 
     @nn.compact
-    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+    def __call__(self, x: jnp.ndarray, train: bool = False) -> jnp.ndarray:
         values = MLP(
             (*self.hidden_dims, 1), self.activation, self.dropout_rate
-        )(x)
+        )(x, train=train)
         return values.squeeze(-1)

@@ -32,7 +32,7 @@ class DeterministicPolicy(nn.Module):
         self, observations: jnp.ndarray, train: bool=False
     ) -> jnp.ndarray:
         features = MLP(
-            self.hidden_dims, dropout_rate=self.dropout_rate,
+            self.hidden_dims, dropout_rate=self.dropout_rate, activate_final=True,
         )(observations, train=train)
         features = nn.Dense(
             self.action_dim, kernel_init=default_init(),
@@ -41,9 +41,7 @@ class DeterministicPolicy(nn.Module):
         if self.low is None or self.high is None:
             return actions
         return _rescale_from_tanh(actions)
-    
 
-import jax
 class NormalTanhPolicy(nn.Module):
     hidden_dims: Sequence[int]
     action_dim: int
@@ -58,7 +56,7 @@ class NormalTanhPolicy(nn.Module):
         train: bool = False,
     ) -> distrax.Distribution:
         features = MLP(
-            self.hidden_dims, dropout_rate=self.dropout_rate
+            self.hidden_dims, dropout_rate=self.dropout_rate, activate_final=True,
         )(observations, train=train)
 
         means = nn.Dense(self.action_dim, kernel_init=default_init())(features)
