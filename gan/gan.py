@@ -1,3 +1,5 @@
+import sys
+
 from typing import Callable, Dict, Tuple
 
 import jax
@@ -16,10 +18,7 @@ from gan.discriminator import Discriminator
 from gan.generator import Generator
 
 
-class GAN(PyTreeNode):
-    discriminator: Discriminator
-    generator: Generator
-
+class GAN:
     @classmethod
     def create(
         cls,
@@ -28,51 +27,53 @@ class GAN(PyTreeNode):
         input_sample: jnp.ndarray,
         generator_output_dim: int,
         #
-        generator_module_config: DictConfig,
-        discriminator_module_config: DictConfig,
-        #
-        generator_optimizer_config: DictConfig,
-        discriminator_optimizer_config: DictConfig,
+        generator_config: DictConfig,
+        discriminator_config: DictConfig,
+        
     ):
         generator = Generator.create(
             seed=seed,
             input_sample=input_sample,
             output_dim=generator_output_dim,
-            module_config=generator_module_config,
-            optimizer_config=generator_optimizer_config,
+            **generator_config,
         )
         
         discriminator_input_sample = generator(input_sample)
-        discriminator = discriminator.create(
+        discriminator = Discriminator.create(
             seed=seed,
             input_sample=discriminator_input_sample,
-            module_config=discriminator_module_config,
-            optimizer_config=discriminator_optimizer_config,
+            **discriminator_config,
         )
 
         return cls(generator=generator, discriminator=discriminator)
+    
+    def __init__(self, generator: Generator, discriminator: Discriminator):
+        self.generator = generator
+        self.discriminator = discriminator
 
-    def update(self, batch: jnp.ndarray):
+    def update(self, gan_inputs: jnp.ndarray, real_batch: jnp.ndarray):
         (
             self.generator,
             self.discriminator,
             info,
             stats_info,
         ) = _update_jit(
-            batch,
+            gan_inputs=gan_inputs,
+            real_batch=real_batch,
             generator=self.generator,
-            discriminator=self.discriminator
+            discriminator=self.discriminator,
         )
         return info, stats_info
-    
+
 @jax.jit
 def _update_jit(
-    batch: jnp.ndarray,
+    gan_inputs: jnp.ndarray,
+    real_batch: jnp.ndarray,
     generator: Generator,
     discriminator: Discriminator,
 ):
-    new_gen, gen_info, gen_stats_info = generator.update(batch=batch, discriminator=discriminator)
-    new_disc, disc_info, disc_stats_info = discriminator.update(real_batch=batch, fake_batch=gen_info.pop("fake_batch"))
+    new_gen, gen_info, gen_stats_info = generator.update(batch=gan_inputs, discriminator=discriminator)
+    new_disc, disc_info, disc_stats_info = discriminator.update(real_batch=real_batch, fake_batch=gen_info.pop("fake_batch"))
 
     info = {**gen_info, **disc_info}
     stats_info = {**gen_stats_info, **disc_stats_info}
