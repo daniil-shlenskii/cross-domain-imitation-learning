@@ -14,7 +14,7 @@ import wandb
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
-from evaluate import evaluate
+from utils.evaluate import evaluate
 from utils.utils import save_pickle, load_buffer
 
 
@@ -34,7 +34,7 @@ def init() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main(args):
+def main(args: argparse.Namespace):
     wandb.init(project=args.wandb_project_name)
 
     config = OmegaConf.load(args.config_path)
