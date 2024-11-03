@@ -6,49 +6,79 @@ import gymnasium as gym
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
+import flashbax
+
 from agents.base_agent import Agent
 from nn.train_state import TrainState
-from utils.types import DataType, PRNGKey, Buffer
+from utils.types import DataType, PRNGKey, Buffer, BufferState
 from utils.utils import load_pickle
 
-from gail.gail_discriminator import GAILDiscriminator
+from agents.gail.gail_discriminator import GAILDiscriminator
 
 
 class GAILAgent(Agent):
     @classmethod
     def create(
         cls,
-        *
-        observations_space: gym.Space,
+        *,
+        seed: int,
+        observation_space: gym.Space,
         action_space: gym.Space,
         #
-        expert_buffer_path: str,
+        expert_batch_size: int,
+        expert_buffer_state_path: str,
         #
         agent_config: DictConfig,
-        discriminator_config: DictConfig
+        discriminator_config: DictConfig,
     ):
-        ...
         # agent and discriminator init
-        agent = instantiate(agent_config, observations_space=observations_space, action_space=action_space)
-        discriminator = instantiate(discriminator_config)
+        agent = instantiate(
+            agent_config,
+            seed=seed,
+            observation_space=observation_space,
+            action_space=action_space,
+            _recursive_=False,
+        )
+        
+        obs = observation_space.sample()
+        discriminator_input_sample = jnp.concatenate([obs, obs], axis=-1)
+        discriminator = instantiate(
+            discriminator_config,
+            seed=seed,
+            input_sample=discriminator_input_sample,
+            _recursive_=False,
+        )
 
         # expert buffer init
-        expert_buffer = load_pickle(expert_buffer_path)
+        expert_buffer_state = load_pickle(expert_buffer_state_path)
+        expert_buffer = flashbax.make_item_buffer(
+            sample_batch_size=expert_batch_size,
+            min_length=expert_buffer_state.current_index,
+            max_length=expert_buffer_state.current_index,
+            add_batches=False,
+        )
+
 
         return cls(
+            seed=seed,
             expert_buffer=expert_buffer,
+            expert_buffer_state=expert_buffer_state,
             agent=agent,
             discriminator=discriminator,
         )
 
     def __init__(
         self,
-        *
+        *,
+        seed: int,
         expert_buffer: Buffer,
+        expert_buffer_state: BufferState,
         agent: DictConfig,
         discriminator: DictConfig,
     ):
+        self.rng = jax.random.key(seed=seed)
         self.expert_buffer = expert_buffer
+        self.expert_buffer_state = expert_buffer_state
         self.agent = agent
         self.discriminator = discriminator
 
@@ -57,44 +87,35 @@ class GAILAgent(Agent):
         return self.agent.actor
 
     def update(self, batch: DataType):
+        self.rng, key = jax.random.split(self.rng)
+
+        # process batch
         learner_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=-1)
-        
-        batch_size = learner_batch.shape[0]
-        expert_batch = self.expert_buffer.sample(batch_size)
+        expert_batch = self.expert_buffer.sample(self.expert_buffer_state, key).experience
+
         expert_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=-1)
 
-        (
-            self.agent,
-            self.discriminator,
-            info,
-            stats_info
-        ) = _update_jit(
-            learner_batch=learner_batch,
+        # update agent
+        batch["reward"] = self.discriminator.get_rewards(learner_batch)
+        agent_info, agent_stats_info = self.agent.update(batch)
+
+        # update discriminator
+        self.discriminator, disc_info, disc_stats_info = _update_discriminator_jit(
             expert_batch=expert_batch,
-            agent=self.agent,
+            learner_batch=learner_batch,
             disc=self.discriminator,
         )
 
+        info = {**agent_info, **disc_info}
+        stats_info = {**agent_stats_info, **disc_stats_info}
         return info, stats_info
 
 @jax.jit
-def _update_jit(
+def _update_discriminator_jit(
     *,
-    learner_batch: jnp.ndarray,
     expert_batch: jnp.ndarray,
-    #
-    agent: Agent,
+    learner_batch: jnp.ndarray,
     disc: GAILDiscriminator,
 ):
-    learner_batch["rewards"] = disc.get_rewards(learner_batch)
-    new_agent, agent_info, agent_stats_info = agent.update(learner_batch)
-    new_disc, disc_info, disc_stats_info = disc.update(expert_batch)
-
-    info = {**agent_info, **disc_info}
-    stats_info = {**agent_stats_info, **disc_stats_info}
-    return (
-        new_agent,
-        new_disc,
-        info,
-        stats_info,
-    )
+    new_disc, disc_info, disc_stats_info = disc.update(expert_batch=expert_batch, learner_batch=learner_batch)
+    return new_disc, disc_info, disc_stats_info

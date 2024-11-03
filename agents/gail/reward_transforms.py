@@ -50,15 +50,15 @@ class IdentityRewardTransform(RewardTransform):
         return self
 
 class RewardStandartization(RewardTransform):
-    mean: jnp.ndarray
-    std: jnp.ndarray
+    mean: jnp.ndarray = 0.
+    std: jnp.ndarray = 1.
     ema: float = 0.99
     eps: float = 1e-8
 
     def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
         return (rewards - self.mean) / (self.std + self.eps)
     
-    def transform(self, rewards: jnp.ndarray) -> RewardTransform:
+    def update(self, rewards: jnp.ndarray) -> RewardTransform:
         new_mean = self.mean * self.ema + rewards.mean() * (1 - self.ema)
         new_std = self.std * self.ema + rewards.std() * (1 - self.ema)
         return self.replace(mean=new_mean, std=new_std)
