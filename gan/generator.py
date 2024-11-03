@@ -50,8 +50,7 @@ class Generator(PyTreeNode):
             state=self.state,
             discriminator=discriminator,
         )
-        self = self.replace(state=new_state)
-        return self, info, stats_info
+        return self.replace(state=new_state), info, stats_info
     
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)

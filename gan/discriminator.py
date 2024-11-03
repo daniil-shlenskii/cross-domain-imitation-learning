@@ -31,6 +31,8 @@ class Discriminator(PyTreeNode):
         optimizer_config: DictConfig,
         #
         gradient_penalty_coef: float = 1.,
+        #
+        **kwargs,
     ):
         rng = jax.random.key(seed)
         rng, key = jax.random.split(rng)
@@ -44,7 +46,7 @@ class Discriminator(PyTreeNode):
             tx=instantiate_optimizer(optimizer_config),
             info_key="discriminator",
         )
-        return cls(rng=rng, state=state, gradient_penalty_coef=gradient_penalty_coef)
+        return cls(rng=rng, state=state, gradient_penalty_coef=gradient_penalty_coef, **kwargs)
 
     def update(self, *, real_batch: jnp.ndarray, fake_batch: jnp.ndarray):
         (
@@ -59,8 +61,7 @@ class Discriminator(PyTreeNode):
             gradient_penalty_coef=self.gradient_penalty_coef,
             rng=self.rng,
         )
-        self = self.replace(rng=new_rng, state=new_state)
-        return self, info, stats_info
+        return self.replace(rng=new_rng, state=new_state), info, stats_info
     
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
