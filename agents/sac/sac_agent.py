@@ -131,7 +131,7 @@ class SACAgent(Agent):
         discount: float,
         tau: float,
     ):
-        self._rng = jax.random.key(seed)
+        self.rng = jax.random.key(seed)
 
         self.actor = actor
         self.critic1 = critic1
@@ -152,7 +152,7 @@ class SACAgent(Agent):
 
     def update(self, batch: DataType):
         (
-            self._rng,
+            self.rng,
             self.actor,
             self.critic1,
             self.critic2,
@@ -162,8 +162,8 @@ class SACAgent(Agent):
             info,
             stats_info,
         ) = _update_jit(
+            rng=self.rng,
             batch=batch,
-            rng=self._rng,
             actor=self.actor,
             critic1=self.critic1,
             critic2=self.critic2,
@@ -203,6 +203,7 @@ class SACAgent(Agent):
 
 @functools.partial(jax.jit, static_argnames="backup_entropy")
 def _update_jit(
+    *,
     rng: PRNGKey,
     batch: DataType,
     #

@@ -19,7 +19,7 @@ from utils.types import PRNGKey
 
 class Agent:
     actor: TrainState
-    _rng: PRNGKey
+    rng: PRNGKey
 
     @classmethod
     def instantiate_actor_module(
@@ -40,7 +40,7 @@ class Agent:
         )
 
     def sample_actions(self, observations: np.ndarray) -> np.ndarray:
-        self._rng, actions = _sample_actions_jit(self._rng, self.actor, observations)
+        self.rng, actions = _sample_actions_jit(self.rng, self.actor, observations)
         return np.asarray(actions)
 
     def eval_actions(self, observations: np.ndarray) -> np.ndarray:
@@ -71,9 +71,9 @@ class Agent:
 
 @jax.jit
 def _sample_actions_jit(rng: PRNGKey, actor: TrainState, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
-    _rng, key = jax.random.split(rng)
+    rng, key = jax.random.split(rng)
     dist = actor(observations)
-    return _rng, dist.sample(seed=key)
+    return rng, dist.sample(seed=key)
 
 @jax.jit
 def _eval_actions_jit(actor: TrainState, observations: np.ndarray) -> np.ndarray:
