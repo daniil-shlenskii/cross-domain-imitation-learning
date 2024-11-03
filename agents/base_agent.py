@@ -19,27 +19,17 @@ from utils.types import PRNGKey
 
 class Agent:
     actor: TrainState
-    _rng: PRNGKey
+    rng: PRNGKey
 
-    def sample_actions(self, observations: np.ndarray) -> np.ndarray:
-        self._rng, actions = _sample_actions_jit(self._rng, self.actor, observations)
-        return np.asarray(actions)
-
-    def eval_actions(self, observations: np.ndarray) -> np.ndarray:
-        actions = _eval_actions_jit(self.actor, observations)
-        return np.asarray(actions)
-
-    def eval_log_probs(self, observations: np.ndarray, actions: np.ndarray) -> float:
-        return _eval_log_probs_jit(self.actor, observations, actions)
-    
+    @classmethod
     def instantiate_actor_module(
-        self,
+        cls,
         actor_module_config: DictConfig,
         *,
         action_space: gym.Space,
         **kwargs,
     ) -> nn.Module:
-        action_dim = action_space.sample().shape[0]
+        action_dim = action_space.sample().shape[-1]
 
         low, high = None, None
         if np.any(action_space.low != -1) or np.any(action_space.high != 1):
@@ -48,6 +38,17 @@ class Agent:
         return instantiate(
             actor_module_config, action_dim=action_dim, low=low, high=high, **kwargs
         )
+
+    def sample_actions(self, observations: np.ndarray) -> np.ndarray:
+        self.rng, actions = _sample_actions_jit(self.rng, self.actor, observations)
+        return np.asarray(actions)
+
+    def eval_actions(self, observations: np.ndarray) -> np.ndarray:
+        actions = _eval_actions_jit(self.actor, observations)
+        return np.asarray(actions)
+
+    def eval_log_probs(self, observations: np.ndarray, actions: np.ndarray) -> float:
+        return _eval_log_probs_jit(self.actor, observations, actions)
     
     def save(self, dir_path: str) -> None:
         dir_path = Path(dir_path)
@@ -70,9 +71,9 @@ class Agent:
 
 @jax.jit
 def _sample_actions_jit(rng: PRNGKey, actor: TrainState, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
-    _rng, key = jax.random.split(rng)
+    rng, key = jax.random.split(rng)
     dist = actor(observations)
-    return _rng, dist.sample(seed=key)
+    return rng, dist.sample(seed=key)
 
 @jax.jit
 def _eval_actions_jit(actor: TrainState, observations: np.ndarray) -> np.ndarray:

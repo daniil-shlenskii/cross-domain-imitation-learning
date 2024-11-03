@@ -3,7 +3,7 @@ from typing import Dict
 import gymnasium as gym
 import numpy as np
 
-from experts.base_agent import Agent
+from agents.base_agent import Agent
 
 
 def evaluate(agent: Agent, env: gym.Env, num_episodes: int, seed: int=0) -> Dict[str, float]:

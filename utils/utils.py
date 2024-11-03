@@ -3,6 +3,7 @@ from typing import Any
 import warnings
 
 import pickle
+import json
 
 import optax
 from hydra.utils import instantiate
@@ -18,6 +19,14 @@ def instantiate_optimizer(config: DictConfig):
     ]
     return optax.chain(*transforms)
 
+def save_json(data, path: str):
+    with open(path, "w") as file:
+        json.dump(data, file, indent=4)
+
+def load_json(path: str):
+    with open(path) as file:
+        data = json.load(data, file)
+    return data
 
 def save_pickle(data: Any, path: str):
     with open(path, "wb") as file:

@@ -10,18 +10,19 @@ from flax.training.train_state import TrainState as FlaxTrainState
 
 class TrainState(FlaxTrainState):
     loss_fn: Callable = struct.field(pytree_node=False)
+    info_key: str = struct.field(pytree_node=False)
 
     def __call__(self, *args, **kwargs):
         return self.apply_fn({"params": self.params}, *args, **kwargs)
 
-    def update(self, model_name: str, **loss_kwargs):
+    def update(self, **loss_kwargs):
         grads, info = jax.grad(self.loss_fn, has_aux=True)(
             self.params, state=self, **loss_kwargs
         )
 
         stats_info = {}
-        stats_info[f"{model_name}/max_grad_norm"] = _compute_norms(grads)
-        stats_info[f"{model_name}/max_weight_norm"] = _compute_norms(self.params)
+        stats_info[f"{self.info_key}/max_grad_norm"] = _compute_norms(grads)
+        stats_info[f"{self.info_key}/max_weight_norm"] = _compute_norms(self.params)
 
         return self.apply_gradients(grads=grads), info, stats_info
 

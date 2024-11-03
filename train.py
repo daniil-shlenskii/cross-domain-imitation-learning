@@ -1,5 +1,5 @@
 import argparse
-from pprint import pformat
+import warnings
 
 import jax
 
@@ -14,7 +14,7 @@ import wandb
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
-from evaluate import evaluate
+from utils.evaluate import evaluate
 from utils.utils import save_pickle, load_buffer
 
 
@@ -27,13 +27,14 @@ def init() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="RL agent training script"
     )
-    parser.add_argument("--config_path",        type=str)
-    parser.add_argument("--wandb_project_name", type=str, default="_default_wandb_project_name")
-    parser.add_argument("--from_scratch",       action="store_true")
+    parser.add_argument("--config_path",           type=str)
+    parser.add_argument("--wandb_project_name",    type=str, default="_default_wandb_project_name")
+    parser.add_argument("--from_scratch",          action="store_true")
+    parser.add_argument("-w", "--ignore_warnings", action="store_true")
     return parser.parse_args()
 
 
-def main(args):
+def main(args: argparse.Namespace):
     wandb.init(project=args.wandb_project_name)
 
     config = OmegaConf.load(args.config_path)
@@ -160,7 +161,6 @@ def main(args):
     logger.info("Training..")
 
     observation, _  = env.reset(seed=config.seed)
-    best_return = None
     for i in tqdm(range(config.n_iters_training)):
         # evaluate model
         if i == 0 or (i + 1) % config.eval_every == 0:
@@ -172,15 +172,6 @@ def main(args):
             )
             for k, v in eval_info.items():
                 wandb.log({f"evaluation/{k}": v}, step=i)
-            if best_return is None:
-               best_return = eval_info["return"]
-            if eval_info["return"] > best_return:
-                # save agent
-                agent.save(agent_save_dir)
-                # save agent buffer
-                save_pickle(state, agent_buffer_load_path)
-                #update best return
-                best_return = eval_info["return"]
 
         # sample actions
         action = agent.sample_actions(observation[None])
@@ -204,14 +195,20 @@ def main(args):
             for k, v in stats_info.items():
                 wandb.log({f"training_stats/{k}": v}, step=i)
 
-    logger.info(
-        f"Agent is stored under the path: {agent_save_dir}. " +
-        f"Best Return: {np.round(best_return, 3)}"
-    )
+        # save model
+        if (i + 1) % config.save_every == 0:
+            agent.save(agent_save_dir)
+            save_pickle(state, agent_buffer_load_path)
+
+    logger.info(f"Agent is stored under the path: {agent_save_dir}.")
 
     env.close()
 
 
 if __name__ == "__main__":
     args = init()
+
+    if args.ignore_warnings:
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+
     main(args)
