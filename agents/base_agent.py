@@ -29,7 +29,7 @@ class Agent:
         action_space: gym.Space,
         **kwargs,
     ) -> nn.Module:
-        action_dim = action_space.sample().shape[0]
+        action_dim = action_space.sample().shape[-1]
 
         low, high = None, None
         if np.any(action_space.low != -1) or np.any(action_space.high != 1):
