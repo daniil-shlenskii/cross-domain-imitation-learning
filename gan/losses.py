@@ -7,13 +7,13 @@ from utils.types import PRNGKey
 
 
 def g_nonsaturating_loss(fake_logits: jnp.ndarray):
-    loss = jax.nn.softplus(-fake_logits) 
+    loss = jax.nn.softplus(-fake_logits).mean()
     return loss
 
 def d_logistic_loss(real_logits: jnp.ndarray, fake_logits: jnp.ndarray):
-    real_loss = jax.nn.softplus(-real_logits)
-    fake_loss = jax.nn.softplus(fake_logits)
-    return real_loss.mean() + fake_loss.mean()
+    real_loss = jax.nn.softplus(-real_logits).mean()
+    fake_loss = jax.nn.softplus(fake_logits).mean()
+    return real_loss + fake_loss
 
 def gradient_penalty(
     key: PRNGKey,
