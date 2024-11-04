@@ -1,13 +1,8 @@
 from typing import Optional, Sequence
 
+import distrax
 import flax.linen as nn
 import jax.numpy as jnp
-from tensorflow_probability.substrates import jax as tfp
-
-tfd = tfp.distributions
-tfb = tfp.bijectors
-
-import distrax
 
 from networks.common import MLP, default_init
 

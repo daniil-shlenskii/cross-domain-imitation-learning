@@ -1,25 +1,18 @@
 import functools
 from copy import deepcopy
+from pathlib import Path
 from typing import Dict, Tuple
 
-from pathlib import Path
-
-import flax
-import flax.linen as nn
 import gymnasium as gym
 import jax
 import jax.numpy as jnp
-import numpy as np
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
-from nn.train_state import TrainState
-
 from agents.base_agent import Agent
-
+from nn.train_state import TrainState
 from utils.types import DataType, Params, PRNGKey
-from utils.utils import instantiate_optimizer, save_pickle, load_pickle
-
+from utils.utils import instantiate_optimizer, load_pickle, save_pickle
 
 
 class SACAgent(Agent):

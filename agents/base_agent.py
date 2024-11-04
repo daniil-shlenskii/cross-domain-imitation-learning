@@ -1,19 +1,15 @@
-from typing import Tuple, Sequence
 from pathlib import Path
+from typing import Tuple
 
+import flax.linen as nn
 import gym
-
-import numpy as np
-
 import jax
 import jax.numpy as jnp
-import flax.linen as nn
 import numpy as np
-from nn.train_state import TrainState
-
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
+from nn.train_state import TrainState
 from utils.types import PRNGKey
 
 

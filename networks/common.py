@@ -1,7 +1,5 @@
 from typing import Callable, Optional, Sequence
 
-import jax
-
 import flax.linen as nn
 import jax.numpy as jnp
 

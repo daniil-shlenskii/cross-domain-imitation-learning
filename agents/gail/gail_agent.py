@@ -1,19 +1,15 @@
+import flashbax
+import gymnasium as gym
 import jax
 import jax.numpy as jnp
-
-import gymnasium as gym
-
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
-import flashbax
-
 from agents.base_agent import Agent
-from nn.train_state import TrainState
-from utils.types import DataType, PRNGKey, Buffer, BufferState
-from utils.utils import load_pickle
-
 from agents.gail.gail_discriminator import GAILDiscriminator
+from nn.train_state import TrainState
+from utils.types import Buffer, BufferState, DataType
+from utils.utils import load_pickle
 
 
 class GAILAgent(Agent):

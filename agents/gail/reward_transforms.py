@@ -1,12 +1,9 @@
 import abc
-from typing import List, Dict
+from typing import Dict, List
 
-from hydra.utils import instantiate
-
-import jax
-from jax import numpy as jnp
 from flax.struct import PyTreeNode
-from jax.numpy import ndarray
+from hydra.utils import instantiate
+from jax import numpy as jnp
 
 
 class RewardTransform(PyTreeNode):
