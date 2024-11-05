@@ -11,15 +11,13 @@ from omegaconf.dictconfig import DictConfig
 
 from nn.train_state import TrainState
 from utils.types import PRNGKey
-from utils.utils import SaveLoadObjectMixin
+from utils.utils import SaveLoadMixin
 
 
-class Agent(SaveLoadObjectMixin):
+class Agent(SaveLoadMixin):
     actor: TrainState
     rng: PRNGKey
-    _save_attrs: Tuple[str] = (
-        "actor",
-    )
+    _save_attrs: Tuple[str] = ("actor",)
 
     @classmethod
     def instantiate_actor_module(

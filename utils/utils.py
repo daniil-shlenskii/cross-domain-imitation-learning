@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Tuple
 
 import optax
+from flax import struct
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
@@ -50,6 +51,7 @@ def load_buffer(state: Buffer, path: str):
 
 def save_object_attr_pickle(obj, attrs, dir_path):
     dir_path = Path(dir_path)
+    dir_path.mkdir(exist_ok=True, parents=True)
     for attr in attrs:
         attr_value = getattr(obj, attr)
         if hasattr(attr_value, "save"):
@@ -59,27 +61,36 @@ def save_object_attr_pickle(obj, attrs, dir_path):
 
 def load_object_attr_pickle(obj, attrs, dir_path):
     dir_path = Path(dir_path)
-    loaded_attrs = []
+    
+    attr_to_value, loaded_attrs = {}, []
     for attr in attrs:
-        attr_value = getattr(obj, attr)
-        if hasattr(attr_value, "load"):
+        value = getattr(obj, attr)
+        if hasattr(value, "load"):
             load_dir = dir_path / attr
             if load_dir.exists():
-                attr_value.load(load_dir)
+                value, _ = value.load(load_dir)
+                attr_to_value[attr] = value
                 loaded_attrs.append(attr)
         else:
             load_path = dir_path / f"{attr}.pickle"
             if load_path.exists():
-                attr_value = load_pickle(load_path)
-                setattr(obj, attr, attr_value)
+                value = load_pickle(load_path)
+                attr_to_value[attr] = value
                 loaded_attrs.append(attr)
-    return loaded_attrs
+    return attr_to_value, loaded_attrs
 
-class SaveLoadObjectMixin:
-    _save_attrs: Tuple[str]
-
+class SaveLoadMixin:
     def save(self, dir_path: str) -> None:
         save_object_attr_pickle(self, self._save_attrs, dir_path)
 
     def load(self, dir_path: str) -> None:
-        return load_object_attr_pickle(self, self._save_attrs, dir_path)
+        attr_to_value, loaded_attrs = load_object_attr_pickle(self, self._save_attrs, dir_path)
+        for attr, value in attr_to_value.items():
+            setattr(self, attr, value)
+        return self, loaded_attrs
+    
+class SaveLoadFrozenDataclassMixin(SaveLoadMixin):
+    def load(self, dir_path: str) -> None:
+        attr_to_value, loaded_attrs = load_object_attr_pickle(self, self._save_attrs, dir_path)
+        self = self.replace(**attr_to_value)
+        return self, loaded_attrs

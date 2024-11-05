@@ -55,7 +55,7 @@ def main(args: argparse.Namespace):
     # load agent params if given
     agent_load_dir = Path(config_archive.get("agent_load_dir", TMP_AGENT_STORAGE_DIR)) / config.env_name
     if not args.from_scratch and agent_load_dir.exists():
-        loaded_keys = agent.load(agent_load_dir)
+        _, loaded_keys = agent.load(agent_load_dir)
         logger.info(
             f"Agent is initialized with data under the path: {agent_load_dir}.\n" +
             f"Loaded keys: {' '.join(loaded_keys)}."
