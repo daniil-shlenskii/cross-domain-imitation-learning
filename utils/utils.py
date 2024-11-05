@@ -2,7 +2,7 @@ import json
 import pickle
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, Tuple
 
 import optax
 from hydra.utils import instantiate
@@ -70,7 +70,16 @@ def load_object_attr_pickle(obj, attrs, dir_path):
         else:
             load_path = dir_path / f"{attr}.pickle"
             if load_path.exists():
-                attr_value.load(load_path)
-                load_pickle(attr_value, load_path)
+                attr_value = load_pickle(load_path)
+                setattr(obj, attr_value)
                 loaded_attrs.append(attr)
     return loaded_attrs
+
+class SaveLoadObjectMixin:
+    _save_attrs: Tuple[str]
+
+    def save(self, dir_path: str) -> None:
+        save_object_attr_pickle(self, self._save_attrs, dir_path)
+
+    def load(self, dir_path: str) -> None:
+        return load_object_attr_pickle(self, self._save_attrs, dir_path)
