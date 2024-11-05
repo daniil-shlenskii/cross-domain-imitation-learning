@@ -16,14 +16,14 @@ from utils.utils import instantiate_optimizer
 
 
 class SACAgent(Agent):
-    _save_attrs = [
+    _save_attrs = (
         "actor",
         "critic1",
         "critic2",
         "temperature",
         "target_critic1_params",
         "target_critic2_params",
-    ]
+    )
 
     @classmethod
     def create(
