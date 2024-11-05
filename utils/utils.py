@@ -1,6 +1,7 @@
 import json
 import pickle
 import warnings
+from pathlib import Path
 from typing import Any
 
 import optax
@@ -46,3 +47,30 @@ def load_buffer(state: Buffer, path: str):
             f"Data fields: {', '.join(sorted(list(stored_state.experience.keys())))}"
         )
     return state
+
+def save_object_attr_pickle(obj, attrs, dir_path):
+    dir_path = Path(dir_path)
+    for attr in attrs:
+        attr_value = getattr(obj, attr)
+        if hasattr(attr_value, "save"):
+            attr_value.save(dir_path / attr)
+        else:
+            load_pickle(attr_value, dir_path / f"{attr}.pickle")
+
+def load_object_attr_pickle(obj, attrs, dir_path):
+    dir_path = Path(dir_path)
+    loaded_attrs = []
+    for attr in attrs:
+        attr_value = getattr(obj, attr)
+        if hasattr(attr_value, "load"):
+            load_dir = dir_path / attr
+            if load_dir.exists():
+                attr_value.load(load_dir)
+                loaded_attrs.append(attr)
+        else:
+            load_path = dir_path / f"{attr}.pickle"
+            if load_path.exists():
+                attr_value.load(load_path)
+                load_pickle(attr_value, load_path)
+                loaded_attrs.append(attr)
+    return loaded_attrs

@@ -11,11 +11,15 @@ from omegaconf.dictconfig import DictConfig
 
 from nn.train_state import TrainState
 from utils.types import PRNGKey
+from utils.utils import load_object_attr_pickle, save_object_attr_pickle
 
 
 class Agent:
     actor: TrainState
     rng: PRNGKey
+    _save_attrs: Tuple[str] = (
+        "actor",
+    )
 
     @classmethod
     def instantiate_actor_module(
@@ -47,23 +51,10 @@ class Agent:
         return _eval_log_probs_jit(self.actor, observations, actions)
     
     def save(self, dir_path: str) -> None:
-        dir_path = Path(dir_path)
-        for k, v in self.__dict__.items():
-            if isinstance(v, TrainState):
-                v.save(dir_path / f"{k}.pickle")
+        save_object_attr_pickle(self, self._save_attrs, dir_path)
 
     def load(self, dir_path: str) -> None:
-        dir_path = Path(dir_path)
-        loaded_attrs = []
-        for path in dir_path.iterdir():
-            attr = str(path).split("/")[-1].split(".")[0]
-            if hasattr(self, attr):
-                train_state = getattr(self, attr)
-                if isinstance(train_state, TrainState):
-                    loaded_train_state = train_state.load(path)
-                    setattr(self, attr, loaded_train_state)
-                    loaded_attrs.append(attr)
-        return loaded_attrs
+        return load_object_attr_pickle(self, self._save_attrs, dir_path)
 
 @jax.jit
 def _sample_actions_jit(rng: PRNGKey, actor: TrainState, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:

@@ -171,29 +171,6 @@ class SACAgent(Agent):
 
         return info, stats_info
 
-    def save(self, dir_path: str) -> None:
-        super().save(dir_path)
-
-        dir_path = Path(dir_path)
-        for attr in self._non_train_state_attrs_to_save:
-            save_pickle(
-                getattr(self, attr),
-                dir_path / f"{attr}.pickle"
-            )
-
-    def load(self, dir_path: str) -> list:        
-        loaded_attrs = super().load(dir_path)
-
-        dir_path = Path(dir_path)
-        for attr in self._non_train_state_attrs_to_save:
-            path = dir_path / f"{attr}.pickle"
-            if path.exists():
-                attr_value = load_pickle(dir_path / f"{attr}.pickle")
-                setattr(self, attr, attr_value)
-                loaded_attrs.append(attr)
-
-        return loaded_attrs
-
 @functools.partial(jax.jit, static_argnames="backup_entropy")
 def _update_jit(
     *,
