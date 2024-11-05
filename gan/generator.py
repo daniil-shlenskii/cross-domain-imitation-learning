@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Tuple
+
 import jax
 import jax.numpy as jnp
 from flax.struct import PyTreeNode
@@ -8,11 +11,14 @@ from gan.discriminator import Discriminator
 from gan.losses import g_nonsaturating_loss
 from nn.train_state import TrainState
 from utils.types import Params
-from utils.utils import instantiate_optimizer
+from utils.utils import SaveLoadObjectMixin, instantiate_optimizer
 
 
-class Generator(PyTreeNode):
+class Generator(PyTreeNode, SaveLoadObjectMixin):
     state: TrainState
+    _save_attrs: Tuple[str] = (
+        "state",
+    )
 
     @classmethod
     def create(

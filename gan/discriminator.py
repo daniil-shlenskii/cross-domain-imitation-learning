@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Dict, Tuple
 
 import jax
@@ -9,13 +10,16 @@ from omegaconf.dictconfig import DictConfig
 from gan.losses import d_logistic_loss, gradient_penalty
 from nn.train_state import TrainState
 from utils.types import Params, PRNGKey
-from utils.utils import instantiate_optimizer
+from utils.utils import SaveLoadObjectMixin, instantiate_optimizer
 
 
-class Discriminator(PyTreeNode):
+class Discriminator(PyTreeNode, SaveLoadObjectMixin):
     rng: PRNGKey
     state: TrainState
     gradient_penalty_coef: float
+    _save_attrs: Tuple[str] = (
+        "state",
+    )
 
     @classmethod
     def create(

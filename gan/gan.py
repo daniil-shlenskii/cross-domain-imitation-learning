@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Tuple
+
 import jax
 import jax.numpy as jnp
 from flax.struct import PyTreeNode
@@ -7,10 +10,15 @@ from omegaconf.dictconfig import DictConfig
 from gan.discriminator import Discriminator
 from gan.generator import Generator
 from utils.types import Params, PRNGKey
-from utils.utils import instantiate_optimizer
+from utils.utils import SaveLoadObjectMixin
 
 
-class GAN:
+class GAN(SaveLoadObjectMixin):
+    _attrs_to_save: Tuple[str] = (
+        "generator",
+        "discriminator",
+    )
+
     @classmethod
     def create(
         cls,
