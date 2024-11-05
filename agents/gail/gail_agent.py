@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
+from typing_extensions import override
 
 from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
@@ -54,7 +55,6 @@ class GAILAgent(Agent):
             add_batches=False,
         )
 
-
         return cls(
             seed=seed,
             expert_buffer=expert_buffer,
@@ -88,6 +88,7 @@ class GAILAgent(Agent):
         # process batch
         learner_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=-1)
         expert_batch = self.expert_buffer.sample(self.expert_buffer_state, key).experience
+        expert_batch = self._preprocess_expert_batch(expert_batch)
 
         expert_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=-1)
 
@@ -105,6 +106,11 @@ class GAILAgent(Agent):
         info = {**agent_info, **disc_info}
         stats_info = {**agent_stats_info, **disc_stats_info}
         return info, stats_info
+    
+    @override
+    def _preprocess_expert_batch(self, expert_batch: DataType) -> DataType:
+        return expert_batch
+
 
 @jax.jit
 def _update_discriminator_jit(
