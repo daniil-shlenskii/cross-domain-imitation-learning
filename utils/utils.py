@@ -61,22 +61,26 @@ def save_object_attr_pickle(obj, attrs, dir_path):
 
 def load_object_attr_pickle(obj, attrs, dir_path):
     dir_path = Path(dir_path)
-    
-    attr_to_value, loaded_attrs = {}, []
+    attr_to_value, loaded_attrs = {}, {}
     for attr in attrs:
         value = getattr(obj, attr)
         if hasattr(value, "load"):
             load_dir = dir_path / attr
             if load_dir.exists():
-                value, _ = value.load(load_dir)
+                value, loaded_subattrs = value.load(load_dir)
                 attr_to_value[attr] = value
-                loaded_attrs.append(attr)
+                # loaded_attrs.append(attr: loaded_subattrs)
+                loaded_attrs[attr] = loaded_subattrs
+            else:
+                loaded_attrs[attr] = "-"
         else:
             load_path = dir_path / f"{attr}.pickle"
             if load_path.exists():
                 value = load_pickle(load_path)
                 attr_to_value[attr] = value
-                loaded_attrs.append(attr)
+                loaded_attrs[attr] = "+"
+            else:
+                loaded_attrs[attr] = "-"
     return attr_to_value, loaded_attrs
 
 class SaveLoadMixin:

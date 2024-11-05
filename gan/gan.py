@@ -10,13 +10,13 @@ from omegaconf.dictconfig import DictConfig
 from gan.discriminator import Discriminator
 from gan.generator import Generator
 from utils.types import Params, PRNGKey
-from utils.utils import SaveLoadObjectMixin
+from utils.utils import SaveLoadMixin
 
 
-class GAN(SaveLoadObjectMixin):
+class GAN(SaveLoadMixin):
     _attrs_to_save: Tuple[str] = (
         "generator",
-        "discriminator",
+        "discriminator"
     )
 
     @classmethod
@@ -29,7 +29,6 @@ class GAN(SaveLoadObjectMixin):
         #
         generator_config: DictConfig,
         discriminator_config: DictConfig,
-        
     ):
         generator = Generator.create(
             seed=seed,

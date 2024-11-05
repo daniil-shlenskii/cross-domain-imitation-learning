@@ -9,10 +9,6 @@ from gan.discriminator import Discriminator
 
 class GAILDiscriminator(Discriminator):
     reward_transform: ...
-    _save_attrs: Tuple[str] = (
-        "state",
-        "reward_transform"
-    )
 
     @classmethod
     def create(
@@ -22,7 +18,11 @@ class GAILDiscriminator(Discriminator):
         **discriminator_kwargs,
     ):
         reward_transform = instantiate(reward_transform_config)
-        return super().create(reward_transform=reward_transform, **discriminator_kwargs)
+        return super().create(
+            reward_transform=reward_transform,
+            _save_attrs=("state", "reward_transform"),
+            **discriminator_kwargs
+        )
 
     def update(self, *, expert_batch: jnp.ndarray, learner_batch: jnp.ndarray):
         new_state, info, stats_info = super().update(real_batch=expert_batch, fake_batch=learner_batch)

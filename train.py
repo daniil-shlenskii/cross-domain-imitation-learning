@@ -1,6 +1,7 @@
 import argparse
 import warnings
 from pathlib import Path
+from pprint import pformat
 
 import jax
 import numpy as np
@@ -57,8 +58,8 @@ def main(args: argparse.Namespace):
     if not args.from_scratch and agent_load_dir.exists():
         _, loaded_keys = agent.load(agent_load_dir)
         logger.info(
-            f"Agent is initialized with data under the path: {agent_load_dir}.\n" +
-            f"Loaded keys: {' '.join(loaded_keys)}."
+            f"Agent is initialized with data under the path: {agent_load_dir}.\n" + \
+            f"Loaded keys:\n----------------\n{OmegaConf.to_yaml(loaded_keys)}"
         )
 
     # prepare path to save agent params

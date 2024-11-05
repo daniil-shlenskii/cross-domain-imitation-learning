@@ -3,6 +3,7 @@ from typing import Tuple
 
 import jax
 import jax.numpy as jnp
+from flax import struct
 from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
@@ -11,14 +12,12 @@ from gan.discriminator import Discriminator
 from gan.losses import g_nonsaturating_loss
 from nn.train_state import TrainState
 from utils.types import Params
-from utils.utils import SaveLoadObjectMixin, instantiate_optimizer
+from utils.utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
 
 
-class Generator(PyTreeNode, SaveLoadObjectMixin):
+class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
     state: TrainState
-    _save_attrs: Tuple[str] = (
-        "state",
-    )
+    _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -30,6 +29,8 @@ class Generator(PyTreeNode, SaveLoadObjectMixin):
         #
         module_config: DictConfig,
         optimizer_config: DictConfig,
+        #
+        **kwargs,
     ):
         module_config.hidden_dims.append(output_dim)
 
@@ -43,7 +44,11 @@ class Generator(PyTreeNode, SaveLoadObjectMixin):
             tx=instantiate_optimizer(optimizer_config),
             info_key="generator",
         )
-        return cls(state=state)
+
+        if "_save_attrs" not in kwargs:
+            kwargs["_save_attrs"] = ("state",)
+
+        return cls(state=state, **kwargs)
 
     def update(self, *, batch: jnp.ndarray, discriminator: Discriminator):
         new_state, info, stats_info = _update_jit(

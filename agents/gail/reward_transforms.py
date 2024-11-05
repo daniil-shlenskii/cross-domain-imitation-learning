@@ -1,12 +1,23 @@
 import abc
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
+from flax import struct
 from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from jax import numpy as jnp
 
+from utils.utils import SaveLoadFrozenDataclassMixin
 
-class RewardTransform(PyTreeNode):
+
+class RewardTransform(PyTreeNode, SaveLoadFrozenDataclassMixin):
+    _save_attrs: Tuple[str] = struct.field(pytree_node=False)
+
+    @classmethod
+    def create(cls, **kwargs):
+        if "_save_attrs" not in kwargs:
+            kwargs["_save_attrs"] = tuple()
+        return cls(**kwargs)
+
     @abc.abstractmethod
     def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
         ...
@@ -24,7 +35,10 @@ class RewardTransformList(PyTreeNode):
             instantiate(tranform_config)
             for tranform_config in tranforms_config
         ]
-        return cls(transforms=transforms)
+        return cls(
+            transforms=transforms,
+            _save_attrs=("transforms",)
+        )
 
     def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
         for transform in self.transforms:
@@ -47,10 +61,22 @@ class IdentityRewardTransform(RewardTransform):
         return self
 
 class RewardStandartization(RewardTransform):
-    mean: jnp.ndarray = 0.
-    std: jnp.ndarray = 1.
-    ema: float = 0.99
-    eps: float = 1e-8
+    mean: jnp.ndarray
+    std: jnp.ndarray
+    ema: float
+    eps: float
+
+    @classmethod
+    def create(
+        cls, mean=0., std=1., ema=0.99, eps=1e-8,
+    ) -> RewardTransform:
+        return cls(
+            mean=mean,
+            std=std,
+            ema=ema,
+            eps=eps,
+            _save_attrs=("mean", "std", "ema", "eps")
+        )
 
     def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
         return (rewards - self.mean) / (self.std + self.eps)

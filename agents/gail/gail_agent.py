@@ -11,10 +11,10 @@ from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
 from nn.train_state import TrainState
 from utils.types import Buffer, BufferState, DataType
-from utils.utils import SaveLoadObjectMixin, load_pickle
+from utils.utils import load_pickle
 
 
-class GAILAgent(Agent, SaveLoadObjectMixin):
+class GAILAgent(Agent):
     _save_attrs: Tuple[str] = (
         "agent",
         "discriminator"
@@ -62,7 +62,6 @@ class GAILAgent(Agent, SaveLoadObjectMixin):
             add_batches=False,
         )
 
-
         return cls(
             seed=seed,
             expert_buffer=expert_buffer,
@@ -109,7 +108,6 @@ class GAILAgent(Agent, SaveLoadObjectMixin):
             learner_batch=learner_batch,
             disc=self.discriminator,
         )
-
         info = {**agent_info, **disc_info}
         stats_info = {**agent_stats_info, **disc_stats_info}
         return info, stats_info
