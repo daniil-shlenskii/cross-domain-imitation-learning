@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import flashbax
 import gymnasium as gym
 import jax
@@ -9,10 +11,16 @@ from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
 from nn.train_state import TrainState
 from utils.types import Buffer, BufferState, DataType
-from utils.utils import load_pickle
+from utils.utils import SaveLoadObjectMixin, load_pickle
 
 
-class GAILAgent(Agent):
+class GAILAgent(Agent, SaveLoadObjectMixin):
+    _save_attrs: Tuple[str] = (
+        "agent",
+        "discriminator"
+    )
+
+
     @classmethod
     def create(
         cls,

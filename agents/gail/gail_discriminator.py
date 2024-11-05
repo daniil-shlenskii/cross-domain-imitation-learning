@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import jax.numpy as jnp
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
@@ -7,6 +9,10 @@ from gan.discriminator import Discriminator
 
 class GAILDiscriminator(Discriminator):
     reward_transform: ...
+    _save_attrs: Tuple[str] = (
+        "state",
+        "reward_transform"
+    )
 
     @classmethod
     def create(
