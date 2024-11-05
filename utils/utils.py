@@ -55,7 +55,7 @@ def save_object_attr_pickle(obj, attrs, dir_path):
         if hasattr(attr_value, "save"):
             attr_value.save(dir_path / attr)
         else:
-            load_pickle(attr_value, dir_path / f"{attr}.pickle")
+            save_pickle(attr_value, dir_path / f"{attr}.pickle")
 
 def load_object_attr_pickle(obj, attrs, dir_path):
     dir_path = Path(dir_path)
@@ -71,7 +71,7 @@ def load_object_attr_pickle(obj, attrs, dir_path):
             load_path = dir_path / f"{attr}.pickle"
             if load_path.exists():
                 attr_value = load_pickle(load_path)
-                setattr(obj, attr_value)
+                setattr(obj, attr, attr_value)
                 loaded_attrs.append(attr)
     return loaded_attrs
 
