@@ -1,19 +1,14 @@
-from typing import Callable, Dict, Tuple
-
 import jax
 import jax.numpy as jnp
-
 from flax.struct import PyTreeNode
-
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
-from nn.train_state import TrainState
-from utils.utils import instantiate_optimizer
-from utils.types import Params
-
 from gan.discriminator import Discriminator
 from gan.losses import g_nonsaturating_loss
+from nn.train_state import TrainState
+from utils.types import Params
+from utils.utils import instantiate_optimizer
 
 
 class Generator(PyTreeNode):

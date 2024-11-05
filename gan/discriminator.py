@@ -1,18 +1,15 @@
-from typing import Callable, Dict, Tuple
+from typing import Dict, Tuple
 
 import jax
 import jax.numpy as jnp
-
 from flax.struct import PyTreeNode
-
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
-from nn.train_state import TrainState
-from utils.utils import instantiate_optimizer
-from utils.types import Params, PRNGKey
-
 from gan.losses import d_logistic_loss, gradient_penalty
+from nn.train_state import TrainState
+from utils.types import Params, PRNGKey
+from utils.utils import instantiate_optimizer
 
 
 class Discriminator(PyTreeNode):
