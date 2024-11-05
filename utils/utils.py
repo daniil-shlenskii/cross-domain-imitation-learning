@@ -3,8 +3,11 @@ import pickle
 import warnings
 from typing import Any
 
+import matplotlib.pyplot as plt
+import numpy as np
 import optax
 from hydra.utils import instantiate
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 from omegaconf.dictconfig import DictConfig
 
 from utils.types import Buffer
@@ -46,3 +49,8 @@ def load_buffer(state: Buffer, path: str):
             f"Data fields: {', '.join(sorted(list(stored_state.experience.keys())))}"
         )
     return state
+
+def convert_figure_to_array(figure: plt.Figure) -> np.ndarray:
+    agg = figure.canvas.switch_backends(FigureCanvasAgg)
+    agg.draw()
+    return np.asarray(agg.buffer_rgba())
