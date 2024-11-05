@@ -1,7 +1,9 @@
+from pathlib import Path
 from typing import Dict, Tuple
 
 import jax
 import jax.numpy as jnp
+from flax import struct
 from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
@@ -9,13 +11,14 @@ from omegaconf.dictconfig import DictConfig
 from gan.losses import d_logistic_loss, gradient_penalty
 from nn.train_state import TrainState
 from utils.types import Params, PRNGKey
-from utils.utils import instantiate_optimizer
+from utils.utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
 
 
-class Discriminator(PyTreeNode):
+class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
     rng: PRNGKey
     state: TrainState
     gradient_penalty_coef: float
+    _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -43,7 +46,16 @@ class Discriminator(PyTreeNode):
             tx=instantiate_optimizer(optimizer_config),
             info_key="discriminator",
         )
-        return cls(rng=rng, state=state, gradient_penalty_coef=gradient_penalty_coef, **kwargs)
+
+        if "_save_attrs" not in kwargs:
+            kwargs["_save_attrs"] = ("state",)
+
+        return cls(
+            rng=rng,
+            state=state,
+            gradient_penalty_coef=gradient_penalty_coef,
+            **kwargs
+        )
 
     def update(self, *, real_batch: jnp.ndarray, fake_batch: jnp.ndarray):
         (

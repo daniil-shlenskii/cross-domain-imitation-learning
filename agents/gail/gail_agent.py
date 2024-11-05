@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import flashbax
 import gymnasium as gym
 import jax
@@ -13,6 +15,12 @@ from utils.utils import load_pickle
 
 
 class GAILAgent(Agent):
+    _save_attrs: Tuple[str] = (
+        "agent",
+        "discriminator"
+    )
+
+
     @classmethod
     def create(
         cls,
@@ -53,7 +61,6 @@ class GAILAgent(Agent):
             max_length=expert_buffer_state.current_index,
             add_batches=False,
         )
-
 
         return cls(
             seed=seed,
@@ -101,7 +108,6 @@ class GAILAgent(Agent):
             learner_batch=learner_batch,
             disc=self.discriminator,
         )
-
         info = {**agent_info, **disc_info}
         stats_info = {**agent_stats_info, **disc_stats_info}
         return info, stats_info

@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import jax.numpy as jnp
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
@@ -16,7 +18,11 @@ class GAILDiscriminator(Discriminator):
         **discriminator_kwargs,
     ):
         reward_transform = instantiate(reward_transform_config)
-        return super().create(reward_transform=reward_transform, **discriminator_kwargs)
+        return super().create(
+            reward_transform=reward_transform,
+            _save_attrs=("state", "reward_transform"),
+            **discriminator_kwargs
+        )
 
     def update(self, *, expert_batch: jnp.ndarray, learner_batch: jnp.ndarray):
         new_state, info, stats_info = super().update(real_batch=expert_batch, fake_batch=learner_batch)
