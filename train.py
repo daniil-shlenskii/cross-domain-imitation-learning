@@ -171,10 +171,6 @@ def main(args: argparse.Namespace):
         # sample actions
         action = agent.sample_actions(observation[None])
 
-        if np.isnan(action).any():
-            print(i, observation, action)
-            assert False
-
         # do step in the environment
         do_environment_step(action[0], i)
 
