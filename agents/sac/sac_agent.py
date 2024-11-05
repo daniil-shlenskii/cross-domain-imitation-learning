@@ -12,7 +12,7 @@ from omegaconf.dictconfig import DictConfig
 from agents.base_agent import Agent
 from nn.train_state import TrainState
 from utils.types import DataType, Params, PRNGKey
-from utils.utils import instantiate_optimizer, load_pickle, save_pickle
+from utils.utils import instantiate_optimizer
 
 
 class SACAgent(Agent):

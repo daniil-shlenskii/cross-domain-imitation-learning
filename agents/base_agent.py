@@ -11,10 +11,10 @@ from omegaconf.dictconfig import DictConfig
 
 from nn.train_state import TrainState
 from utils.types import PRNGKey
-from utils.utils import load_object_attr_pickle, save_object_attr_pickle
+from utils.utils import SaveLoadObjectMixin
 
 
-class Agent:
+class Agent(SaveLoadObjectMixin):
     actor: TrainState
     rng: PRNGKey
     _save_attrs: Tuple[str] = (
@@ -49,12 +49,6 @@ class Agent:
 
     def eval_log_probs(self, observations: np.ndarray, actions: np.ndarray) -> float:
         return _eval_log_probs_jit(self.actor, observations, actions)
-    
-    def save(self, dir_path: str) -> None:
-        save_object_attr_pickle(self, self._save_attrs, dir_path)
-
-    def load(self, dir_path: str) -> None:
-        return load_object_attr_pickle(self, self._save_attrs, dir_path)
 
 @jax.jit
 def _sample_actions_jit(rng: PRNGKey, actor: TrainState, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
