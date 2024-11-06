@@ -19,24 +19,6 @@ class Agent(SaveLoadMixin):
     rng: PRNGKey
     _save_attrs: Tuple[str] = ("actor",)
 
-    @classmethod
-    def instantiate_actor_module(
-        cls,
-        actor_module_config: DictConfig,
-        *,
-        action_space: gym.Space,
-        **kwargs,
-    ) -> nn.Module:
-        action_dim = action_space.sample().shape[-1]
-
-        low, high = None, None
-        if np.any(action_space.low != -1) or np.any(action_space.high != 1):
-            low, high = action_space.low, action_space.high
-        
-        return instantiate(
-            actor_module_config, action_dim=action_dim, low=low, high=high, **kwargs
-        )
-
     def sample_actions(self, observations: np.ndarray) -> np.ndarray:
         self.rng, actions = _sample_actions_jit(self.rng, self.actor, observations)
         return np.asarray(actions)
