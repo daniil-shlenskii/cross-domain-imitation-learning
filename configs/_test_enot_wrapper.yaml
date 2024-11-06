@@ -1,0 +1,27 @@
+seed: &seed 5
+n_training_iters: 60_000
+batch_size: 2048
+eval_batch_size: 512
+
+log_every: 500
+eval_every: 2_500
+save_every: 2_500
+
+enot:
+  _target_: enot.ENOT.create
+  seed: *seed
+  f_potential_module_config: &module_config
+    _target_: networks.common.MLP
+    hidden_dims: [128, 128, 128, 128, 1]
+  g_potential_module_config: *module_config
+  f_potential_optimizer_config: &optimizer_config
+    transforms:
+      - _target_: optax.clip
+        max_delta: 1.0
+      - _target_: optax.adamw
+        learning_rate: 3e-4
+  g_potential_optimizer_config: *optimizer_config
+  cost_fn_config:
+    _target_: ott.geometry.costs.SqEuclidean
+  expectile: 0.98
+  expectile_loss_coef: 0.25
