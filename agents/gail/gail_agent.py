@@ -10,6 +10,7 @@ from omegaconf.dictconfig import DictConfig
 
 from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
+from gan.discriminator import Discriminator
 from nn.train_state import TrainState
 from utils.types import Buffer, BufferState, DataType
 from utils.utils import load_pickle
@@ -36,6 +37,8 @@ class GAILAgent(Agent):
         #
         agent_config: DictConfig,
         discriminator_config: DictConfig,
+        #
+        **kwargs,
     ):
         # agent and discriminator init
         agent = instantiate(
@@ -72,6 +75,7 @@ class GAILAgent(Agent):
             expert_buffer_state=expert_buffer_state,
             agent=agent,
             discriminator=discriminator,
+            **kwargs,
         )
 
     def __init__(
@@ -80,8 +84,8 @@ class GAILAgent(Agent):
         seed: int,
         expert_buffer: Buffer,
         expert_buffer_state: BufferState,
-        agent: DictConfig,
-        discriminator: DictConfig,
+        agent: Agent,
+        discriminator: Discriminator,
     ):
         self.rng = jax.random.key(seed=seed)
         self.expert_buffer = expert_buffer
