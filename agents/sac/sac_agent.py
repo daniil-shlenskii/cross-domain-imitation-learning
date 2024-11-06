@@ -6,6 +6,7 @@ from typing import Dict, Tuple
 import gymnasium as gym
 import jax
 import jax.numpy as jnp
+import numpy as np
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
@@ -30,8 +31,10 @@ class SACAgent(Agent):
         cls,
         *,
         seed: int,
-        observation_space: gym.Space,
-        action_space: gym.Space,
+        observation_dim: gym.Space,
+        action_dim: gym.Space,
+        low: np.ndarray[float],
+        high: np.ndarray[float],
         #
         actor_module_config: DictConfig,
         critic_module_config: DictConfig,
@@ -52,10 +55,10 @@ class SACAgent(Agent):
         actor_key, critic1_key, critic2_key, temperature_key = jax.random.split(rng, 4)
 
         # actor, critic and temperature initialization
-        observation = observation_space.sample()
-        action = action_space.sample()
+        observation = np.ones(observation_dim)
+        action = np.ones(action_dim)
 
-        actor_module = cls.instantiate_actor_module(actor_module_config, action_space=action_space)
+        actor_module = instantiate(actor_module_config, action_dim=action_dim, low=low, high=high)
         critic1_module = instantiate(critic_module_config)
         critic2_module = instantiate(critic_module_config)
         temperature_module = instantiate(temperature_module_config)

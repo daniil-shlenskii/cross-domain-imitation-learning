@@ -46,10 +46,21 @@ def main(args: argparse.Namespace):
     eval_env = instantiate(config.evaluation.environment)
 
     # agent init
+    observation_space = env.observation_space
+    action_space = env.action_space
+
+    observation_dim = observation_space.sample().shape[-1]
+    action_dim = action_space.sample().shape[-1]
+    low, high = action_space.low, action_space.high
+    if np.any(low == -1) or np.any(high == 1):
+        low, high = None, None
+        
     agent = instantiate(
         config.agent,
-        observation_space=env.observation_space,
-        action_space=env.action_space,
+        observation_dim=observation_dim,
+        action_dim=action_dim,
+        low=low,
+        high=high,
         _recursive_=False,
     )
 

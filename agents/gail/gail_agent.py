@@ -4,6 +4,7 @@ import flashbax
 import gymnasium as gym
 import jax
 import jax.numpy as jnp
+import numpy as np
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
@@ -20,14 +21,15 @@ class GAILAgent(Agent):
         "discriminator"
     )
 
-
     @classmethod
     def create(
         cls,
         *,
         seed: int,
-        observation_space: gym.Space,
-        action_space: gym.Space,
+        observation_dim: gym.Space,
+        action_dim: gym.Space,
+        low: np.ndarray[float],
+        high: np.ndarray[float],
         #
         expert_batch_size: int,
         expert_buffer_state_path: str,
@@ -39,12 +41,14 @@ class GAILAgent(Agent):
         agent = instantiate(
             agent_config,
             seed=seed,
-            observation_space=observation_space,
-            action_space=action_space,
+            observation_dim=observation_dim,
+            action_dim=action_dim,
+            low=low,
+            high=high,
             _recursive_=False,
         )
         
-        obs = observation_space.sample()
+        obs = np.ones(observation_dim)
         discriminator_input_sample = jnp.concatenate([obs, obs], axis=-1)
         discriminator = instantiate(
             discriminator_config,
