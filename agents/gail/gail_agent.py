@@ -85,7 +85,7 @@ class GAILAgent(Agent):
         expert_buffer: Buffer,
         expert_buffer_state: BufferState,
         agent: Agent,
-        discriminator: Discriminator,
+        discriminator: GAILDiscriminator,
     ):
         self.rng = jax.random.key(seed=seed)
         self.expert_buffer = expert_buffer
