@@ -52,29 +52,38 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
 
         return cls(state=state, **kwargs)
 
-    def update(self, *, batch: jnp.ndarray, discriminator: Discriminator):
+    def update(self, *, batch: jnp.ndarray, discriminator: Discriminator, **kwargs):
         new_state, info, stats_info = _update_jit(
             batch=batch,
             state=self.state,
             discriminator=discriminator,
+            **kwargs,
         )
         return self.replace(state=new_state), info, stats_info
     
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
     
-@jax.jit
-def _update_jit(batch: jnp.ndarray, state: TrainState, discriminator: Discriminator):
-    new_state, info, stats_info = state.update(batch=batch, discriminator=discriminator)
+@functools.partial(jax.jit, static_argnames="process_discriminator_input")
+def _update_jit(
+    batch: jnp.ndarray,
+    state: TrainState,
+    discriminator: Discriminator,
+    process_discriminator_input: Callable = lambda x: x
+):
+    new_state, info, stats_info = state.update(
+        batch=batch,
+        discriminator=discriminator,
+        process_discriminator_input=process_discriminator_input
+    )
     return new_state, info, stats_info
 
-@functools(jax.jit, static_argnames="process_discriminator_input")
 def _gan_loss_fn(
     params: Params,
     state: TrainState,
     batch: jnp.ndarray,
     discriminator: Discriminator,
-    process_discriminator_input: Callable = lambda x: x
+    process_discriminator_input: Callable,
 ):
     fake_batch = state.apply_fn({"params": params}, batch, train=True)
     fake_batch = process_discriminator_input(fake_batch)
