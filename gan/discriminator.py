@@ -32,6 +32,7 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         #
         gradient_penalty_coef: float = 1.,
         #
+        info_key: str = "discriminator",
         **kwargs,
     ):
         rng = jax.random.key(seed)
@@ -44,7 +45,7 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             apply_fn=module.apply,
             params=params,
             tx=instantiate_optimizer(optimizer_config),
-            info_key="discriminator",
+            info_key=info_key,
         )
 
         if "_save_attrs" not in kwargs:

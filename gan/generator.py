@@ -1,5 +1,6 @@
+import functools
 from pathlib import Path
-from typing import Tuple
+from typing import Callable, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -30,6 +31,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         module_config: DictConfig,
         optimizer_config: DictConfig,
         #
+        info_key: str = "generator",
         **kwargs,
     ):
         module_config.hidden_dims.append(output_dim)
@@ -42,7 +44,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             apply_fn=module.apply,
             params=params,
             tx=instantiate_optimizer(optimizer_config),
-            info_key="generator",
+            info_key=info_key,
         )
 
         if "_save_attrs" not in kwargs:
@@ -66,18 +68,21 @@ def _update_jit(batch: jnp.ndarray, state: TrainState, discriminator: Discrimina
     new_state, info, stats_info = state.update(batch=batch, discriminator=discriminator)
     return new_state, info, stats_info
 
+@functools(jax.jit, static_argnames="process_discriminator_input")
 def _gan_loss_fn(
     params: Params,
     state: TrainState,
     batch: jnp.ndarray,
     discriminator: Discriminator,
+    process_discriminator_input: Callable = lambda x: x
 ):
     fake_batch = state.apply_fn({"params": params}, batch, train=True)
+    fake_batch = process_discriminator_input(fake_batch)
     fake_logits = discriminator(fake_batch)
     loss = g_nonsaturating_loss(fake_logits)
 
     info = {
         f"{state.info_key}_loss": loss,
-        "fake_batch": fake_batch
+        "generations": fake_batch
     }
     return loss, info
