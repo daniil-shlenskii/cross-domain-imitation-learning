@@ -20,15 +20,21 @@ class Agent(SaveLoadMixin):
     _save_attrs: Tuple[str] = ("actor",)
 
     def sample_actions(self, observations: np.ndarray) -> np.ndarray:
+        observations = self._preprocess_observations(observations)
         self.rng, actions = _sample_actions_jit(self.rng, self.actor, observations)
         return np.asarray(actions)
 
     def eval_actions(self, observations: np.ndarray) -> np.ndarray:
+        observations = self._preprocess_observations(observations)
         actions = _eval_actions_jit(self.actor, observations)
         return np.asarray(actions)
 
     def eval_log_probs(self, observations: np.ndarray, actions: np.ndarray) -> float:
+        observations = self._preprocess_observations(observations)
         return _eval_log_probs_jit(self.actor, observations, actions)
+    
+    def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
+        return observations
 
 @jax.jit
 def _sample_actions_jit(rng: PRNGKey, actor: TrainState, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
