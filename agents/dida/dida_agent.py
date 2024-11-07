@@ -11,11 +11,10 @@ from omegaconf.dictconfig import DictConfig
 
 from agents import GAILAgent
 from agents.base_agent import Agent
-from agents.gail.gail_discriminator import GAILDiscriminator
+from agents.dida.das import domain_adversarial_sampling_jit
 from gan.discriminator import Discriminator
 from gan.generator import Generator
-from nn.train_state import TrainState
-from utils.types import Buffer, BufferState, DataType
+from utils.types import Buffer, BufferState, DataType, PRNGKey
 from utils.utils import get_buffer_state_size, load_pickle
 
 
@@ -141,19 +140,25 @@ class DIDAAgent(GAILAgent):
         )
 
         # prepare gail input
+        # embed observation
         keys_to_change = ["observations", "observations_next"]
 
-        gail_batch = batch
-        
-        batch_size = gail_batch["observations"].shape[0]
-        perm_idcs = np.random.permutation(2 * batch_size)[:batch_size]
-        gail_expert_batch = {
-            key: jnp.concatenate([expert_batch[key], anchor_batch[key]])[perm_idcs]
-            for key in keys_to_change
-        }
         for key_to_change in keys_to_change:
-            gail_batch[key_to_change] = self.learner_encoder(gail_batch[key_to_change])
-            gail_expert_batch[key_to_change] = self.expert_encoder(gail_expert_batch[key_to_change])
+            batch[key_to_change] = self.learner_encoder(batch[key_to_change])
+            expert_batch[key_to_change] = self.expert_encoder(expert_batch[key_to_change])
+            anchor_batch[key_to_change] = self.expert_encoder(anchor_batch[key_to_change])
+
+        # get gail learner batch via das
+        self.rng, gail_batch = domain_adversarial_sampling_jit(
+            rng=self.rng,
+            embedded_learner_batch=batch,
+            embedded_anchor_batch=anchor_batch,
+            domain_discriminator=self.domain_discriminator,
+            alpha=0.5, # TODO
+        )
+
+        # gail expert batch is just embedded expert batch
+        gail_expert_batch = expert_batch
 
         # apply gail
         gail_info, gail_stats_info = super().update(batch=gail_batch, expert_batch=gail_expert_batch)
@@ -163,7 +168,11 @@ class DIDAAgent(GAILAgent):
         return info, stats_info
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
-        return self.learner_encoder(observations)
+        return _preprocess_observations_jit(self.learner_encoder, observations)
+    
+@jax.jit
+def _preprocess_observations_jit(learner_encoder, observations):
+    return learner_encoder(observations)
 
 @jax.jit
 def _update_encoders_part_jit(
@@ -179,10 +188,10 @@ def _update_encoders_part_jit(
     expert_policy_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=0)
     
     new_learner_encoder, learner_encoder_info, learner_encoder_stats_info = learner_encoder.update(
-        batch=learner_policy_batch, discriminator=policy_discriminator, process_discriminator_input=_process_policy_discriminator_input 
+        batch=learner_policy_batch, discriminator=policy_discriminator, process_discriminator_input=process_policy_discriminator_input 
     )
     new_expert_encoder, expert_encoder_info, expert_encoder_stats_info = expert_encoder.update(
-        batch=expert_policy_batch, discriminator=policy_discriminator, process_discriminator_input=_process_policy_discriminator_input 
+        batch=expert_policy_batch, discriminator=policy_discriminator, process_discriminator_input=process_policy_discriminator_input 
     )
 
     del learner_encoder_info["generations"], expert_encoder_info["generations"]
@@ -218,7 +227,8 @@ def _update_encoders_part_jit(
         stats_info,
     )
 
-def _process_policy_discriminator_input(x: jnp.ndarray):
+def process_policy_discriminator_input(x: jnp.ndarray):
     doubled_b_size, dim = x.shape
     x = x.reshape(2, doubled_b_size // 2, dim).transpose(1, 2, 0).reshape(-1, dim * 2)
     return x
+    
