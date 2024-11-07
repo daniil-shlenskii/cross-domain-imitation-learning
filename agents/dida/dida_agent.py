@@ -19,7 +19,7 @@ from utils.types import Buffer, BufferState, DataType
 from utils.utils import get_buffer_state_size, load_pickle
 
 
-class DIDA(GAILAgent):
+class DIDAAgent(GAILAgent):
     @classmethod
     def create(
         cls,
@@ -29,6 +29,8 @@ class DIDA(GAILAgent):
         action_dim: gym.Space,
         low: np.ndarray[float],
         high: np.ndarray[float],
+        #
+        encoders_dim: int,
         #
         expert_batch_size: int,
         expert_buffer_state_path: str,
@@ -47,24 +49,24 @@ class DIDA(GAILAgent):
             learner_encoder_config,
             seed=seed,
             input_sample=learner_encoder_input_sample,
+            output_dim=encoders_dim,
             info_key="learner_encoder",
             _recursive_=False,
         )
 
         expert_buffer_state = load_pickle(expert_buffer_state_path)
-        expert_observation_dim = expert_buffer_state.experience["observation"].shape[-1]
+        expert_observation_dim = expert_buffer_state.experience["observations"].shape[-1]
         expert_encoder_input_sample = jnp.ones(expert_observation_dim)
         expert_encoder = instantiate(
             expert_encoder_config,
             seed=seed,
             input_sample=expert_encoder_input_sample,
+            output_dim=encoders_dim,
             info_key="expert_encoder",
             _recursive_=False,
         )
 
-        new_observation_dim = learner_encoder(learner_encoder_input_sample).shape[-1]
-        obs = np.ones(new_observation_dim)
-        domain_discriminator_input_sample = jnp.concatenate([obs, obs], axis=-1)
+        domain_discriminator_input_sample = np.ones(encoders_dim)
         domain_discriminator = instantiate(
             domain_discriminator_config,
             seed=seed,
@@ -75,7 +77,7 @@ class DIDA(GAILAgent):
 
         return super().create(
             seed=seed,
-            observation_dim=new_observation_dim,
+            observation_dim=encoders_dim,
             action_dim=action_dim,
             low=low,
             high=high,
@@ -112,8 +114,8 @@ class DIDA(GAILAgent):
         anchor_buffer_state = deepcopy(expert_buffer_state)
         buffer_state_size = get_buffer_state_size(anchor_buffer_state)
         perm_idcs = np.random.permutation(buffer_state_size)
-        anchor_buffer_state["observations_next"].at[0].set(
-            anchor_buffer_state["observations_next"][0:, perm_idcs]
+        anchor_buffer_state.experience["observations_next"].at[0, :buffer_state_size].set(
+            anchor_buffer_state.experience["observations_next"][0, :buffer_state_size][perm_idcs]
         )
         self.anchor_buffer_state = anchor_buffer_state
 
@@ -132,7 +134,6 @@ class DIDA(GAILAgent):
         ) = _update_encoders_part_jit(
             learner_batch=batch,
             expert_batch=expert_batch,
-            anchor_batch=anchor_batch,
             learner_encoder=self.learner_encoder,
             expert_encoder=self.expert_encoder,
             policy_discriminator=self.discriminator,
@@ -140,20 +141,29 @@ class DIDA(GAILAgent):
         )
 
         # prepare gail input
-        gail_input_kwargs = {
-            "batch": deepcopy(batch),
-            "expert_batch": deepcopy(expert_batch)
+        keys_to_change = ["observations", "observations_next"]
+
+        gail_batch = batch
+        
+        batch_size = gail_batch["observations"].shape[0]
+        perm_idcs = np.random.permutation(2 * batch_size)[:batch_size]
+        gail_expert_batch = {
+            key: jnp.concatenate([expert_batch[key], anchor_batch[key]])[perm_idcs]
+            for key in keys_to_change
         }
-        for key_to_change in ["observations", "observations_next"]:
-            gail_input_kwargs["batch"][key_to_change] = self.learner_encoder(gail_input_kwargs["batch"][key_to_change])
-            gail_input_kwargs["expert_batch"][key_to_change] = self.expert_encoder(gail_input_kwargs["expert_batch"][key_to_change])(batch)
+        for key_to_change in keys_to_change:
+            gail_batch[key_to_change] = self.learner_encoder(gail_batch[key_to_change])
+            gail_expert_batch[key_to_change] = self.expert_encoder(gail_expert_batch[key_to_change])
 
         # apply gail
-        gail_info, gail_stats_info = super().update(**gail_input_kwargs)
+        gail_info, gail_stats_info = super().update(batch=gail_batch, expert_batch=gail_expert_batch)
 
         info["gail_update"] = {**gail_info}
         stats_info["gail_update"] = {**gail_stats_info}
         return info, stats_info
+
+    def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
+        return self.learner_encoder(observations)
 
 @jax.jit
 def _update_encoders_part_jit(
@@ -165,8 +175,8 @@ def _update_encoders_part_jit(
     domain_discriminator: Discriminator,
 ):
     # update encoders via policy discriminator
-    learner_policy_batch = jnp.stack([learner_batch["observations"], learner_batch["observations_next"]])
-    expert_policy_batch = jnp.stack([expert_batch["observations"], expert_batch["observations_next"]])
+    learner_policy_batch = jnp.concatenate([learner_batch["observations"], learner_batch["observations_next"]], axis=0)
+    expert_policy_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=0)
     
     new_learner_encoder, learner_encoder_info, learner_encoder_stats_info = learner_encoder.update(
         batch=learner_policy_batch, discriminator=policy_discriminator, process_discriminator_input=_process_policy_discriminator_input 
@@ -193,8 +203,8 @@ def _update_encoders_part_jit(
 
     # update domain discriminator
     new_domain_disc, domain_disc_info, domain_disc_stats_info = domain_discriminator.update(
-        real_batch=learner_encoder_info["generation"],
-        fake_batch=expert_encoder_info["generation"]
+        real_batch=learner_encoder_info["generations"],
+        fake_batch=expert_encoder_info["generations"]
     )
 
     info["domain_update"] = {**learner_encoder_info, **expert_encoder_info, **domain_disc_info}
@@ -208,6 +218,7 @@ def _update_encoders_part_jit(
         stats_info,
     )
 
-def _process_policy_discriminator_input(x):
+def _process_policy_discriminator_input(x: jnp.ndarray):
     doubled_b_size, dim = x.shape
-    return lambda x: x.reshape(2, doubled_b_size // 2, dim).transpose(1, 2, 0)
+    x = x.reshape(2, doubled_b_size // 2, dim).transpose(1, 2, 0).reshape(-1, dim * 2)
+    return x
