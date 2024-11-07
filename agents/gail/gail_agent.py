@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 
 import flashbax
 import gymnasium as gym
@@ -97,14 +97,15 @@ class GAILAgent(Agent):
     def actor(self):
         return self.agent.actor
 
-    def update(self, batch: DataType):
+    def update(self, batch: DataType, expert_batch: Optional[DataType]=None):
         self.rng, key = jax.random.split(self.rng)
 
         # process batch
         learner_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=-1)
-        expert_batch = self.expert_buffer.sample(self.expert_buffer_state, key).experience
 
-        expert_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=-1)
+        if expert_batch is None:
+            expert_batch = self.expert_buffer.sample(self.expert_buffer_state, key).experience
+            expert_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=-1)
 
         # update agent
         batch["reward"] = self.discriminator.get_rewards(learner_batch)
