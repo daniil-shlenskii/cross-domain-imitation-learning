@@ -105,7 +105,7 @@ class GAILAgent(Agent):
 
         if expert_batch is None:
             expert_batch = self.expert_buffer.sample(self.expert_buffer_state, key).experience
-            expert_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=-1)
+        expert_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=-1)
 
         # update agent
         batch["reward"] = self.discriminator.get_rewards(learner_batch)
