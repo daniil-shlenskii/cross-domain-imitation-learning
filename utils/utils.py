@@ -102,6 +102,7 @@ class SaveLoadFrozenDataclassMixin(SaveLoadMixin):
 def get_buffer_state_size(buffer_state: BufferState) -> int:
     if buffer_state.is_full:
         key = list(buffer_state.experience.keys())[0]
-        return buffer_state.experience[key].shape[1]
+        size = buffer_state.experience[key].shape[1]
     else:
-        return buffer_state.current_index
+        size = buffer_state.current_index
+    return int(size)
