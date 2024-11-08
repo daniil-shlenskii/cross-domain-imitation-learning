@@ -38,6 +38,7 @@ class GAILAgent(Agent):
         #
         agent_config: DictConfig,
         discriminator_config: DictConfig,
+        **kwargs,
     ):
         rng = jax.random.key(seed)
 
@@ -79,7 +80,8 @@ class GAILAgent(Agent):
             _save_attrs = (
                 "agent",
                 "discriminator"
-            )
+            ),
+            **kwargs,
         )
 
     @property
