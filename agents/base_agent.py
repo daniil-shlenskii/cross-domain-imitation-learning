@@ -47,6 +47,9 @@ class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
 
         return {"return": np.mean(env.return_queue), "length": np.mean(env.length_queue)}
 
+    def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
+        return observations
+
 @jax.jit
 def _sample_actions_jit(key: PRNGKey, actor: TrainState, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
     dist = actor(observations)
