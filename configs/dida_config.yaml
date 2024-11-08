@@ -1,4 +1,4 @@
-seed: &seed 42
+seed: &seed 0
 env_name: &env_name HalfCheetah-v5 # Hopper-v5
 precollect_buffer_size: &precollect_buffer_size 5_000
 n_iters_training: 1_000_000
@@ -25,7 +25,7 @@ replay_buffer:
 agent:
   _target_: agents.dida.DIDAAgent.create
   seed: *seed
-  encoders_dim: 6
+  encoders_dim: 36
   expert_batch_size: *batch_size
   expert_buffer_state_path: archive/agents/sac/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
   agent_config:
@@ -38,7 +38,7 @@ agent:
       hidden_dims: [256, 256]
     temperature_module_config:
       _target_: agents.sac.Temperature
-      initial_temperature: 0.5
+      initial_temperature: 0.2
     actor_optimizer_config: &optimizer_config
       transforms:
         - _target_: optax.clip
@@ -49,7 +49,7 @@ agent:
     temperature_optimizer_config:
       transforms:
         - _target_: optax.sgd
-          learning_rate: 1e-5
+          learning_rate: 0.
   discriminator_config:
     _target_: agents.gail.GAILDiscriminator.create
     module_config:
@@ -63,20 +63,35 @@ agent:
     _target_: gan.generator.Generator.create
     module_config:
       _target_: networks.common.MLP
-      hidden_dims: [128, 128]
-    optimizer_config: *optimizer_config
+      hidden_dims: [256, 256]
+    optimizer_config:
+      transforms:
+        - _target_: optax.clip
+          max_delta: 1.0
+        - _target_: optax.adamw
+          learning_rate: 1e-4
   expert_encoder_config:
     _target_: gan.generator.Generator.create
     module_config:
       _target_: networks.common.MLP
-      hidden_dims: [128, 128]
-    optimizer_config: *optimizer_config
+      hidden_dims: [256, 256]
+    optimizer_config:
+      transforms:
+        - _target_: optax.clip
+          max_delta: 1.0
+        - _target_: optax.adamw
+          learning_rate: 1e-4
   domain_discriminator_config:
     _target_: gan.discriminator.Discriminator.create
     module_config:
       _target_: networks.discriminator.Discriminator
       hidden_dims: [256, 256]
-    optimizer_config: *optimizer_config
+    optimizer_config:
+      transforms:
+        - _target_: optax.clip
+          max_delta: 1.0
+        - _target_: optax.adamw
+          learning_rate: 5e-4
     gradient_penalty_coef: 10.
 
 evaluation:
