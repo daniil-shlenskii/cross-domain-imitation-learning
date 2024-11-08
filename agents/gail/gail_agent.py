@@ -11,7 +11,7 @@ from omegaconf.dictconfig import DictConfig
 from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
 from nn.train_state import TrainState
-from utils.types import Buffer, BufferState, DataType
+from utils.types import *
 from utils.utils import load_pickle
 
 
@@ -80,8 +80,8 @@ class GAILAgent(Agent):
         seed: int,
         expert_buffer: Buffer,
         expert_buffer_state: BufferState,
-        agent: DictConfig,
-        discriminator: DictConfig,
+        agent: Agent,
+        discriminator: GAILDiscriminator,
     ):
         self.rng = jax.random.key(seed=seed)
         self.expert_buffer = expert_buffer
@@ -94,34 +94,48 @@ class GAILAgent(Agent):
         return self.agent.actor
 
     def update(self, batch: DataType):
-        self.rng, key = jax.random.split(self.rng)
-
-        # process batch
-        learner_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=-1)
-        expert_batch = self.expert_buffer.sample(self.expert_buffer_state, key).experience
-
-        expert_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=-1)
-
-        # update agent
-        batch["reward"] = self.discriminator.get_rewards(learner_batch)
-        agent_info, agent_stats_info = self.agent.update(batch)
-
-        # update discriminator
-        self.discriminator, disc_info, disc_stats_info = _update_discriminator_jit(
-            expert_batch=expert_batch,
-            learner_batch=learner_batch,
-            disc=self.discriminator,
+        (
+            self.rng,
+            self.agent,
+            self.discriminator,
+            info,
+            stats_info,
+        ) = _update_jit(
+            rng=self.rng,
+            batch=batch,
+            expert_buffer=self.expert_buffer,
+            expert_buffer_state=self.expert_buffer_state,
+            agent=self.agent,
+            discriminator=self.discriminator,
         )
-        info = {**agent_info, **disc_info}
-        stats_info = {**agent_stats_info, **disc_stats_info}
         return info, stats_info
-
-@jax.jit
-def _update_discriminator_jit(
+    
+def _update_jit(
     *,
-    expert_batch: jnp.ndarray,
-    learner_batch: jnp.ndarray,
-    disc: GAILDiscriminator,
+    rng: PRNGKey,
+    batch: DataType,
+    #
+    expert_buffer: Buffer,
+    expert_buffer_state: BufferState,
+    #
+    agent: Agent,
+    discriminator: GAILDiscriminator,
 ):
-    new_disc, disc_info, disc_stats_info = disc.update(expert_batch=expert_batch, learner_batch=learner_batch)
-    return new_disc, disc_info, disc_stats_info
+    new_rng, key = jax.random.split(rng)
+
+    # process batch
+    learner_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=-1)
+
+    expert_batch = expert_buffer.sample(expert_buffer_state, key).experience
+    expert_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=-1)
+
+    # update agent
+    batch["reward"] = discriminator.get_rewards(learner_batch)
+    agent_info, agent_stats_info = agent.update(batch)
+
+    # update discriminator
+    new_disc, disc_info, disc_stats_info = discriminator.update(expert_batch=expert_batch, learner_batch=learner_batch)
+
+    info = {**agent_info, **disc_info}
+    stats_info = {**agent_stats_info, **disc_stats_info}
+    return new_rng, agent, new_disc, info, stats_info
