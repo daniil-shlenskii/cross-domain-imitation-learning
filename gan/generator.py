@@ -30,6 +30,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         module_config: DictConfig,
         optimizer_config: DictConfig,
         #
+        info_key: str = "generator",
         **kwargs,
     ):
         module_config.hidden_dims.append(output_dim)
@@ -42,13 +43,14 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             apply_fn=module.apply,
             params=params,
             tx=instantiate_optimizer(optimizer_config),
-            info_key="generator",
+            info_key=info_key,
         )
 
-        if "_save_attrs" not in kwargs:
-            kwargs["_save_attrs"] = ("state",)
-
-        return cls(state=state, **kwargs)
+        return cls(
+            state=state,
+            _save_attrs=kwargs.pop("_save_attrs", "state"),
+            **kwargs
+        )
 
     def update(self, *, batch: jnp.ndarray, discriminator: Discriminator):
         new_state, info, stats_info = _update_jit(
