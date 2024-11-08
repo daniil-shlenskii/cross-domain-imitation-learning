@@ -13,8 +13,7 @@ from agents import GAILAgent
 from agents.base_agent import Agent
 from agents.dida.das import domain_adversarial_sampling
 from agents.dida.sar import self_adaptive_rate
-from agents.dida.utils import (encode_observations_jit,
-                               process_policy_discriminator_input)
+from agents.dida.utils import process_policy_discriminator_input
 from gan.discriminator import Discriminator
 from gan.generator import Generator
 from utils.types import Buffer, BufferState, DataType, PRNGKey
@@ -158,8 +157,8 @@ class DIDAAgent(GAILAgent):
         batch["observations_next"] = encoded_learner_state[:, encoders_dim:]
         expert_batch["observations"] = encoded_expert_state[:, :encoders_dim]
         expert_batch["observations_next"] = encoded_expert_state[:, encoders_dim:]
-        anchor_batch["observations"] = encode_observations_jit(self.expert_encoder, anchor_batch["observations"])
-        anchor_batch["observations_next"] = encode_observations_jit(self.expert_encoder, anchor_batch["observations_next"])
+        anchor_batch["observations"] = self.expert_encoder(self.expert_encoder, anchor_batch["observations"])
+        anchor_batch["observations_next"] = self.expert_encoder(self.expert_encoder, anchor_batch["observations_next"])
 
         # get das alph param with sar
         alpha = self_adaptive_rate(
@@ -186,7 +185,7 @@ class DIDAAgent(GAILAgent):
         return info, stats_info
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
-        return encode_observations_jit(self.learner_encoder, observations)
+        return self.learner_encoder(observations)
 
 @jax.jit
 def _update_encoders_part_jit(
