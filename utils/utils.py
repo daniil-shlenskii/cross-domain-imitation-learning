@@ -9,7 +9,7 @@ from flax import struct
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
-from utils.types import Buffer
+from utils.types import Buffer, BufferState
 
 
 def instantiate_optimizer(config: DictConfig):
@@ -98,3 +98,11 @@ class SaveLoadFrozenDataclassMixin(SaveLoadMixin):
         attr_to_value, loaded_attrs = load_object_attr_pickle(self, self._save_attrs, dir_path)
         self = self.replace(**attr_to_value)
         return self, loaded_attrs
+    
+def get_buffer_state_size(buffer_state: BufferState) -> int:
+    if buffer_state.is_full:
+        key = list(buffer_state.experience.keys())[0]
+        size = buffer_state.experience[key].shape[1]
+    else:
+        size = buffer_state.current_index
+    return int(size)
