@@ -202,10 +202,16 @@ def _update_encoders_part_jit(
     expert_policy_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=0)
     
     new_learner_encoder, learner_encoder_info, learner_encoder_stats_info = learner_encoder.update(
-        batch=learner_policy_batch, discriminator=policy_discriminator, process_discriminator_input=process_policy_discriminator_input 
+        hold_grad=True,
+        batch=learner_policy_batch,
+        discriminator=policy_discriminator,
+        process_discriminator_input=process_policy_discriminator_input 
     )
     new_expert_encoder, expert_encoder_info, expert_encoder_stats_info = expert_encoder.update(
-        batch=expert_policy_batch, discriminator=policy_discriminator, process_discriminator_input=process_policy_discriminator_input 
+        hold_grad=True,
+        batch=expert_policy_batch,
+        discriminator=policy_discriminator,
+        process_discriminator_input=process_policy_discriminator_input 
     )
 
     # store batch encoding for policy discriminator update
