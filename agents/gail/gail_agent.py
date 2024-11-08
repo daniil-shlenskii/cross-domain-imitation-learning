@@ -136,7 +136,7 @@ def _update_jit(
     new_agent, agent_info, agent_stats_info = agent.update(batch)
 
     # update discriminator
-    new_disc, disc_info, disc_stats_info = discriminator.update(expert_batch=expert_batch, learner_batch=learner_batch)
+    new_disc, disc_info, disc_stats_info = discriminator.update(learner_batch=learner_batch, expert_batch=expert_batch)
 
     info = {**agent_info, **disc_info}
     stats_info = {**agent_stats_info, **disc_stats_info}
