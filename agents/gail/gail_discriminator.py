@@ -25,8 +25,8 @@ class GAILDiscriminator(Discriminator):
             **discriminator_kwargs
         )
 
-    def update(self, *, expert_batch: jnp.ndarray, learner_batch: jnp.ndarray):
-        new_state, info, stats_info = super().update(real_batch=expert_batch, fake_batch=learner_batch)
+    def update(self, *, expert_batch: jnp.ndarray, learner_batch: jnp.ndarray, **kwargs):
+        new_state, info, stats_info = super().update(real_batch=expert_batch, fake_batch=learner_batch, **kwargs)
         
         base_rewards = -jnp.log(self(learner_batch))
         new_reward_transform = self.reward_transform.update(base_rewards)

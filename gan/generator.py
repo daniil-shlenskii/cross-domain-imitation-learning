@@ -69,12 +69,14 @@ def _update_jit(
     batch: jnp.ndarray,
     state: TrainState,
     discriminator: Discriminator,
-    process_discriminator_input: Callable = lambda x: x
+    process_discriminator_input: Callable = lambda x: x,
+    **kwargs,
 ):
     new_state, info, stats_info = state.update(
         batch=batch,
         discriminator=discriminator,
-        process_discriminator_input=process_discriminator_input
+        process_discriminator_input=process_discriminator_input,
+        **kwargs,
     )
     return new_state, info, stats_info
 

@@ -58,7 +58,7 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             **kwargs
         )
 
-    def update(self, *, real_batch: jnp.ndarray, fake_batch: jnp.ndarray):
+    def update(self, *, real_batch: jnp.ndarray, fake_batch: jnp.ndarray, **kwargs):
         (
             new_rng,
             new_state,
@@ -70,6 +70,7 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             state=self.state,
             gradient_penalty_coef=self.gradient_penalty_coef,
             rng=self.rng,
+            **kwargs
         )
         return self.replace(rng=new_rng, state=new_state), info, stats_info
     
@@ -83,9 +84,16 @@ def _update_jit(
     fake_batch: jnp.ndarray,
     state: TrainState,
     gradient_penalty_coef: float,
+    **kwargs,
 ) -> Tuple[TrainState, Dict, Dict]:
     new_rng, key = jax.random.split(rng)
-    new_state, info, stats_info = state.update(key=key, real_batch=real_batch, fake_batch=fake_batch, gradient_penalty_coef=gradient_penalty_coef)
+    new_state, info, stats_info = state.update(
+        key=key,
+        real_batch=real_batch,
+        fake_batch=fake_batch,
+        gradient_penalty_coef=gradient_penalty_coef,
+        **kwargs
+    )
     return new_rng, new_state, info, stats_info
 
 def _discr_loss_fn(
