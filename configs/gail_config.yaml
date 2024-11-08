@@ -57,7 +57,7 @@ agent:
     optimizer_config: *optimizer_config
     gradient_penalty_coef: 10.
     reward_transform_config:
-      _target_: agents.gail.reward_transforms.RewardStandartization
+      _target_: agents.gail.reward_transforms.RewardStandartization.create
 
 evaluation:
   seed: 42
