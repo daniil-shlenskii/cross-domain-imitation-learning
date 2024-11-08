@@ -52,7 +52,7 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             rng=rng,
             state=state,
             gradient_penalty_coef=gradient_penalty_coef,
-            _save_attrs=kwargs.pop("_save_attrs", "state")
+            _save_attrs=kwargs.pop("_save_attrs", "state"),
             **kwargs
         )
 
