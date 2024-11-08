@@ -4,12 +4,9 @@ import warnings
 from pathlib import Path
 from typing import Any, Tuple
 
-<<<<<<< HEAD
 import jax
-=======
 import matplotlib.pyplot as plt
 import numpy as np
->>>>>>> d320934 (dida: evaluation added)
 import optax
 from flax import struct
 from hydra.utils import instantiate
