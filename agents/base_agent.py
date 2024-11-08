@@ -20,7 +20,7 @@ class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
     rng: PRNGKey
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
-    def sample_actions(self, key: PRNGKey, observations: np.ndarray,) -> np.ndarray:
+    def sample_actions(self, key: PRNGKey, observations: np.ndarray) -> np.ndarray:
         actions = _sample_actions_jit(key, self.actor, observations)
         return np.asarray(actions)
 
@@ -29,7 +29,11 @@ class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
         return np.asarray(actions)
 
     def eval_log_probs(self, observations: np.ndarray, actions: np.ndarray) -> float:
+        observations = self._preprocess_observations(observations)
         return _eval_log_probs_jit(self.actor, observations, actions)
+
+    def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
+        return observations
 
 @jax.jit
 def _sample_actions_jit(key: PRNGKey, actor: TrainState, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
