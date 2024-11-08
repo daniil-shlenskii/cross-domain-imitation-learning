@@ -6,7 +6,7 @@ from gan.generator import Generator
 from utils.types import DataType, PRNGKey
 
 
-def domain_adversarial_sampling_jit(
+def domain_adversarial_sampling(
     rng: PRNGKey,
     embedded_learner_batch: DataType,
     embedded_anchor_batch: DataType,
