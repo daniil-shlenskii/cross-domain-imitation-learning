@@ -33,6 +33,7 @@ class TrainState(FlaxTrainState, SaveLoadFrozenDataclassMixin):
             **kwargs,
         )
 
+    @jax.jit
     def __call__(self, *args, **kwargs):
         return self.apply_fn({"params": self.params}, *args, **kwargs)
 
