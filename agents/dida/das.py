@@ -35,9 +35,12 @@ def domain_adversarial_sampling(
 def get_das_probs(
     embedded_learner_batch: DataType,
     domain_discriminator: Discriminator,
+    clip_min: float = 0.1,
+    clip_max: float = 0.9,
 ):
     observations_probs = jax.nn.sigmoid(domain_discriminator(embedded_learner_batch["observations"]))
     observations_next_probs = jax.nn.sigmoid(domain_discriminator(embedded_learner_batch["observations_next"]))
     probs = (observations_probs + observations_next_probs) * 0.5
-    das_probs = probs / probs.sum()
-    return das_probs
+    confidence = jnp.abs(probs - 0.5)
+    das_probs = confidence / confidence.sum()
+    return jnp.clip(das_probs, min=clip_min, max=clip_max)
