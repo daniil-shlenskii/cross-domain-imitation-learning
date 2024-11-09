@@ -18,7 +18,6 @@ from utils.utils import SaveLoadFrozenDataclassMixin
 
 class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
     rng: PRNGKey
-    actor: TrainState
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     def sample_actions(self, key: PRNGKey, observations: np.ndarray,) -> np.ndarray:
