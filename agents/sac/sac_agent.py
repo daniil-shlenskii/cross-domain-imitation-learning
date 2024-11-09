@@ -7,6 +7,7 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
+from flax import struct
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
@@ -17,15 +18,16 @@ from utils.utils import instantiate_optimizer
 
 
 class SACAgent(Agent): 
+    actor: TrainState
     critic1: TrainState
     critic2: TrainState
     target_critic1_params: Params
     target_critic2_params: Params
     temperature: TrainState
-    target_entropy: float
-    backup_entropy: bool
-    discount: float
-    tau: float
+    target_entropy: float = struct.field(pytree_node=False)
+    backup_entropy: bool = struct.field(pytree_node=False)
+    discount: float = struct.field(pytree_node=False)
+    tau: float = struct.field(pytree_node=False)
 
     @classmethod
     def create(
