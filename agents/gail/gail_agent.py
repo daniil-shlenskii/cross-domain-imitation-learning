@@ -110,6 +110,7 @@ class GAILAgent(Agent):
         )
         return info, stats_info
     
+@jax.jit
 def _update_jit(
     *,
     rng: PRNGKey,
