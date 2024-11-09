@@ -16,15 +16,16 @@ from utils.types import DataType, Params, PRNGKey
 from utils.utils import instantiate_optimizer
 
 
-class SACAgent(Agent):
-    _save_attrs = (
-        "actor",
-        "critic1",
-        "critic2",
-        "temperature",
-        "target_critic1_params",
-        "target_critic2_params",
-    )
+class SACAgent(Agent): 
+    critic1: TrainState
+    critic2: TrainState
+    target_critic1_params: Params
+    target_critic2_params: Params
+    temperature: TrainState
+    target_entropy: float
+    backup_entropy: bool
+    discount: float
+    tau: float
 
     @classmethod
     def create(
@@ -52,7 +53,7 @@ class SACAgent(Agent):
     ):
         # reproducibility keys
         rng = jax.random.key(seed)
-        actor_key, critic1_key, critic2_key, temperature_key = jax.random.split(rng, 4)
+        rng, actor_key, critic1_key, critic2_key, temperature_key = jax.random.split(rng, 5)
 
         # actor, critic and temperature initialization
         observation = np.ones(observation_dim)
@@ -67,6 +68,9 @@ class SACAgent(Agent):
         critic1_params = critic1_module.init(critic1_key, observation, action)["params"]
         critic2_params = critic2_module.init(critic2_key, observation, action)["params"]
         temperature_params = temperature_module.init(temperature_key)["params"]
+
+        target_critic1_params = deepcopy(critic1_params)
+        target_critic2_params = deepcopy(critic2_params)
 
         actor = TrainState.create(
             loss_fn=_actor_loss_fn,
@@ -105,46 +109,26 @@ class SACAgent(Agent):
             target_entropy = target_entropy
 
         return cls(
-            seed=seed,
+            rng=rng,
             actor=actor,
             critic1=critic1,
             critic2=critic2,
+            target_critic1_params=target_critic1_params,
+            target_critic2_params=target_critic2_params,
             temperature=temperature,
             target_entropy=target_entropy,
             backup_entropy=backup_entropy,
             discount=discount,
             tau=tau,
+            _save_attrs = (
+                "actor",
+                "critic1",
+                "critic2",
+                "temperature",
+                "target_critic1_params",
+                "target_critic2_params",
+            ),
         )
-
-    def __init__(
-        self,
-        *,
-        seed: int,
-        #
-        actor: TrainState,
-        critic1: TrainState,
-        critic2: TrainState,
-        temperature: TrainState,
-        #
-        target_entropy: float,
-        backup_entropy: bool,
-        discount: float,
-        tau: float,
-    ):
-        self.rng = jax.random.key(seed)
-
-        self.actor = actor
-        self.critic1 = critic1
-        self.critic2 = critic2
-        self.temperature = temperature
-
-        self.target_critic1_params = deepcopy(critic1.params)
-        self.target_critic2_params = deepcopy(critic2.params)
-
-        self.target_entropy = target_entropy
-        self.backup_entropy = backup_entropy
-        self.discount = discount
-        self.tau = tau
 
     @property
     def critic(self):
@@ -152,13 +136,13 @@ class SACAgent(Agent):
 
     def update(self, batch: DataType):
         (
-            self.rng,
-            self.actor,
-            self.critic1,
-            self.critic2,
-            self.target_critic1_params,
-            self.target_critic2_params,
-            self.temperature,
+            new_rng,
+            new_actor,
+            new_critic1,
+            new_critic2,
+            new_target_critic1_params,
+            new_target_critic2_params,
+            new_temperature,
             info,
             stats_info,
         ) = _update_jit(
@@ -175,8 +159,16 @@ class SACAgent(Agent):
             discount=self.discount,
             tau=self.tau,
         )
-
-        return info, stats_info
+        new_agent = self.replace(
+            rng=new_rng,
+            actor=new_actor,
+            critic1=new_critic1,
+            critic2=new_critic2,
+            target_critic1_params=new_target_critic1_params,
+            target_critic2_params=new_target_critic2_params,
+            temperature=new_temperature,
+        )
+        return new_agent, info, stats_info
 
 @functools.partial(jax.jit, static_argnames="backup_entropy")
 def _update_jit(
