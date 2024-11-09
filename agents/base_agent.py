@@ -6,24 +6,25 @@ import gym
 import jax
 import jax.numpy as jnp
 import numpy as np
+from flax import struct
+from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
 from nn.train_state import TrainState
 from utils.types import PRNGKey
-from utils.utils import SaveLoadMixin
+from utils.utils import SaveLoadFrozenDataclassMixin
 
 
-class Agent(SaveLoadMixin):
-    actor: TrainState
+class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
     rng: PRNGKey
-    _save_attrs: Tuple[str] = ("actor",)
+    _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
-    def sample_actions(self, observations: np.ndarray) -> np.ndarray:
-        self.rng, actions = _sample_actions_jit(self.rng, self.actor, observations)
+    def sample_actions(self, key: PRNGKey, observations: np.ndarray,) -> np.ndarray:
+        actions = _sample_actions_jit(key, self.actor, observations)
         return np.asarray(actions)
 
-    def eval_actions(self, observations: np.ndarray) -> np.ndarray:
+    def eval_actions(self, observations: np.ndarray,) -> np.ndarray:
         actions = _eval_actions_jit(self.actor, observations)
         return np.asarray(actions)
 
@@ -31,10 +32,9 @@ class Agent(SaveLoadMixin):
         return _eval_log_probs_jit(self.actor, observations, actions)
 
 @jax.jit
-def _sample_actions_jit(rng: PRNGKey, actor: TrainState, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
-    rng, key = jax.random.split(rng)
+def _sample_actions_jit(key: PRNGKey, actor: TrainState, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
     dist = actor(observations)
-    return rng, dist.sample(seed=key)
+    return dist.sample(seed=key)
 
 @jax.jit
 def _eval_actions_jit(actor: TrainState, observations: np.ndarray) -> np.ndarray:

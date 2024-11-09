@@ -67,7 +67,7 @@ def main(args: argparse.Namespace):
     # load agent params if given
     agent_load_dir = Path(config_archive.get("agent_load_dir", TMP_AGENT_STORAGE_DIR)) / config.env_name
     if not args.from_scratch and agent_load_dir.exists():
-        _, loaded_keys = agent.load(agent_load_dir)
+        agent, loaded_keys = agent.load(agent_load_dir)
         logger.info(
             f"Agent is initialized with data under the path: {agent_load_dir}.\n" + \
             f"Loaded keys:\n----------------\n{OmegaConf.to_yaml(loaded_keys)}"
@@ -169,6 +169,9 @@ def main(args: argparse.Namespace):
 
     observation, _  = env.reset(seed=config.seed)
     for i in tqdm(range(config.n_iters_training)):
+        # reproducibility
+        rng, agent_sample_key, buffer_sample_key = jax.random.split(rng, 3)
+
         # evaluate model
         if i == 0 or (i + 1) % config.eval_every == 0:
             eval_info = evaluate(
@@ -181,15 +184,14 @@ def main(args: argparse.Namespace):
                 wandb.log({f"evaluation/{k}": v}, step=i)
 
         # sample actions
-        action = agent.sample_actions(observation[None])
+        action = agent.sample_actions(agent_sample_key, observation[None])
 
         # do step in the environment
         do_environment_step(action[0], i)
 
         # do RL optimization step
-        rng, key = jax.random.split(rng)
-        batch = buffer.sample(state, key).experience
-        update_info, stats_info = agent.update(batch)
+        batch = buffer.sample(state, buffer_sample_key).experience
+        agent, update_info, stats_info = agent.update(batch)
 
         # logging
         if (i + 1) % config.log_every == 0:
