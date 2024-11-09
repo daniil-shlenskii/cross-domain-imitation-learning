@@ -120,36 +120,61 @@ class DIDAAgent(GAILAgent):
         object.__setattr__(self, 'anchor_buffer_state', anchor_buffer_state)
 
     def update(self, batch: DataType):
-        (
-            new_rng,
-            new_learner_encoder,
-            new_expert_encoder,
-            new_policy_discriminator,
-            domain_discriminator,
-            new_agent,
-            info,
-            stats_info
-        ) = _update_jit(
-            rng=self.rng,
-            batch=batch,
-            expert_buffer=self.expert_buffer,
-            expert_buffer_state=self.expert_buffer_state,
-            anchor_buffer_state=self.anchor_buffer_state,
-            learner_encoder=self.learner_encoder,
-            expert_encoder=self.expert_encoder,
-            policy_discriminator=self.discriminator,
-            domain_discriminator=self.domain_discriminator,
-            agent=self.agent,
-            sar_p=self.sar_p,
+        update_domain_discriminator_only = (
+            self.n_domain_discriminator_updates > 1 and
+            (self.domain_discriminator.state.step + 1) % self.n_domain_discriminator_updates != 0
         )
-        new_agent = self.replace(
-            rng=new_rng,
-            learner_encoder=new_learner_encoder,
-            expert_encoder=new_expert_encoder,
-            discriminator=new_policy_discriminator,
-            domain_discriminator=domain_discriminator,
-            agent=new_agent,
-        )
+
+        if update_domain_discriminator_only:
+            (
+                new_rng,
+                new_domain_discriminator,
+                info,
+                stats_info
+            ) = _update_domain_discriminator_jit(
+                rng=self.rng,
+                batch=batch,
+                expert_buffer=self.expert_buffer,
+                expert_buffer_state=self.expert_buffer_state,
+                learner_encoder=self.learner_encoder,
+                expert_encoder=self.expert_encoder,
+                domain_discriminator=self.domain_discriminator,
+            )
+            new_agent = self.replace(
+                rng=new_rng,
+                domain_discriminator=new_domain_discriminator,
+            )
+        else:
+            (
+                new_rng,
+                new_learner_encoder,
+                new_expert_encoder,
+                new_policy_discriminator,
+                new_domain_discriminator,
+                new_agent,
+                info,
+                stats_info
+            ) = _update_jit(
+                rng=self.rng,
+                batch=batch,
+                expert_buffer=self.expert_buffer,
+                expert_buffer_state=self.expert_buffer_state,
+                anchor_buffer_state=self.anchor_buffer_state,
+                learner_encoder=self.learner_encoder,
+                expert_encoder=self.expert_encoder,
+                policy_discriminator=self.discriminator,
+                domain_discriminator=self.domain_discriminator,
+                agent=self.agent,
+                sar_p=self.sar_p,
+            )
+            new_agent = self.replace(
+                rng=new_rng,
+                learner_encoder=new_learner_encoder,
+                expert_encoder=new_expert_encoder,
+                discriminator=new_policy_discriminator,
+                domain_discriminator=new_domain_discriminator,
+                agent=new_agent,
+            )
         return new_agent, info, stats_info
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
@@ -171,7 +196,7 @@ def _update_jit(
     #
     sar_p: float
 ):
-    new_rng, expert_batch, anchor_batch = _prepare_batches_jit(rng, expert_buffer, expert_buffer_state, anchor_buffer_state)
+    new_rng, expert_batch, anchor_batch = _prepare_batches_step_jit(rng, expert_buffer, expert_buffer_state, anchor_buffer_state)
 
     # UPDATE encoders
     (
@@ -183,7 +208,7 @@ def _update_jit(
         encoded_expert_policy_batch,
         encoders_info,
         encoders_stats_info,
-    ) = _update_encoders_jit(
+    ) = _update_encoders_step_jit(
         learner_batch=batch,
         expert_batch=expert_batch,
         learner_encoder=learner_encoder,
@@ -193,14 +218,14 @@ def _update_jit(
     )
 
     # UPDATE domain discriminator
-    new_domain_disc, domain_disc_info, domain_disc_stats_info = _update_domain_discriminator_jit(
+    new_domain_disc, domain_disc_info, domain_disc_stats_info = _update_domain_discriminator_step_jit(
         encoded_learner_domain_batch=encoded_learner_domain_batch,
         encoded_expert_domain_batch=encoded_expert_domain_batch,
         domain_discriminator=domain_discriminator
     )
 
     # UPDATE agent and policy discriminator with gail
-    batch, expert_batch, anchor_batch, alpha = _prepare_gail_batches_and_get_sar_jit(
+    batch, expert_batch, anchor_batch, alpha = _prepare_gail_batches_and_get_sar_step_jit(
         batch=batch,
         expert_batch=expert_batch,
         anchor_batch=anchor_batch,
@@ -219,7 +244,7 @@ def _update_jit(
     )
 
     # apply gail
-    agent, new_policy_disc, gail_info, gail_stats_info = _update_gail_jit(
+    agent, new_policy_disc, gail_info, gail_stats_info = _update_gail_step_jit(
         batch=mixed_batch,
         expert_batch=expert_batch,
         agent=agent,
@@ -240,7 +265,7 @@ def _update_jit(
     )
 
 @functools.partial(jax.jit, static_argnames="expert_buffer")
-def _prepare_batches_jit(
+def _prepare_batches_step_jit(
     rng: PRNGKey,
     expert_buffer: Buffer,
     expert_buffer_state: BufferState,
@@ -252,7 +277,7 @@ def _prepare_batches_jit(
     return new_rng, expert_batch, anchor_batch
 
 @jax.jit
-def _update_encoders_jit(
+def _update_encoders_step_jit(
     learner_batch: DataType,
     expert_batch: DataType,
     learner_encoder: Generator,
@@ -312,7 +337,7 @@ def _update_encoders_jit(
     )
 
 @jax.jit
-def _update_domain_discriminator_jit(
+def _update_domain_discriminator_step_jit(
     *,
     encoded_learner_domain_batch: jnp.ndarray,
     encoded_expert_domain_batch: jnp.ndarray,
@@ -324,8 +349,31 @@ def _update_domain_discriminator_jit(
     )
     return new_domain_disc, domain_disc_info, domain_disc_stats_info
 
+@functools.partial(jax.jit, static_argnames="expert_buffer")
+def _update_domain_discriminator_jit(
+    *,
+    rng: PRNGKey,
+    batch: DataType,
+    expert_buffer: Buffer,
+    expert_buffer_state: BufferState,
+    learner_encoder: Generator,
+    expert_encoder: Generator,
+    domain_discriminator: Discriminator
+):
+    new_rng, key = jax.random.split(rng, 2)
+    expert_batch = expert_buffer.sample(expert_buffer_state, key).experience
+
+    encoded_learner_domain_batch = learner_encoder(batch["observations"])
+    encoded_expert_domain_batch = expert_encoder(expert_batch["observations"])
+
+    new_domain_disc, domain_disc_info, domain_disc_stats_info = domain_discriminator.update(
+        real_batch=encoded_learner_domain_batch,
+        fake_batch=encoded_expert_domain_batch
+    )
+    return new_rng, new_domain_disc, domain_disc_info, domain_disc_stats_info
+
 @jax.jit
-def _prepare_gail_batches_and_get_sar_jit(
+def _prepare_gail_batches_and_get_sar_step_jit(
     batch: DataType,
     expert_batch: DataType,
     anchor_batch: DataType,
@@ -355,7 +403,7 @@ def _prepare_gail_batches_and_get_sar_jit(
     return batch, expert_batch, anchor_batch, alpha
 
 @jax.jit
-def _update_gail_jit(
+def _update_gail_step_jit(
     *,
     batch: DataType,
     expert_batch: DataType,
