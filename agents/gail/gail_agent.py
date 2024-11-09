@@ -1,3 +1,4 @@
+import functools
 from typing import Tuple
 
 import flashbax
@@ -5,6 +6,7 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
+from flax import struct
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
@@ -16,10 +18,10 @@ from utils.utils import load_pickle
 
 
 class GAILAgent(Agent):
-    _save_attrs: Tuple[str] = (
-        "agent",
-        "discriminator"
-    )
+    agent: Agent
+    discriminator: GAILDiscriminator
+    expert_buffer: Buffer = struct.field(pytree_node=False)
+    expert_buffer_state: BufferState = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -37,6 +39,8 @@ class GAILAgent(Agent):
         agent_config: DictConfig,
         discriminator_config: DictConfig,
     ):
+        rng = jax.random.key(seed)
+
         # agent and discriminator init
         agent = instantiate(
             agent_config,
@@ -67,27 +71,16 @@ class GAILAgent(Agent):
         )
 
         return cls(
-            seed=seed,
+            rng=rng,
             expert_buffer=expert_buffer,
             expert_buffer_state=expert_buffer_state,
             agent=agent,
             discriminator=discriminator,
+            _save_attrs = (
+                "agent",
+                "discriminator"
+            )
         )
-
-    def __init__(
-        self,
-        *,
-        seed: int,
-        expert_buffer: Buffer,
-        expert_buffer_state: BufferState,
-        agent: Agent,
-        discriminator: GAILDiscriminator,
-    ):
-        self.rng = jax.random.key(seed=seed)
-        self.expert_buffer = expert_buffer
-        self.expert_buffer_state = expert_buffer_state
-        self.agent = agent
-        self.discriminator = discriminator
 
     @property
     def actor(self):
@@ -95,9 +88,9 @@ class GAILAgent(Agent):
 
     def update(self, batch: DataType):
         (
-            self.rng,
-            self.agent,
-            self.discriminator,
+            new_rng,
+            new_agent,
+            new_discriminator,
             info,
             stats_info,
         ) = _update_jit(
@@ -108,9 +101,14 @@ class GAILAgent(Agent):
             agent=self.agent,
             discriminator=self.discriminator,
         )
-        return info, stats_info
+        new_agent = self.replace(
+            rng=new_rng,
+            agent=new_agent,
+            discriminator=new_discriminator
+        )
+        return new_agent, info, stats_info
     
-@jax.jit
+@functools.partial(jax.jit, static_argnames="expert_buffer")
 def _update_jit(
     *,
     rng: PRNGKey,
@@ -118,7 +116,7 @@ def _update_jit(
     #
     expert_buffer: Buffer,
     expert_buffer_state: BufferState,
-    #
+    # #
     agent: Agent,
     discriminator: GAILDiscriminator,
 ):
@@ -132,11 +130,11 @@ def _update_jit(
 
     # update agent
     batch["reward"] = discriminator.get_rewards(learner_batch)
-    agent_info, agent_stats_info = agent.update(batch)
+    new_agent, agent_info, agent_stats_info = agent.update(batch)
 
     # update discriminator
     new_disc, disc_info, disc_stats_info = discriminator.update(expert_batch=expert_batch, learner_batch=learner_batch)
 
     info = {**agent_info, **disc_info}
     stats_info = {**agent_stats_info, **disc_stats_info}
-    return new_rng, agent, new_disc, info, stats_info
+    return new_rng, new_agent, new_disc, info, stats_info
