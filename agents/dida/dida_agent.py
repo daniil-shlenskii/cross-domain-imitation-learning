@@ -314,6 +314,27 @@ def _update_jit(
         encoded_expert_policy_batch=encoded_expert_policy_batch,
         expert_encoder=expert_encoder,
     )
+    if use_das:
+        alpha = self_adaptive_rate(
+            domain_discriminator=domain_discriminator,
+            learner_batch=batch,
+            expert_batch=expert_batch,
+            p=sar_p,
+        )
+        new_rng, mixed_batch = domain_adversarial_sampling(
+            rng=new_rng,
+            embedded_learner_batch=batch,
+            embedded_anchor_batch=anchor_batch,
+            domain_discriminator=domain_discriminator,
+            alpha=alpha
+        )
+    else:
+        batch_size = batch["observations"].shape[0]
+        mixed_batch = jax.tree.map(
+            lambda x, y: jnp.concatenate([x[:batch_size//2], y[:batch_size//2]], axis=0),
+            batch,
+            anchor_batch
+        )
 
     if use_das:
         alpha, new_p_acc_ema, sar_info = self_adaptive_rate(
