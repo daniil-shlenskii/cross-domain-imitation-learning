@@ -29,6 +29,7 @@ class DIDAAgent(GAILAgent):
     learner_encoder: Generator
     expert_encoder: Generator
     domain_discriminator: Discriminator
+    use_das: float = struct.field(pytree_node=False)
     sar_p: float = struct.field(pytree_node=False)
     n_domain_discriminator_updates: int = struct.field(pytree_node=False)
     encoders_domain_discriminator_loss_scale: int = struct.field(pytree_node=False)
@@ -55,6 +56,7 @@ class DIDAAgent(GAILAgent):
         expert_encoder_config: DictConfig,
         domain_discriminator_config: DictConfig,
         #
+        use_das: bool = False,
         sar_p: float = 0.5,
         #
         n_domain_discriminator_updates: int = 1,
@@ -107,6 +109,7 @@ class DIDAAgent(GAILAgent):
             learner_encoder=learner_encoder,
             expert_encoder=expert_encoder,
             domain_discriminator=domain_discriminator,
+            use_das=use_das,
             sar_p=sar_p,
             n_domain_discriminator_updates=n_domain_discriminator_updates,
             encoders_domain_discriminator_loss_scale=encoders_domain_discriminator_loss_scale
@@ -168,6 +171,7 @@ class DIDAAgent(GAILAgent):
                 policy_discriminator=self.discriminator,
                 domain_discriminator=self.domain_discriminator,
                 agent=self.agent,
+                use_das=self.use_das,
                 sar_p=self.sar_p,
                 encoders_domain_discriminator_loss_scale=self.encoders_domain_discriminator_loss_scale
             )
@@ -198,6 +202,7 @@ def _update_jit(
     domain_discriminator: Discriminator,
     agent: Agent,
     #
+    use_das: bool,
     sar_p: float,
     encoders_domain_discriminator_loss_scale,
 ):
@@ -231,23 +236,35 @@ def _update_jit(
     )
 
     # UPDATE agent and policy discriminator with gail
-    batch, expert_batch, anchor_batch, alpha = _prepare_gail_batches_and_get_sar_step_jit(
+    batch, expert_batch, anchor_batch = _prepare_gail_batches_jit(
         batch=batch,
         expert_batch=expert_batch,
         anchor_batch=anchor_batch,
         encoded_learner_policy_batch=encoded_learner_policy_batch,
         encoded_expert_policy_batch=encoded_expert_policy_batch,
         expert_encoder=expert_encoder,
-        domain_discriminator=domain_discriminator,
-        sar_p=sar_p,
     )
-    new_rng, mixed_batch = domain_adversarial_sampling(
-        rng=new_rng,
-        embedded_learner_batch=batch,
-        embedded_anchor_batch=anchor_batch,
-        domain_discriminator=domain_discriminator,
-        alpha=alpha
-    )
+    if use_das:
+        alpha = self_adaptive_rate(
+            domain_discriminator=domain_discriminator,
+            learner_batch=batch,
+            expert_batch=expert_batch,
+            p=sar_p,
+        )
+        new_rng, mixed_batch = domain_adversarial_sampling(
+            rng=new_rng,
+            embedded_learner_batch=batch,
+            embedded_anchor_batch=anchor_batch,
+            domain_discriminator=domain_discriminator,
+            alpha=alpha
+        )
+    else:
+        batch_size = batch["observations"].shape[0]
+        mixed_batch = jax.tree.map(
+            lambda x, y: jnp.concatenate([x[:batch_size//2], y[:batch_size//2]], axis=0),
+            batch,
+            anchor_batch
+        )
 
     # apply gail
     agent, new_policy_disc, gail_info, gail_stats_info = _update_gail_step_jit(
@@ -384,17 +401,14 @@ def _update_domain_discriminator_jit(
     return new_rng, new_domain_disc, domain_disc_info, domain_disc_stats_info
 
 @jax.jit
-def _prepare_gail_batches_and_get_sar_step_jit(
+def _prepare_gail_batches_jit(
     batch: DataType,
     expert_batch: DataType,
     anchor_batch: DataType,
     encoded_learner_policy_batch: jnp.ndarray,
     encoded_expert_policy_batch: jnp.ndarray,
     expert_encoder: Generator,
-    domain_discriminator: Discriminator,
-    sar_p: int
 ):
-    # encode observation
     encoders_dim = encoded_learner_policy_batch.shape[-1] // 2
     batch["observations"] = encoded_learner_policy_batch[:, :encoders_dim]
     batch["observations_next"] = encoded_learner_policy_batch[:, encoders_dim:]
@@ -403,15 +417,7 @@ def _prepare_gail_batches_and_get_sar_step_jit(
     anchor_batch["observations"] = expert_encoder(anchor_batch["observations"])
     anchor_batch["observations_next"] = expert_encoder(anchor_batch["observations_next"])
 
-    # get das alpha param with sar
-    alpha = self_adaptive_rate(
-        domain_discriminator=domain_discriminator,
-        learner_batch=batch,
-        expert_batch=expert_batch,
-        p=sar_p,
-    )
-
-    return batch, expert_batch, anchor_batch, alpha
+    return batch, expert_batch, anchor_batch
 
 @jax.jit
 def _update_gail_step_jit(
