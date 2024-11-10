@@ -158,7 +158,7 @@ class DIDAAgent(GAILAgent):
                 new_expert_encoder,
                 new_policy_discriminator,
                 new_domain_discriminator,
-                new_agent,
+                new_rl_agent,
                 info,
                 stats_info
             ) = _update_jit(
@@ -182,7 +182,7 @@ class DIDAAgent(GAILAgent):
                 expert_encoder=new_expert_encoder,
                 discriminator=new_policy_discriminator,
                 domain_discriminator=new_domain_discriminator,
-                agent=new_agent,
+                agent=new_rl_agent,
             )
         return new_agent, info, stats_info
 
@@ -268,7 +268,7 @@ def _update_jit(
         )
 
     # apply gail
-    agent, new_policy_disc, gail_info, gail_stats_info = _update_gail_step_jit(
+    new_agent, new_policy_disc, gail_info, gail_stats_info = _update_gail_step_jit(
         batch=mixed_batch,
         expert_batch=expert_batch,
         agent=agent,
@@ -283,7 +283,7 @@ def _update_jit(
         new_expert_encoder,
         new_policy_disc,
         new_domain_disc,
-        agent,
+        new_agent,
         info,
         stats_info
     )
