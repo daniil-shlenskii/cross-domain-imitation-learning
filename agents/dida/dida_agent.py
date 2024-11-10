@@ -31,6 +31,7 @@ class DIDAAgent(GAILAgent):
     domain_discriminator: Discriminator
     sar_p: float = struct.field(pytree_node=False)
     n_domain_discriminator_updates: int = struct.field(pytree_node=False)
+    encoders_domain_discriminator_loss_scale: int = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -57,6 +58,7 @@ class DIDAAgent(GAILAgent):
         sar_p: float = 0.5,
         #
         n_domain_discriminator_updates: int = 1,
+        encoders_domain_discriminator_loss_scale: float = 0.2,
     ):  
         discriminator_config["info_key"] = "policy_discriminator"
 
@@ -106,7 +108,8 @@ class DIDAAgent(GAILAgent):
             expert_encoder=expert_encoder,
             domain_discriminator=domain_discriminator,
             sar_p=sar_p,
-            n_domain_discriminator_updates=n_domain_discriminator_updates
+            n_domain_discriminator_updates=n_domain_discriminator_updates,
+            encoders_domain_discriminator_loss_scale=encoders_domain_discriminator_loss_scale
         )
     
     def __post_init__(self):
@@ -166,6 +169,7 @@ class DIDAAgent(GAILAgent):
                 domain_discriminator=self.domain_discriminator,
                 agent=self.agent,
                 sar_p=self.sar_p,
+                encoders_domain_discriminator_loss_scale=self.encoders_domain_discriminator_loss_scale
             )
             new_agent = self.replace(
                 rng=new_rng,
@@ -194,7 +198,8 @@ def _update_jit(
     domain_discriminator: Discriminator,
     agent: Agent,
     #
-    sar_p: float
+    sar_p: float,
+    encoders_domain_discriminator_loss_scale,
 ):
     new_rng, expert_batch, anchor_batch = _prepare_batches_step_jit(rng, expert_buffer, expert_buffer_state, anchor_buffer_state)
 
@@ -215,6 +220,7 @@ def _update_jit(
         expert_encoder=expert_encoder,
         policy_discriminator=policy_discriminator,
         domain_discriminator=domain_discriminator,
+        encoders_domain_discriminator_loss_scale=encoders_domain_discriminator_loss_scale
     )
 
     # UPDATE domain discriminator
@@ -284,20 +290,25 @@ def _update_encoders_step_jit(
     expert_encoder: Generator,
     policy_discriminator: Discriminator,
     domain_discriminator: Discriminator,
+    encoders_domain_discriminator_loss_scale: float,
 ):
     # update encoders with policy discriminator
     learner_policy_batch = jnp.concatenate([learner_batch["observations"], learner_batch["observations_next"]], axis=0)
     expert_policy_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=0)
     
     new_learner_encoder, learner_encoder_info, learner_encoder_stats_info = learner_encoder.update(
+        hold_grad=True,
+        grad_scale=encoders_domain_discriminator_loss_scale,
         batch=learner_policy_batch,
         discriminator=policy_discriminator,
-        process_discriminator_input=process_policy_discriminator_input 
+        process_discriminator_input=process_policy_discriminator_input
     )
     new_expert_encoder, expert_encoder_info, expert_encoder_stats_info = expert_encoder.update(
+        hold_grad=True,
+        grad_scale=encoders_domain_discriminator_loss_scale,
         batch=expert_policy_batch,
         discriminator=policy_discriminator,
-        process_discriminator_input=process_policy_discriminator_input 
+        process_discriminator_input=process_policy_discriminator_input
     )
 
     # store encoded batch for policy discriminator update
