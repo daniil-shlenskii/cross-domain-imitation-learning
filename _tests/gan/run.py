@@ -11,7 +11,7 @@ import wandb
 def main():
     wandb.init(project="test_gan")
 
-    config = OmegaConf.load("configs/_test_gan_config.yaml")
+    config = OmegaConf.load("_tests/gan/run_config.yaml")
 
     # reproducibility
     rng = jax.random.key(config.seed)
