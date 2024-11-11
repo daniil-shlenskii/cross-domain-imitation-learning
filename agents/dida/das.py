@@ -43,9 +43,13 @@ def get_das_probs(
     observations_next_probs = jax.nn.sigmoid(domain_discriminator(embedded_learner_batch["observations_next"]))
     probs = (observations_probs + observations_next_probs) * 0.5
 <<<<<<< HEAD
+<<<<<<< HEAD
     das_probs = probs / probs.sum()
 =======
     confidence = jnp.abs(probs - 0.5)
     das_probs = confidence / confidence.sum()
 >>>>>>> a16cda1 (dida saving (need to be fixed))
+=======
+    das_probs = probs / probs.sum()
+>>>>>>> 2330c84 (dida das fixed: from confidence to probs)
     return jnp.clip(das_probs, min=clip_min, max=clip_max)
