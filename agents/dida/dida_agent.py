@@ -57,7 +57,7 @@ class DIDAAgent(GAILAgent):
         domain_discriminator_config: DictConfig,
         #
         use_das: bool = False,
-        sar_p: float = 0.5,
+        sar_p: float = 0.66,
         #
         n_domain_discriminator_updates: int = 1,
         encoders_domain_discriminator_loss_scale: float = 0.2,
@@ -245,9 +245,8 @@ def _update_jit(
         encoded_expert_policy_batch=encoded_expert_policy_batch,
         expert_encoder=expert_encoder,
     )
-    sar_alpha_info = {}
     if use_das:
-        alpha = self_adaptive_rate(
+        alpha, sar_info = self_adaptive_rate(
             domain_discriminator=domain_discriminator,
             learner_batch=batch,
             expert_batch=expert_batch,
@@ -260,7 +259,6 @@ def _update_jit(
             domain_discriminator=domain_discriminator,
             alpha=alpha
         )
-        sar_alpha_info = {"sar_alpha_info": alpha}
     else:
         batch_size = batch["observations"].shape[0]
         mixed_batch = jax.tree.map(
@@ -268,6 +266,7 @@ def _update_jit(
             batch,
             anchor_batch
         )
+        sar_info = {}
 
     # apply gail
     new_agent, new_policy_disc, gail_info, gail_stats_info = _update_gail_step_jit(
@@ -277,7 +276,7 @@ def _update_jit(
         discriminator=policy_discriminator,
     )
 
-    info = {**encoders_info, **domain_disc_info, **gail_info, **sar_alpha_info}
+    info = {**encoders_info, **domain_disc_info, **gail_info, **sar_info}
     stats_info = {**encoders_stats_info, **domain_disc_stats_info, **gail_stats_info}
     return (
         new_rng,
