@@ -13,7 +13,9 @@ def self_adaptive_rate(
     p: float,
 ):
     p_acc = _discriminator_accuracy_score_jit(domain_discriminator, learner_batch, expert_batch)
-    return jnp.minimum(p_acc / p, (1 - p_acc) / (1 - p))
+    alpha = jnp.minimum(p_acc / p, (1 - p_acc) / (1 - p))
+    info = {"sar/alpha": alpha, "sar/p_acc": p_acc}
+    return alpha, info
 
 def _discriminator_accuracy_score_jit(domain_discriminator, learner_batch, expert_batch):
     learner_probs = jax.nn.sigmoid(domain_discriminator(learner_batch["observations"]))
