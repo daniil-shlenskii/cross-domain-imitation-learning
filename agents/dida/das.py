@@ -18,9 +18,7 @@ def domain_adversarial_sampling(
     # preparation
     b_size = embedded_learner_batch["observations"].shape[0]
     num_to_mix = jnp.array(alpha * b_size, int)
-    # idcs_to_change = jax.random.permutation(perm_key, b_size).at[:num_to_mix].get()
-    idcs_to_change = jax.random.permutation(perm_key, b_size)
-    idcs_to_change = jax.lax.dynamic_slice(idcs_to_change, start_indices=(0,), slice_sizes=(num_to_mix,))
+    idcs_to_change = jax.random.permutation(perm_key, b_size).at[:num_to_mix].get()
     embedded_mixed_batch = embedded_anchor_batch
 
     # get das probabilites
@@ -42,6 +40,5 @@ def get_das_probs(
     observations_probs = jax.nn.sigmoid(domain_discriminator(embedded_learner_batch["observations"]))
     observations_next_probs = jax.nn.sigmoid(domain_discriminator(embedded_learner_batch["observations_next"]))
     probs = (observations_probs + observations_next_probs) * 0.5
-    confidence = jnp.abs(probs - 0.5)
-    das_probs = confidence / confidence.sum()
+    das_probs = probs / probs.sum()
     return jnp.clip(das_probs, min=clip_min, max=clip_max)
