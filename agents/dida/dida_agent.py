@@ -314,9 +314,8 @@ def _update_jit(
         encoded_expert_policy_batch=encoded_expert_policy_batch,
         expert_encoder=expert_encoder,
     )
-    sar_alpha_info = {}
     if use_das:
-        alpha = self_adaptive_rate(
+        alpha, sar_info = self_adaptive_rate(
             domain_discriminator=domain_discriminator,
             learner_batch=batch,
             expert_batch=expert_batch,
@@ -329,7 +328,6 @@ def _update_jit(
             domain_discriminator=domain_discriminator,
             alpha=alpha
         )
-        sar_alpha_info = {"sar_alpha_info": alpha}
     else:
         batch_size = batch["observations"].shape[0]
         mixed_batch = jax.tree.map(
@@ -337,6 +335,7 @@ def _update_jit(
             batch,
             anchor_batch
         )
+        sar_info = {}
 
     if use_das:
         alpha, new_p_acc_ema, sar_info = self_adaptive_rate(
