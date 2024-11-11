@@ -174,8 +174,7 @@ def main(args: argparse.Namespace):
 
         # evaluate model
         if i == 0 or (i + 1) % config.eval_every == 0:
-            eval_info = evaluate(
-                agent,
+            eval_info = agent.evaluate(
                 eval_env,
                 num_episodes=config.evaluation.num_episodes,
                 seed=config.evaluation.seed,
