@@ -36,7 +36,7 @@ class DIDAAgent(GAILAgent):
     p_acc_ema: float = struct.field(pytree_node=False)
     p_acc_ema_decay: float = struct.field(pytree_node=False)
     n_domain_discriminator_updates: int = struct.field(pytree_node=False)
-    encoders_domain_discriminator_loss_scale: int = struct.field(pytree_node=False)
+    domain_loss_scale: int = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -61,12 +61,12 @@ class DIDAAgent(GAILAgent):
         domain_discriminator_config: DictConfig,
         #
         use_das: bool = True,
-        sar_p: float = 0.66,
+        sar_p: float = 0.3,
         p_acc_ema: float = 0.85,
         p_acc_ema_decay: float = 0.999,
         #
         n_domain_discriminator_updates: int = 1,
-        encoders_domain_discriminator_loss_scale: float = 0.2,
+        domain_loss_scale: float = 1.0,
     ):  
         discriminator_config["info_key"] = "policy_discriminator"
 
@@ -117,10 +117,10 @@ class DIDAAgent(GAILAgent):
             domain_discriminator=domain_discriminator,
             use_das=use_das,
             sar_p=sar_p,
-            n_domain_discriminator_updates=n_domain_discriminator_updates,
-            encoders_domain_discriminator_loss_scale=encoders_domain_discriminator_loss_scale,
             p_acc_ema_decay=p_acc_ema_decay,
             p_acc_ema=p_acc_ema,
+            n_domain_discriminator_updates=n_domain_discriminator_updates,
+            domain_loss_scale=domain_loss_scale,
             #
             _save_attrs = (
                 "agent",
@@ -194,7 +194,7 @@ class DIDAAgent(GAILAgent):
                 sar_p=self.sar_p,
                 p_acc_ema=self.p_acc_ema,
                 p_acc_ema_decay=self.p_acc_ema_decay,
-                encoders_domain_discriminator_loss_scale=self.encoders_domain_discriminator_loss_scale
+                domain_loss_scale=self.domain_loss_scale
             )
             new_agent = self.replace(
                 rng=new_rng,
@@ -241,6 +241,9 @@ class DIDAAgent(GAILAgent):
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
         return encode_observation(self.learner_encoder, observations)
+    
+    def _update_encoders_domain_discriminator_loss_scale(self):
+        
 
 def _update_jit(
     *,
@@ -260,7 +263,7 @@ def _update_jit(
     sar_p: float,
     p_acc_ema: float,
     p_acc_ema_decay: float,
-    encoders_domain_discriminator_loss_scale,
+    domain_loss_scale,
 ):
     new_rng, expert_batch, anchor_batch = _prepare_batches_step_jit(rng, expert_buffer, expert_buffer_state, anchor_buffer_state)
 
@@ -281,7 +284,7 @@ def _update_jit(
         expert_encoder=expert_encoder,
         policy_discriminator=policy_discriminator,
         domain_discriminator=domain_discriminator,
-        encoders_domain_discriminator_loss_scale=encoders_domain_discriminator_loss_scale
+        domain_loss_scale=domain_loss_scale
     )
 
     # UPDATE domain discriminator
@@ -369,7 +372,7 @@ def _update_encoders_step_jit(
     expert_encoder: Generator,
     policy_discriminator: Discriminator,
     domain_discriminator: Discriminator,
-    encoders_domain_discriminator_loss_scale: float,
+    domain_loss_scale: float,
 ):
     # update encoders with policy discriminator
     learner_policy_batch = jnp.concatenate([learner_batch["observations"], learner_batch["observations_next"]], axis=0)
@@ -377,14 +380,14 @@ def _update_encoders_step_jit(
     
     new_learner_encoder, learner_encoder_info, learner_encoder_stats_info = learner_encoder.update(
         hold_grad=True,
-        grad_scale=encoders_domain_discriminator_loss_scale,
+        grad_scale=domain_loss_scale,
         batch=learner_policy_batch,
         discriminator=policy_discriminator,
         process_discriminator_input=process_policy_discriminator_input
     )
     new_expert_encoder, expert_encoder_info, expert_encoder_stats_info = expert_encoder.update(
         hold_grad=True,
-        grad_scale=encoders_domain_discriminator_loss_scale,
+        grad_scale=domain_loss_scale,
         batch=expert_policy_batch,
         discriminator=policy_discriminator,
         process_discriminator_input=process_policy_discriminator_input
