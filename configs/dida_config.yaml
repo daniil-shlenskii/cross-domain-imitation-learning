@@ -96,7 +96,7 @@ evaluation:
         id: *env_name
 
 archive:
-  agent_load_dir: &agent_dir archive/agents/dida_main_from_cheetah
+  agent_load_dir: &agent_dir archive/agents/dida
   agent_save_dir: *agent_dir
   agent_buffer_load_dir: *agent_dir
   agent_buffer_save_dir: *agent_dir

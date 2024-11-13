@@ -1,11 +1,14 @@
-seed: &seed 42
-env_name: &env_name Hopper-v5 # Hopper-v5 HalfCheetah-v5
-precollect_buffer_size: &precollect_buffer_size 5_000
+seed: &seed 0
+env_name: &env_name HalfCheetah-v5 # Hopper-v5
+
 n_iters_training: 1_000_000
+batch_size: &batch_size 256
+
+precollect_buffer_size: &precollect_buffer_size 5_000
 
 log_every: 1_000
-eval_every: 1_000
-save_every: 1_000
+eval_every: 5_000
+save_every: 5_000
 
 agent:
   _target_: agents.sac.SACAgent.create
@@ -18,7 +21,7 @@ agent:
     hidden_dims: [256, 256]
   temperature_module_config:
     _target_: agents.sac.Temperature
-    initial_temperature: 1.0
+    initial_temperature: 0.2
   actor_optimizer_config: &optimizer_config
     transforms:
       - _target_: optax.clip
@@ -29,7 +32,7 @@ agent:
   temperature_optimizer_config:
     transforms:
       - _target_: optax.sgd
-        learning_rate: 1e-5
+        learning_rate: 0.
 
 environment:
   _target_: gymnasium.wrappers.TimeLimit
@@ -53,13 +56,13 @@ replay_buffer:
   _target_: flashbax.make_item_buffer
   max_length: 1_000_000
   min_length: *precollect_buffer_size
-  sample_batch_size: 256
+  sample_batch_size: *batch_size
   add_batches: False
 
 archive:
-  # agent_load_dir: &agent_dir archive/agents/sac_with_learnable_temperature
-  # agent_save_dir: *agent_dir
-  # agent_buffer_load_dir: *agent_dir
-  # agent_buffer_save_dir: *agent_dir
+  agent_load_dir: &agent_dir archive/agents/sac
+  agent_save_dir: *agent_dir
+  agent_buffer_load_dir: *agent_dir
+  agent_buffer_save_dir: *agent_dir
   random_buffer_load_dir: &random_buffer_dir archive/random_buffers
   random_buffer_save_dir: *random_buffer_dir
