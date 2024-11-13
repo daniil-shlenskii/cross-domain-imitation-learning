@@ -40,7 +40,7 @@ def get_tsne_embeddings_scatter(
     # prepare learner_random buffer state
     learner_random_buffer_state = deepcopy(learner_buffer_state)
     buffer_state_size = get_buffer_state_size(learner_random_buffer_state)
-    perm_idcs = np.random.permutation(buffer_state_size)
+    perm_idcs = np.random.choice(buffer_state_size)
     learner_random_buffer_state.experience["observations_next"] = \
         learner_random_buffer_state.experience["observations_next"].at[0, :buffer_state_size].set(
             learner_random_buffer_state.experience["observations_next"][0, perm_idcs]
@@ -112,10 +112,12 @@ def get_tsne_embeddings_scatter(
         if i in {1, 3}:
             plt.scatter(tsne_state_embeddings[:, 0], tsne_state_embeddings[:, 1], **scatter_params)
     plt.legend()
+    plt.close()
 
     behavior_figure = plt.figure(figsize=(4, 4)) 
     for tsne_behavior_embeddings, scatter_params in zip(tsne_behavior_embeddings_tpl, scatter_params_tpl):
         plt.scatter(tsne_behavior_embeddings[:, 0], tsne_behavior_embeddings[:, 1], **scatter_params)
     plt.legend()
+    plt.close()
 
     return state_figure, behavior_figure
