@@ -85,7 +85,7 @@ agent:
       _target_: networks.discriminator.Discriminator
       hidden_dims: [256, 256]
     optimizer_config: *optimizer_config
-    gradient_penalty_coef: 1.
+    gradient_penalty_coef: 10.
 
 evaluation:
   seed: 42
