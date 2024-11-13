@@ -35,8 +35,13 @@ class DIDAAgent(GAILAgent):
     domain_discriminator: Discriminator
     use_das: float = struct.field(pytree_node=False)
     sar_p: float = struct.field(pytree_node=False)
+<<<<<<< HEAD
     p_acc_ema: float = struct.field(pytree_node=False)
     p_acc_ema_decay: float = struct.field(pytree_node=False)
+=======
+    p_acc_ema: float
+    p_acc_ema_decay: float
+>>>>>>> 750563e (dida: sar p_acc ema accumulation)
     n_domain_discriminator_updates: int = struct.field(pytree_node=False)
     domain_loss_scale: float = struct.field(pytree_node=False)
     domain_loss_scale_updater: int = struct.field(pytree_node=False)
@@ -152,6 +157,8 @@ class DIDAAgent(GAILAgent):
                 anchor_buffer_state.experience["observations_next"][0, perm_idcs]
             )
         object.__setattr__(self, 'anchor_buffer_state', anchor_buffer_state)
+
+        # TODO: save_attrs
 
     def update(self, batch: DataType):
         update_domain_discriminator_only = (
@@ -316,11 +323,13 @@ def _update_jit(
     )
 
     if use_das:
-        alpha, sar_info = self_adaptive_rate(
+        alpha, new_p_acc_ema, sar_info = self_adaptive_rate(
             domain_discriminator=domain_discriminator,
             learner_batch=batch,
             expert_batch=expert_batch,
             p=sar_p,
+            p_acc_ema=p_acc_ema,
+            p_acc_ema_decay=p_acc_ema_decay,
         )
         new_rng, mixed_batch = domain_adversarial_sampling(
             rng=new_rng,
@@ -336,7 +345,7 @@ def _update_jit(
             batch,
             anchor_batch
         )
-        sar_info = {}
+        sar_info, new_p_acc_ema = {}, None
 
     if use_das:
         alpha, new_p_acc_ema, sar_info = self_adaptive_rate(
