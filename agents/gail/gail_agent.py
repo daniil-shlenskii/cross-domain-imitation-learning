@@ -71,16 +71,18 @@ class GAILAgent(Agent):
             add_batches=False,
         )
 
+        _save_attrs = kwargs.pop(
+            "_save_attrs",
+            ("agent", "discriminator")
+        )
+
         return cls(
             rng=rng,
             expert_buffer=expert_buffer,
             expert_buffer_state=expert_buffer_state,
             agent=agent,
             discriminator=discriminator,
-            _save_attrs = (
-                "agent",
-                "discriminator"
-            ),
+            _save_attrs = _save_attrs,
             **kwargs,
         )
 

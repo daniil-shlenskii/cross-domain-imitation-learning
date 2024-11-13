@@ -14,7 +14,7 @@ from utils.utils import SaveLoadMixin
 
 
 class GAN(SaveLoadMixin):
-    _attrs_to_save: Tuple[str] = (
+    _save_attrs: Tuple[str] = (
         "generator",
         "discriminator"
     )
