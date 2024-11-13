@@ -1,5 +1,5 @@
 seed: &seed 0
-env_name: &env_name HalfCheetah-v5 # Hopper-v5
+env_name: &env_name HalfCheetah-v5
 
 n_iters_training: 2_000_000
 batch_size: &batch_size 512
