@@ -1,6 +1,6 @@
 import functools
 from copy import deepcopy
-from typing import Tuple
+from typing import Dict, Tuple
 
 import flashbax
 import gymnasium as gym
@@ -11,17 +11,19 @@ from flax import struct
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
+import wandb
 from agents import GAILAgent
 from agents.base_agent import Agent
 from agents.dida.das import domain_adversarial_sampling
 from agents.dida.sar import self_adaptive_rate
-from agents.dida.utils import (encode_observation,
+from agents.dida.utils import (encode_observation, get_tsne_embeddings_scatter,
                                process_policy_discriminator_input)
 from agents.gail.gail_discriminator import GAILDiscriminator
 from gan.discriminator import Discriminator
 from gan.generator import Generator
 from utils.types import Buffer, BufferState, DataType, PRNGKey
-from utils.utils import get_buffer_state_size, load_pickle
+from utils.utils import (convert_figure_to_array, get_buffer_state_size,
+                         load_pickle)
 
 
 class DIDAAgent(GAILAgent):
@@ -56,7 +58,7 @@ class DIDAAgent(GAILAgent):
         expert_encoder_config: DictConfig,
         domain_discriminator_config: DictConfig,
         #
-        use_das: bool = False,
+        use_das: bool = True,
         sar_p: float = 0.66,
         #
         n_domain_discriminator_updates: int = 1,
@@ -185,6 +187,36 @@ class DIDAAgent(GAILAgent):
                 agent=new_rl_agent,
             )
         return new_agent, info, stats_info
+    
+    def evaluate(
+        self,
+        *,
+        seed: int, 
+        env: gym.Env,
+        num_episodes: int,
+        #
+        learner_buffer: Buffer,
+        learner_buffer_state: BufferState,
+        n_samples_per_buffer: int,
+        convert_to_wandb_type: bool = True,
+    ) -> Dict[str, float]:
+        eval_info = super().evaluate(seed=seed, env=env, num_episodes=num_episodes)
+
+        tsne_fig = get_tsne_embeddings_scatter(
+            seed=seed,
+            learner_buffer=learner_buffer,
+            expert_buffer=self.expert_buffer,
+            learner_buffer_state=learner_buffer_state,
+            expert_buffer_state=self.expert_buffer_state,
+            anchor_buffer_state=self.anchor_buffer_state,
+            learner_encoder=self.learner_encoder,
+            expert_encoder=self.expert_encoder,
+            n_samples_per_buffer=n_samples_per_buffer,
+        )
+        if convert_to_wandb_type:
+            tsne_fig = wandb.Image(convert_figure_to_array(tsne_fig), caption="TSNE plot of behavior feautures")
+        eval_info["tsne_scatter"] = tsne_fig
+        return eval_info
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
         return encode_observation(self.learner_encoder, observations)
