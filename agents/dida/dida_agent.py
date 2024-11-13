@@ -62,7 +62,7 @@ class DIDAAgent(GAILAgent):
         #
         use_das: bool = True,
         sar_p: float = 0.66,
-        p_acc_ema: float = 0.5,
+        p_acc_ema: float = 0.85,
         p_acc_ema_decay: float = 0.999,
         #
         n_domain_discriminator_updates: int = 1,
@@ -136,7 +136,7 @@ class DIDAAgent(GAILAgent):
         # prepare anchor replay buffer
         anchor_buffer_state = deepcopy(self.expert_buffer_state)
         buffer_state_size = get_buffer_state_size(anchor_buffer_state)
-        perm_idcs = np.random.permutation(buffer_state_size)
+        perm_idcs = np.random.choice(buffer_state_size)
         anchor_buffer_state.experience["observations_next"] = \
             anchor_buffer_state.experience["observations_next"].at[0, :buffer_state_size].set(
                 anchor_buffer_state.experience["observations_next"][0, perm_idcs]
