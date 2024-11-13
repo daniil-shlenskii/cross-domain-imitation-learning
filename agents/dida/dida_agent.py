@@ -314,6 +314,7 @@ def _update_jit(
         encoded_expert_policy_batch=encoded_expert_policy_batch,
         expert_encoder=expert_encoder,
     )
+
     if use_das:
         alpha, sar_info = self_adaptive_rate(
             domain_discriminator=domain_discriminator,
