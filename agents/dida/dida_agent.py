@@ -202,7 +202,7 @@ class DIDAAgent(GAILAgent):
     ) -> Dict[str, float]:
         eval_info = super().evaluate(seed=seed, env=env, num_episodes=num_episodes)
 
-        tsne_fig = get_tsne_embeddings_scatter(
+        tsne_state_figure, tsne_behavior_figure = get_tsne_embeddings_scatter(
             seed=seed,
             learner_buffer=learner_buffer,
             expert_buffer=self.expert_buffer,
@@ -214,8 +214,10 @@ class DIDAAgent(GAILAgent):
             n_samples_per_buffer=n_samples_per_buffer,
         )
         if convert_to_wandb_type:
-            tsne_fig = wandb.Image(convert_figure_to_array(tsne_fig), caption="TSNE plot of behavior feautures")
-        eval_info["tsne_scatter"] = tsne_fig
+            tsne_state_figure = wandb.Image(convert_figure_to_array(tsne_state_figure), caption="TSNE plot of state feautures")
+            tsne_behavior_figure = wandb.Image(convert_figure_to_array(tsne_behavior_figure), caption="TSNE plot of behavior feautures")
+        eval_info["tsne_state_scatter"] = tsne_state_figure
+        eval_info["tsne_behvaior_scatter"] = tsne_behavior_figure
         return eval_info
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:

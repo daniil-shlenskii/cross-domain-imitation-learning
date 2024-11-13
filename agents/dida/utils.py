@@ -54,7 +54,7 @@ def get_tsne_embeddings_scatter(
     # collect data and encode it
     @functools.partial(jax.jit, static_argnames=("buffers_tpl", "n_iters_tpl"))
     def compute_embeddings(seed, buffers_tpl, buffer_states_tpl, encoders_tpl, n_iters_tpl):
-        embeddings = [[], [], []]
+        state_embeddings, behavior_embeddings = [[], [], []], [[], [], []]
         
         rng = jax.random.key(seed)
         for i, (buffer, buffer_state, encoder, n_iters) in enumerate(zip(
@@ -63,28 +63,46 @@ def get_tsne_embeddings_scatter(
             for _ in range(n_iters):
                 rng, key = jax.random.split(rng)
                 batch = buffer.sample(buffer_state, key).experience
-                encoded_obsevations = encoder(batch["observations"]) 
-                encoded_obsevations_next = encoder(batch["observations_next"]) 
-                encoded_behavior = jnp.concatenate([encoded_obsevations, encoded_obsevations_next], axis=1)
-                embeddings[i].append(encoded_behavior)
-            embeddings[i] = jnp.concatenate(embeddings[i])
-        return embeddings
+                encoded_observations = encoder(batch["observations"]) 
+                encoded_observations_next = encoder(batch["observations_next"]) 
+                encoded_behavior = jnp.concatenate([encoded_observations, encoded_observations_next], axis=1)
 
-    # behavior embeddings
-    behavior_embeddings_tpl = compute_embeddings(seed, buffers_tpl, buffer_states_tpl, encoders_tpl, n_iters_tpl)
+                state_embeddings[i].append(encoded_observations)
+                behavior_embeddings[i].append(encoded_behavior)
+
+            state_embeddings[i] = jnp.concatenate(state_embeddings[i])
+            behavior_embeddings[i] = jnp.concatenate(behavior_embeddings[i])
+
+        return state_embeddings, behavior_embeddings
+
+    # get embeddings
+    state_embeddings_tpl, behavior_embeddings_tpl = compute_embeddings(seed, buffers_tpl, buffer_states_tpl, encoders_tpl, n_iters_tpl)
+
+    state_embeddings_tpl = tuple(state_emb[:n_samples_per_buffer] for state_emb in state_embeddings_tpl)
     behavior_embeddings_tpl = tuple(behavior_emb[:n_samples_per_buffer] for behavior_emb in behavior_embeddings_tpl)
 
     # get tsne embeddings
-    tsne_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(behavior_embeddings_tpl))
-    tsne_embeddings_tpl = tuple(
-        tsne_embeddings[i * n_samples_per_buffer: (i + 1) * n_samples_per_buffer]
+    tsne_state_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(state_embeddings_tpl))
+    tsne_state_embeddings_tpl = tuple(
+        tsne_state_embeddings[i * n_samples_per_buffer: (i + 1) * n_samples_per_buffer]
+        for i in range(3)
+    )
+    
+    tsne_behavior_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(behavior_embeddings_tpl))
+    tsne_behavior_embeddings_tpl = tuple(
+        tsne_behavior_embeddings[i * n_samples_per_buffer: (i + 1) * n_samples_per_buffer]
         for i in range(3)
     )
     
     # get scatterplot figure
-    fig = plt.figure(figsize=(4, 4)) 
-    for tsne_embeddings, scatter_params in zip(tsne_embeddings_tpl, scatter_params_tpl):
-        plt.scatter(tsne_embeddings[:, 0], tsne_embeddings[:, 1], **scatter_params)
+    state_figure = plt.figure(figsize=(4, 4)) 
+    for tsne_state_embeddings, scatter_params in zip(tsne_state_embeddings_tpl[:2], scatter_params_tpl):
+        plt.scatter(tsne_state_embeddings[:, 0], tsne_state_embeddings[:, 1], **scatter_params)
     plt.legend()
 
-    return fig
+    behavior_figure = plt.figure(figsize=(4, 4)) 
+    for tsne_behavior_embeddings, scatter_params in zip(tsne_behavior_embeddings_tpl, scatter_params_tpl):
+        plt.scatter(tsne_behavior_embeddings[:, 0], tsne_behavior_embeddings[:, 1], **scatter_params)
+    plt.legend()
+
+    return state_figure, behavior_figure
