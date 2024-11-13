@@ -1,11 +1,14 @@
-seed: &seed 42
-env_name: &env_name HalfCheetah-v5
-precollect_buffer_size: &precollect_buffer_size 5_000
-n_iters_training: 1_000_000
+seed: &seed 0
+env_name: &env_name HalfCheetah-v5 # Hopper-v5
 
-log_every: 500
-eval_every: 1_000
-save_every: 1_000
+n_iters_training: 1_000_000
+batch_size: &batch_size 256
+
+precollect_buffer_size: &precollect_buffer_size 5_000
+
+log_every: 1_000
+eval_every: 5_000
+save_every: 5_000
 
 environment:
   _target_: gymnasium.wrappers.TimeLimit
