@@ -1,5 +1,5 @@
 seed: &seed 0
-env_name: &env_name HalfCheetah-v5 # Hopper-v5
+env_name: &env_name HalfCheetah-v5
 
 n_iters_training: 2_000_000
 batch_size: &batch_size 512
@@ -33,7 +33,9 @@ agent:
   expert_buffer_state_path: archive/agents/sac/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
   n_domain_discriminator_updates: 5
   use_das: True
-  sar_p: 0.5
+  sar_p: 0.33
+  p_acc_ema: 0.85
+  encoders_domain_discriminator_loss_scale: 0.5
   agent_config:
     _target_: agents.sac.SACAgent.create
     actor_module_config:
@@ -83,7 +85,7 @@ agent:
       _target_: networks.discriminator.Discriminator
       hidden_dims: [256, 256]
     optimizer_config: *optimizer_config
-    gradient_penalty_coef: 10.
+    gradient_penalty_coef: 1.
 
 evaluation:
   seed: 42
@@ -97,7 +99,7 @@ evaluation:
         id: *env_name
 
 archive:
-  agent_load_dir: &agent_dir archive/agents/dida
+  agent_load_dir: &agent_dir experiments/dida/from_HalfCheetah-v5/to_HalfCheetah-v5/0/archive
   agent_save_dir: *agent_dir
   agent_buffer_load_dir: *agent_dir
   agent_buffer_save_dir: *agent_dir
