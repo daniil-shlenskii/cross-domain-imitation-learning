@@ -17,8 +17,8 @@ def domain_adversarial_sampling(
 
     # preparation
     b_size = embedded_learner_batch["observations"].shape[0]
-    num_to_mix = jnp.array(alpha * b_size, int)
-    idcs_to_change = jax.random.permutation(perm_key, b_size).at[:num_to_mix].get()
+    num_to_mix = int(alpha * b_size)
+    idcs_to_change = jax.random.permutation(perm_key, b_size)[:num_to_mix]
     embedded_mixed_batch = embedded_anchor_batch
 
     # get das probabilites
@@ -26,8 +26,10 @@ def domain_adversarial_sampling(
 
     # udpate mixed batch with objects corresponding to the lowest das probabilites
     idcs = jax.random.choice(choice_key, a=b_size, shape=(num_to_mix,), p=1-das_probs)
-    embedded_mixed_batch["observations"].at[idcs_to_change].set(embedded_learner_batch["observations"].at[idcs].get())
-    embedded_mixed_batch["observations_next"].at[idcs_to_change].set(embedded_learner_batch["observations_next"].at[idcs].get())
+    embedded_mixed_batch["observations"] = \
+        embedded_mixed_batch["observations"].at[idcs_to_change].set(embedded_learner_batch["observations"][idcs])
+    embedded_mixed_batch["observations_next"] = \
+        embedded_mixed_batch["observations_next"].at[idcs_to_change].set(embedded_learner_batch["observations_next"][idcs])
 
     return new_rng, embedded_mixed_batch
 
