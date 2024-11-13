@@ -33,6 +33,8 @@ class DIDAAgent(GAILAgent):
     domain_discriminator: Discriminator
     use_das: float = struct.field(pytree_node=False)
     sar_p: float = struct.field(pytree_node=False)
+    p_acc_ema: float
+    p_acc_ema_decay: float
     n_domain_discriminator_updates: int = struct.field(pytree_node=False)
     encoders_domain_discriminator_loss_scale: int = struct.field(pytree_node=False)
 
@@ -60,6 +62,8 @@ class DIDAAgent(GAILAgent):
         #
         use_das: bool = True,
         sar_p: float = 0.66,
+        p_acc_ema: float = 0.5,
+        p_acc_ema_decay: float = 0.999,
         #
         n_domain_discriminator_updates: int = 1,
         encoders_domain_discriminator_loss_scale: float = 0.2,
@@ -114,7 +118,9 @@ class DIDAAgent(GAILAgent):
             use_das=use_das,
             sar_p=sar_p,
             n_domain_discriminator_updates=n_domain_discriminator_updates,
-            encoders_domain_discriminator_loss_scale=encoders_domain_discriminator_loss_scale
+            encoders_domain_discriminator_loss_scale=encoders_domain_discriminator_loss_scale,
+            p_acc_ema_decay=p_acc_ema_decay,
+            p_acc_ema=p_acc_ema,
         )
     
     def __post_init__(self):
@@ -127,6 +133,8 @@ class DIDAAgent(GAILAgent):
                 anchor_buffer_state.experience["observations_next"][0, :buffer_state_size][perm_idcs]
             )
         object.__setattr__(self, 'anchor_buffer_state', anchor_buffer_state)
+
+        # TODO: save_attrs
 
     def update(self, batch: DataType):
         update_domain_discriminator_only = (
@@ -161,6 +169,7 @@ class DIDAAgent(GAILAgent):
                 new_policy_discriminator,
                 new_domain_discriminator,
                 new_rl_agent,
+                new_p_acc_ema,
                 info,
                 stats_info
             ) = _update_jit(
@@ -176,6 +185,8 @@ class DIDAAgent(GAILAgent):
                 agent=self.agent,
                 use_das=self.use_das,
                 sar_p=self.sar_p,
+                p_acc_ema=self.p_acc_ema,
+                p_acc_ema_decay=self.p_acc_ema_decay,
                 encoders_domain_discriminator_loss_scale=self.encoders_domain_discriminator_loss_scale
             )
             new_agent = self.replace(
@@ -185,6 +196,7 @@ class DIDAAgent(GAILAgent):
                 discriminator=new_policy_discriminator,
                 domain_discriminator=new_domain_discriminator,
                 agent=new_rl_agent,
+                p_acc_ema=new_p_acc_ema,
             )
         return new_agent, info, stats_info
     
@@ -239,6 +251,8 @@ def _update_jit(
     #
     use_das: bool,
     sar_p: float,
+    p_acc_ema: float,
+    p_acc_ema_decay: float,
     encoders_domain_discriminator_loss_scale,
 ):
     new_rng, expert_batch, anchor_batch = _prepare_batches_step_jit(rng, expert_buffer, expert_buffer_state, anchor_buffer_state)
@@ -281,11 +295,13 @@ def _update_jit(
     )
 
     if use_das:
-        alpha, sar_info = self_adaptive_rate(
+        alpha, new_p_acc_ema, sar_info = self_adaptive_rate(
             domain_discriminator=domain_discriminator,
             learner_batch=batch,
             expert_batch=expert_batch,
             p=sar_p,
+            p_acc_ema=p_acc_ema,
+            p_acc_ema_decay=p_acc_ema_decay,
         )
         new_rng, mixed_batch = domain_adversarial_sampling(
             rng=new_rng,
@@ -301,7 +317,7 @@ def _update_jit(
             batch,
             anchor_batch
         )
-        sar_info = {}
+        sar_info, new_p_acc_ema = {}, None
 
     # apply gail
     new_agent, new_policy_disc, gail_info, gail_stats_info = _update_gail_step_jit(
@@ -321,6 +337,7 @@ def _update_jit(
         new_policy_disc,
         new_domain_disc,
         new_agent,
+        new_p_acc_ema,
         info,
         stats_info
     )
