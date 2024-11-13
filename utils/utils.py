@@ -4,9 +4,12 @@ import warnings
 from pathlib import Path
 from typing import Any, Tuple
 
+import matplotlib.pyplot as plt
+import numpy as np
 import optax
 from flax import struct
 from hydra.utils import instantiate
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 from omegaconf.dictconfig import DictConfig
 
 from utils.types import Buffer, BufferState
@@ -106,3 +109,8 @@ def get_buffer_state_size(buffer_state: BufferState) -> int:
     else:
         size = buffer_state.current_index
     return int(size)
+
+def convert_figure_to_array(figure: plt.Figure) -> np.ndarray:
+    agg = figure.canvas.switch_backends(FigureCanvasAgg)
+    agg.draw()
+    return np.asarray(agg.buffer_rgba())
