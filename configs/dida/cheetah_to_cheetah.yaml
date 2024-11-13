@@ -1,5 +1,5 @@
 seed: &seed 0
-env_name: &env_name HalfCheetah-v5 # Hopper-v5
+env_name: &env_name HalfCheetah-v5
 
 n_iters_training: 2_000_000
 batch_size: &batch_size 512
@@ -28,7 +28,6 @@ replay_buffer:
 agent:
   _target_: agents.dida.DIDAAgent.create
   seed: *seed
-  encoders_dim: 12
   expert_batch_size: *batch_size
   expert_buffer_state_path: archive/agents/sac/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
   n_domain_discriminator_updates: 5
