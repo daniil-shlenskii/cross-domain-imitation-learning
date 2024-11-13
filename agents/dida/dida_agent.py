@@ -139,7 +139,7 @@ class DIDAAgent(GAILAgent):
         perm_idcs = np.random.permutation(buffer_state_size)
         anchor_buffer_state.experience["observations_next"] = \
             anchor_buffer_state.experience["observations_next"].at[0, :buffer_state_size].set(
-                anchor_buffer_state.experience["observations_next"][0, :buffer_state_size][perm_idcs]
+                anchor_buffer_state.experience["observations_next"][0, perm_idcs]
             )
         object.__setattr__(self, 'anchor_buffer_state', anchor_buffer_state)
 
