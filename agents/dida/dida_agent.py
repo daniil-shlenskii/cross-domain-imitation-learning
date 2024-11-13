@@ -33,8 +33,8 @@ class DIDAAgent(GAILAgent):
     domain_discriminator: Discriminator
     use_das: float = struct.field(pytree_node=False)
     sar_p: float = struct.field(pytree_node=False)
-    p_acc_ema: float
-    p_acc_ema_decay: float
+    p_acc_ema: float = struct.field(pytree_node=False)
+    p_acc_ema_decay: float = struct.field(pytree_node=False)
     n_domain_discriminator_updates: int = struct.field(pytree_node=False)
     encoders_domain_discriminator_loss_scale: int = struct.field(pytree_node=False)
 
@@ -121,6 +121,15 @@ class DIDAAgent(GAILAgent):
             encoders_domain_discriminator_loss_scale=encoders_domain_discriminator_loss_scale,
             p_acc_ema_decay=p_acc_ema_decay,
             p_acc_ema=p_acc_ema,
+            #
+            _save_attrs = (
+                "agent",
+                "discriminator",
+                "learner_encoder",
+                "expert_encoder",
+                "domain_discriminator",
+                "p_acc_ema",
+            ),
         )
     
     def __post_init__(self):
@@ -133,8 +142,6 @@ class DIDAAgent(GAILAgent):
                 anchor_buffer_state.experience["observations_next"][0, :buffer_state_size][perm_idcs]
             )
         object.__setattr__(self, 'anchor_buffer_state', anchor_buffer_state)
-
-        # TODO: save_attrs
 
     def update(self, batch: DataType):
         update_domain_discriminator_only = (
