@@ -277,6 +277,7 @@ def _update_jit(
         encoded_expert_policy_batch=encoded_expert_policy_batch,
         expert_encoder=expert_encoder,
     )
+
     if use_das:
         alpha, sar_info = self_adaptive_rate(
             domain_discriminator=domain_discriminator,
@@ -302,8 +303,9 @@ def _update_jit(
 
     # apply gail
     new_agent, new_policy_disc, gail_info, gail_stats_info = _update_gail_step_jit(
-        batch=mixed_batch,
+        batch=batch,
         expert_batch=expert_batch,
+        mixed_batch=mixed_batch,
         agent=agent,
         discriminator=policy_discriminator,
     )
@@ -458,19 +460,21 @@ def _update_gail_step_jit(
     *,
     batch: DataType,
     expert_batch: DataType,
+    mixed_batch: DataType,
     #
     agent: Agent,
     discriminator: GAILDiscriminator
 ):
     policy_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=1)
     expert_policy_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=1)
+    mixed_policy_batch = jnp.concatenate([mixed_batch["observations"], mixed_batch["observations_next"]], axis=1)
 
     # update agent
     batch["reward"] = discriminator.get_rewards(policy_batch)
     new_agent, agent_info, agent_stats_info = agent.update(batch)
 
     # update discriminator
-    new_disc, disc_info, disc_stats_info = discriminator.update(learner_batch=policy_batch, expert_batch=expert_policy_batch)
+    new_disc, disc_info, disc_stats_info = discriminator.update(learner_batch=mixed_policy_batch, expert_batch=expert_policy_batch)
 
     info = {**agent_info, **disc_info}
     stats_info = {**agent_stats_info, **disc_stats_info}
