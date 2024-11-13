@@ -4,10 +4,16 @@ import warnings
 from pathlib import Path
 from typing import Any, Tuple
 
+<<<<<<< HEAD
 import jax
+=======
+import matplotlib.pyplot as plt
+import numpy as np
+>>>>>>> d320934 (dida: evaluation added)
 import optax
 from flax import struct
 from hydra.utils import instantiate
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 from omegaconf.dictconfig import DictConfig
 
 from utils.types import Buffer, BufferState
@@ -117,3 +123,8 @@ def make_jitted_fbx_buffer(fbx_buffer_config: DictConfig):
         can_sample = jax.jit(buffer.can_sample),
     )
     return buffer
+
+def convert_figure_to_array(figure: plt.Figure) -> np.ndarray:
+    agg = figure.canvas.switch_backends(FigureCanvasAgg)
+    agg.draw()
+    return np.asarray(agg.buffer_rgba())
