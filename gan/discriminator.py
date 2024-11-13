@@ -48,11 +48,13 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             info_key=info_key,
         )
 
+        _save_attrs = kwargs.pop("_save_attrs", ("state",))
+
         return cls(
             rng=rng,
             state=state,
             gradient_penalty_coef=gradient_penalty_coef,
-            _save_attrs=kwargs.pop("_save_attrs", ("state",)),
+            _save_attrs=_save_attrs,
             **kwargs
         )
 
