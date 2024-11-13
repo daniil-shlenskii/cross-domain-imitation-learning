@@ -79,6 +79,11 @@ class GAILAgent(Agent):
             ("agent", "discriminator")
         )
 
+        _save_attrs = kwargs.pop(
+            "_save_attrs",
+            ("agent", "discriminator")
+        )
+
         return cls(
             rng=rng,
             expert_buffer=expert_buffer,
