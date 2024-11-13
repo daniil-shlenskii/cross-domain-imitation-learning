@@ -49,7 +49,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
 
         return cls(
             state=state,
-            _save_attrs=kwargs.pop("_save_attrs", "state"),
+            _save_attrs=kwargs.pop("_save_attrs", ("state",)),
             **kwargs
         )
 
