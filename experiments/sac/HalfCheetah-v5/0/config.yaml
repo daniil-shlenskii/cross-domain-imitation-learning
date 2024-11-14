@@ -1,7 +1,7 @@
 seed: &seed 0
 env_name: &env_name HalfCheetah-v5
 
-n_iters_training: 2_000_000
+n_iters_training: 1_500_000
 batch_size: &batch_size 256
 
 precollect_buffer_size: &precollect_buffer_size 5_000
@@ -40,7 +40,6 @@ environment:
   env:
       _target_: gymnasium.make
       id: *env_name
-      render_mode: human
 
 evaluation:
   seed: 42
