@@ -40,7 +40,6 @@ environment:
   env:
       _target_: gymnasium.make
       id: *env_name
-      render_mode: human
 
 evaluation:
   seed: 42
