@@ -15,6 +15,8 @@ import wandb
 from agents import GAILAgent
 from agents.base_agent import Agent
 from agents.dida.das import domain_adversarial_sampling
+from agents.dida.domain_loss_scale_updaters import \
+    IdentityDomainLossScaleUpdater
 from agents.dida.sar import self_adaptive_rate
 from agents.dida.utils import (encode_observation, get_tsne_embeddings_scatter,
                                process_policy_discriminator_input)
@@ -36,7 +38,8 @@ class DIDAAgent(GAILAgent):
     p_acc_ema: float = struct.field(pytree_node=False)
     p_acc_ema_decay: float = struct.field(pytree_node=False)
     n_domain_discriminator_updates: int = struct.field(pytree_node=False)
-    domain_loss_scale: int = struct.field(pytree_node=False)
+    domain_loss_scale: float = struct.field(pytree_node=False)
+    domain_loss_scale_updater: int = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -67,6 +70,7 @@ class DIDAAgent(GAILAgent):
         #
         n_domain_discriminator_updates: int = 1,
         domain_loss_scale: float = 1.0,
+        domain_loss_scale_updater_kwargs: DictConfig = None,
     ):  
         discriminator_config["info_key"] = "policy_discriminator"
 
@@ -101,6 +105,11 @@ class DIDAAgent(GAILAgent):
             _recursive_=False,
         )
 
+        if domain_loss_scale_updater_kwargs is None:
+            domain_loss_scale_updater = IdentityDomainLossScaleUpdater()
+        else:
+            domain_loss_scale_updater = instantiate(domain_loss_scale_updater_kwargs)
+
         return super().create(
             seed=seed,
             observation_dim=encoders_dim,
@@ -121,6 +130,7 @@ class DIDAAgent(GAILAgent):
             p_acc_ema=p_acc_ema,
             n_domain_discriminator_updates=n_domain_discriminator_updates,
             domain_loss_scale=domain_loss_scale,
+            domain_loss_scale_updater=domain_loss_scale_updater,
             #
             _save_attrs = (
                 "agent",
@@ -169,6 +179,7 @@ class DIDAAgent(GAILAgent):
                 domain_discriminator=new_domain_discriminator,
             )
         else:
+            new_domain_loss_scale = self.domain_loss_scale_updater.update(self)
             (
                 new_rng,
                 new_learner_encoder,
@@ -194,7 +205,7 @@ class DIDAAgent(GAILAgent):
                 sar_p=self.sar_p,
                 p_acc_ema=self.p_acc_ema,
                 p_acc_ema_decay=self.p_acc_ema_decay,
-                domain_loss_scale=self.domain_loss_scale
+                domain_loss_scale=new_domain_loss_scale,
             )
             new_agent = self.replace(
                 rng=new_rng,
@@ -204,7 +215,10 @@ class DIDAAgent(GAILAgent):
                 domain_discriminator=new_domain_discriminator,
                 agent=new_rl_agent,
                 p_acc_ema=new_p_acc_ema,
+                domain_loss_scale=new_domain_loss_scale,
             )
+            info["domain_loss_scale"] = new_domain_loss_scale
+
         return new_agent, info, stats_info
     
     def evaluate(
@@ -241,9 +255,6 @@ class DIDAAgent(GAILAgent):
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
         return encode_observation(self.learner_encoder, observations)
-    
-    def _update_encoders_domain_discriminator_loss_scale(self):
-        
 
 def _update_jit(
     *,
