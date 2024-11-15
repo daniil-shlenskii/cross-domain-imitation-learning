@@ -220,7 +220,7 @@ def _update_jit(
 
     # target_critic update
     new_target_critic1_params = _update_target_net(new_critic1.params, target_critic1_params, tau)
-    new_target_critic2_params = _update_target_net(new_critic2.params, target_critic1_params, tau)
+    new_target_critic2_params = _update_target_net(new_critic2.params, target_critic2_params, tau)
 
     info = {**critic1_info, **critic2_info, **actor_info, **temperature_info}
     stats_info = {**critic1_stats_info, **critic2_stats_info, **actor_stats_info, **temperature_stats_info}
