@@ -50,7 +50,7 @@ class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
         return observations
     
-    def evaluate(self, env: gym.Env, num_episodes: int, seed: int=0) -> Dict[str, float]:
+    def evaluate(self, env: gym.Env, num_episodes: int, seed: int=0, **kwargs) -> Dict[str, float]:
         env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=num_episodes)
         for i in range(num_episodes):
             observation, _, done, truncated = *env.reset(seed=seed+i), False, False
