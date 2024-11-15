@@ -4,6 +4,7 @@ import warnings
 from pathlib import Path
 from typing import Any, Tuple
 
+import jax
 import optax
 from flax import struct
 from hydra.utils import instantiate
@@ -98,3 +99,13 @@ class SaveLoadFrozenDataclassMixin(SaveLoadMixin):
         attr_to_value, loaded_attrs = load_object_attr_pickle(self, self._save_attrs, dir_path)
         self = self.replace(**attr_to_value)
         return self, loaded_attrs
+    
+def make_jitted_fbx_buffer(fbx_buffer_config: DictConfig):
+    buffer = instantiate(fbx_buffer_config)
+    buffer = buffer.replace(
+        init = jax.jit(buffer.init),
+        add = jax.jit(buffer.add, donate_argnums=0),
+        sample = jax.jit(buffer.sample),
+        can_sample = jax.jit(buffer.can_sample),
+    )
+    return buffer

@@ -14,7 +14,7 @@ from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
 from nn.train_state import TrainState
 from utils.types import *
-from utils.utils import load_pickle
+from utils.utils import load_pickle, make_jitted_fbx_buffer
 
 
 class GAILAgent(Agent):
@@ -63,11 +63,14 @@ class GAILAgent(Agent):
 
         # expert buffer init
         expert_buffer_state = load_pickle(expert_buffer_state_path)
-        expert_buffer = flashbax.make_item_buffer(
-            sample_batch_size=expert_batch_size,
-            min_length=expert_buffer_state.current_index,
-            max_length=expert_buffer_state.current_index,
-            add_batches=False,
+        expert_buffer = make_jitted_fbx_buffer(
+            fbx_buffer_config=dict(
+                _target_="flashbax.make_item_buffer",
+                sample_batch_size=expert_batch_size,
+                min_length=expert_buffer_state.current_index,
+                max_length=expert_buffer_state.current_index,
+                add_batches=False,
+            )
         )
 
         return cls(

@@ -90,7 +90,7 @@ def main(args: argparse.Namespace):
     action = env.action_space.sample()
     observation, reward, done, _, _ = env.step(action)
 
-    buffer = instantiate(config.replay_buffer)
+    buffer = instantiate(config.replay_buffer, _recursive_=False)
     state = buffer.init(
         dict(
             observations=np.array(observation),

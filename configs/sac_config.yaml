@@ -50,11 +50,13 @@ evaluation:
         id: *env_name
 
 replay_buffer:
-  _target_: flashbax.make_item_buffer
-  max_length: 1_000_000
-  min_length: *precollect_buffer_size
-  sample_batch_size: 256
-  add_batches: False
+  _target_: utils.utils.make_jitted_fbx_buffer
+  fbx_buffer_config:
+    _target_: flashbax.make_item_buffer
+    max_length: 1_000_000
+    min_length: *precollect_buffer_size
+    sample_batch_size: 256
+    add_batches: False
 
 archive:
   # agent_load_dir: &agent_dir archive/agents/sac_with_learnable_temperature
