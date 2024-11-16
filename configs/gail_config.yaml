@@ -16,7 +16,6 @@ environment:
   env:
       _target_: gymnasium.make
       id: *env_name
-      render_mode: human
 
 replay_buffer:
   _target_: utils.utils.make_jitted_fbx_buffer
@@ -31,7 +30,7 @@ agent:
   _target_: agents.gail.GAILAgent.create
   seed: *seed
   expert_batch_size: *batch_size
-  expert_buffer_state_path: archive/agents/sac/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
+  expert_buffer_state_path: experiments/sac/HalfCheetah-v5/0/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
   agent_config:
     _target_: agents.sac.SACAgent.create
     actor_module_config:
@@ -42,7 +41,7 @@ agent:
       hidden_dims: [256, 256]
     temperature_module_config:
       _target_: agents.sac.Temperature
-      initial_temperature: 0.2
+      initial_temperature: 1.0
     actor_optimizer_config: &optimizer_config
       transforms:
         - _target_: optax.clip
@@ -53,7 +52,7 @@ agent:
     temperature_optimizer_config:
       transforms:
         - _target_: optax.sgd
-          learning_rate: 0.
+          learning_rate: 1e-5
   discriminator_config:
     _target_: agents.gail.GAILDiscriminator.create
     module_config:
@@ -66,7 +65,7 @@ agent:
 
 evaluation:
   seed: 42
-  num_episodes: 50
+  num_episodes: 10
   environment:
     _target_: gymnasium.wrappers.TimeLimit
     max_episode_steps: 1000
