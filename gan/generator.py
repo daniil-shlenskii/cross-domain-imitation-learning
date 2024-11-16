@@ -1,6 +1,6 @@
 import functools
 from pathlib import Path
-from typing import Callable, Tuple
+from typing import Any, Callable, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -42,7 +42,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         params = module.init(key, input_sample)["params"]
         
         if loss_fn_config is None:
-            loss_fn = _generator_loss_fn
+            loss_fn = generator_loss_fn
         else:
             loss_fn = instantiate(loss_fn_config)
 
@@ -62,7 +62,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             **kwargs
         )
 
-    def update(self, *, batch: jnp.ndarray, discriminator: Discriminator, **kwargs):
+    def update(self, *, batch: Any, discriminator: Discriminator, **kwargs):
         new_state, info, stats_info = _update_jit(
             batch=batch,
             state=self.state,
@@ -75,7 +75,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         return self.state(x, *args, **kwargs)
     
 def _update_jit(
-    batch: jnp.ndarray,
+    batch: Any,
     state: TrainState,
     discriminator: Discriminator,
     **kwargs,
@@ -87,7 +87,7 @@ def _update_jit(
     )
     return new_state, info, stats_info
 
-def _generator_loss_fn(
+def generator_loss_fn(
     params: Params,
     state: TrainState,
     batch: jnp.ndarray,
