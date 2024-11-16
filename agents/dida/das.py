@@ -33,6 +33,7 @@ def domain_adversarial_sampling(
 
     return new_rng, embedded_mixed_batch
 
+@jax.jit
 def get_das_probs(
     embedded_learner_batch: DataType,
     domain_discriminator: Discriminator,
