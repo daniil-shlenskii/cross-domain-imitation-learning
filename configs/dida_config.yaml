@@ -1,8 +1,8 @@
 seed: &seed 0
 env_name: &env_name HalfCheetah-v5 # Hopper-v5
 
-n_iters_training: 2_000_000
-batch_size: &batch_size 512
+n_iters_training: 1_000_000
+batch_size: &batch_size 256
 
 precollect_buffer_size: &precollect_buffer_size 5_000
 
@@ -16,24 +16,33 @@ environment:
   env:
       _target_: gymnasium.make
       id: *env_name
-      render_mode: human
 
 replay_buffer:
-  _target_: flashbax.make_item_buffer
-  max_length: 1_000_000
-  min_length: *precollect_buffer_size
-  sample_batch_size: *batch_size
-  add_batches: False
+  _target_: utils.utils.make_jitted_fbx_buffer
+  fbx_buffer_config:
+    _target_: flashbax.make_item_buffer
+    max_length: 1_000_000
+    min_length: *precollect_buffer_size
+    sample_batch_size: *batch_size
+    add_batches: False
 
 agent:
   _target_: agents.dida.DIDAAgent.create
   seed: *seed
   encoders_dim: 12
   expert_batch_size: *batch_size
-  expert_buffer_state_path: archive/agents/sac/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
-  n_domain_discriminator_updates: 5
-  use_das: True
+  expert_buffer_state_path: experiments/sac/HalfCheetah-v5/0/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
+  #
+  n_domain_discriminator_updates: 1
+  #
+  use_das: False
   sar_p: 0.5
+  p_acc_ema: 0.85
+  #
+  domain_loss_scale: 4.0
+  # domain_loss_scale_updater_kwargs:
+  #   _target_: agents.dida.domain_loss_scale_updaters.RangeDomainLossScaleUpdater
+  #
   agent_config:
     _target_: agents.sac.SACAgent.create
     actor_module_config:
@@ -44,7 +53,7 @@ agent:
       hidden_dims: [256, 256]
     temperature_module_config:
       _target_: agents.sac.Temperature
-      initial_temperature: 0.2
+      initial_temperature: 1.0
     actor_optimizer_config: &optimizer_config
       transforms:
         - _target_: optax.clip
@@ -55,8 +64,8 @@ agent:
     temperature_optimizer_config:
       transforms:
         - _target_: optax.sgd
-          learning_rate: 0.
-  discriminator_config:
+          learning_rate: 1e-5
+  policy_discriminator_config:
     _target_: agents.gail.GAILDiscriminator.create
     module_config:
       _target_: networks.discriminator.Discriminator
@@ -71,12 +80,18 @@ agent:
       _target_: networks.common.MLP
       hidden_dims: [256, 256]
     optimizer_config: *optimizer_config
+    loss_fn_config:
+      _target_: hydra.utils.get_method
+      path: agents.dida.encoder_loss.encoder_loss_fn
   expert_encoder_config:
     _target_: gan.generator.Generator.create
     module_config:
       _target_: networks.common.MLP
       hidden_dims: [256, 256]
     optimizer_config: *optimizer_config
+    loss_fn_config:
+      _target_: hydra.utils.get_method
+      path: agents.dida.encoder_loss.encoder_loss_fn
   domain_discriminator_config:
     _target_: gan.discriminator.Discriminator.create
     module_config:
@@ -87,7 +102,7 @@ agent:
 
 evaluation:
   seed: 42
-  num_episodes: 10
+  num_episodes: 1
   n_samples_per_buffer: 512
   environment:
     _target_: gymnasium.wrappers.TimeLimit

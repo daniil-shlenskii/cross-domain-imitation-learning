@@ -7,7 +7,7 @@ from nn.train_state import TrainState
 from utils.types import Params, DataType
 
 
-def encoder_loss(
+def encoder_loss_fn(
     params: Params,
     state: TrainState,
     batch: DataType,
@@ -21,21 +21,21 @@ def encoder_loss(
 
     policy_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=1)
     policy_logits = policy_discriminator(policy_batch)
-    policy_loss_fn = jax.lac.cond(
+    policy_loss = jax.lax.cond(
         is_learner_encoder,
         lambda policy_logits: g_nonsaturating_loss(policy_logits),
         lambda policy_logits: -g_nonsaturating_loss(policy_logits),
+        policy_logits
     )
-    policy_loss = policy_loss_fn(policy_logits)
 
     domain_batch = batch["observations"]
     domain_logits = domain_discriminator(domain_batch)
-    domain_loss_fn = jax.lac.cond(
+    domain_loss = jax.lax.cond(
         is_learner_encoder,
         lambda domain_logits: -g_nonsaturating_loss(domain_logits),
         lambda domain_logits: g_nonsaturating_loss(domain_logits),
+        domain_logits
     )
-    domain_loss = domain_loss_fn(domain_logits)
 
     loss = policy_loss + domain_loss_scale * domain_loss
     info = {
