@@ -1,5 +1,6 @@
+import functools
 from pathlib import Path
-from typing import Tuple
+from typing import Callable, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -30,6 +31,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         module_config: DictConfig,
         optimizer_config: DictConfig,
         #
+        info_key: str = "generator",
         **kwargs,
     ):
         module_config.hidden_dims.append(output_dim)
@@ -42,28 +44,43 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             apply_fn=module.apply,
             params=params,
             tx=instantiate_optimizer(optimizer_config),
-            info_key="generator",
+            info_key=info_key,
         )
 
-        if "_save_attrs" not in kwargs:
-            kwargs["_save_attrs"] = ("state",)
+        _save_attrs = kwargs.pop("_save_attrs", ("state",))
 
-        return cls(state=state, **kwargs)
+        return cls(
+            state=state,
+            _save_attrs=_save_attrs,
+            **kwargs
+        )
 
-    def update(self, *, batch: jnp.ndarray, discriminator: Discriminator):
+    def update(self, *, batch: jnp.ndarray, discriminator: Discriminator, **kwargs):
         new_state, info, stats_info = _update_jit(
             batch=batch,
             state=self.state,
             discriminator=discriminator,
+            **kwargs
         )
         return self.replace(state=new_state), info, stats_info
     
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
     
-@jax.jit
-def _update_jit(batch: jnp.ndarray, state: TrainState, discriminator: Discriminator):
-    new_state, info, stats_info = state.update(batch=batch, discriminator=discriminator)
+@functools.partial(jax.jit, static_argnames="process_discriminator_input")
+def _update_jit(
+    batch: jnp.ndarray,
+    state: TrainState,
+    discriminator: Discriminator,
+    process_discriminator_input: Callable = lambda x: x,
+    **kwargs,
+):
+    new_state, info, stats_info = state.update(
+        batch=batch,
+        discriminator=discriminator,
+        process_discriminator_input=process_discriminator_input,
+        **kwargs,
+    )
     return new_state, info, stats_info
 
 def _gan_loss_fn(
@@ -71,13 +88,15 @@ def _gan_loss_fn(
     state: TrainState,
     batch: jnp.ndarray,
     discriminator: Discriminator,
+    process_discriminator_input: Callable
 ):
     fake_batch = state.apply_fn({"params": params}, batch, train=True)
+    fake_batch = process_discriminator_input(fake_batch)
     fake_logits = discriminator(fake_batch)
     loss = g_nonsaturating_loss(fake_logits)
 
     info = {
         f"{state.info_key}_loss": loss,
-        "fake_batch": fake_batch
+        "generations": fake_batch
     }
     return loss, info

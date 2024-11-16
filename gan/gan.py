@@ -14,7 +14,7 @@ from utils.utils import SaveLoadMixin
 
 
 class GAN(SaveLoadMixin):
-    _attrs_to_save: Tuple[str] = (
+    _save_attrs: Tuple[str] = (
         "generator",
         "discriminator"
     )
@@ -72,7 +72,7 @@ def _update_jit(
     discriminator: Discriminator,
 ):
     new_gen, gen_info, gen_stats_info = generator.update(batch=gan_inputs, discriminator=discriminator)
-    new_disc, disc_info, disc_stats_info = discriminator.update(real_batch=real_batch, fake_batch=gen_info.pop("fake_batch"))
+    new_disc, disc_info, disc_stats_info = discriminator.update(real_batch=real_batch, fake_batch=gen_info.pop("generations"))
 
     info = {**gen_info, **disc_info}
     stats_info = {**gen_stats_info, **disc_stats_info}

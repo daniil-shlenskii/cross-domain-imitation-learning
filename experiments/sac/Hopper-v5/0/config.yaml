@@ -1,8 +1,8 @@
 seed: &seed 0
-env_name: &env_name HalfCheetah-v5 # Hopper-v5
+env_name: &env_name Hopper-v5
 
 n_iters_training: 1_000_000
-batch_size: &batch_size 256
+batch_size: &batch_size 1024
 
 precollect_buffer_size: &precollect_buffer_size 5_000
 
@@ -21,7 +21,7 @@ agent:
     hidden_dims: [256, 256]
   temperature_module_config:
     _target_: agents.sac.Temperature
-    initial_temperature: 0.2
+    initial_temperature: 1.0
   actor_optimizer_config: &optimizer_config
     transforms:
       - _target_: optax.clip
@@ -42,8 +42,8 @@ environment:
       id: *env_name
 
 evaluation:
-  seed: 42
-  num_episodes: 50
+  seed: *seed
+  num_episodes: 10
   environment:
     _target_: gymnasium.wrappers.TimeLimit
     max_episode_steps: 1000
@@ -57,11 +57,11 @@ replay_buffer:
     _target_: flashbax.make_item_buffer
     max_length: 1_000_000
     min_length: *precollect_buffer_size
-    sample_batch_size: 256
+    sample_batch_size: *batch_size
     add_batches: False
 
 archive:
-  agent_load_dir: &agent_dir archive/agents/sac
+  agent_load_dir: &agent_dir experiments/sac/Hopper-v5/0/archive
   agent_save_dir: *agent_dir
   agent_buffer_load_dir: *agent_dir
   agent_buffer_save_dir: *agent_dir

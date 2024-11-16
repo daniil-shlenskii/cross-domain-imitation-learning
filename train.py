@@ -11,7 +11,6 @@ from omegaconf import OmegaConf
 from tqdm import tqdm
 
 import wandb
-from utils.evaluate import evaluate
 from utils.utils import load_buffer, save_pickle
 
 TMP_RANDOM_BUFFER_STORAGE_DIR = "_tmp_data_storage"
@@ -174,11 +173,14 @@ def main(args: argparse.Namespace):
 
         # evaluate model
         if i == 0 or (i + 1) % config.eval_every == 0:
-            eval_info = evaluate(
-                agent,
-                eval_env,
-                num_episodes=config.evaluation.num_episodes,
+            eval_info = agent.evaluate(
                 seed=config.evaluation.seed,
+                env=eval_env,
+                num_episodes=config.evaluation.num_episodes,
+                #
+                learner_buffer=buffer,
+                learner_buffer_state=state,
+                n_samples_per_buffer=config.evaluation.get("n_samples_per_buffer", config.batch_size),
             )
             for k, v in eval_info.items():
                 wandb.log({f"evaluation/{k}": v}, step=i)

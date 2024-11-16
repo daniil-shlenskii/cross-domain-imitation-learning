@@ -38,6 +38,7 @@ class GAILAgent(Agent):
         #
         agent_config: DictConfig,
         discriminator_config: DictConfig,
+        **kwargs,
     ):
         rng = jax.random.key(seed)
 
@@ -73,16 +74,29 @@ class GAILAgent(Agent):
             )
         )
 
+        _save_attrs = kwargs.pop(
+            "_save_attrs",
+            ("agent", "discriminator")
+        )
+
+        _save_attrs = kwargs.pop(
+            "_save_attrs",
+            ("agent", "discriminator")
+        )
+
+        _save_attrs = kwargs.pop(
+            "_save_attrs",
+            ("agent", "discriminator")
+        )
+
         return cls(
             rng=rng,
             expert_buffer=expert_buffer,
             expert_buffer_state=expert_buffer_state,
             agent=agent,
             discriminator=discriminator,
-            _save_attrs = (
-                "agent",
-                "discriminator"
-            )
+            _save_attrs = _save_attrs,
+            **kwargs,
         )
 
     @property
@@ -119,7 +133,7 @@ def _update_jit(
     #
     expert_buffer: Buffer,
     expert_buffer_state: BufferState,
-    # #
+    #
     agent: Agent,
     discriminator: GAILDiscriminator,
 ):
@@ -136,7 +150,7 @@ def _update_jit(
     new_agent, agent_info, agent_stats_info = agent.update(batch)
 
     # update discriminator
-    new_disc, disc_info, disc_stats_info = discriminator.update(expert_batch=expert_batch, learner_batch=learner_batch)
+    new_disc, disc_info, disc_stats_info = discriminator.update(learner_batch=learner_batch, expert_batch=expert_batch)
 
     info = {**agent_info, **disc_info}
     stats_info = {**agent_stats_info, **disc_stats_info}
