@@ -40,8 +40,6 @@ class GAILAgent(Agent):
         discriminator_config: DictConfig,
         **kwargs,
     ):
-        rng = jax.random.key(seed)
-
         # agent and discriminator init
         agent = instantiate(
             agent_config,
@@ -78,7 +76,7 @@ class GAILAgent(Agent):
         )
 
         return cls(
-            rng=rng,
+            rng=jax.random.key(seed),
             expert_buffer=expert_buffer,
             expert_buffer_state=expert_buffer_state,
             agent=agent,
