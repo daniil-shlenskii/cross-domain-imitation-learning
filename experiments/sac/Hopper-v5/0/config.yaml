@@ -32,7 +32,7 @@ agent:
   temperature_optimizer_config:
     transforms:
       - _target_: optax.sgd
-        learning_rate: 0.
+        learning_rate: 1e-5
 
 environment:
   _target_: gymnasium.wrappers.TimeLimit
