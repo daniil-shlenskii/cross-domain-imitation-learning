@@ -62,11 +62,10 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             **kwargs
         )
 
-    def update(self, *, batch: Any, discriminator: Discriminator, **kwargs):
+    def update(self, *, batch: Any, **kwargs):
         new_state, info, stats_info = _update_jit(
             batch=batch,
             state=self.state,
-            discriminator=discriminator,
             **kwargs
         )
         return self.replace(state=new_state), info, stats_info
