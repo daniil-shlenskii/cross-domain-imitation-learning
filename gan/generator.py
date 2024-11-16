@@ -40,7 +40,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         key = jax.random.key(seed)
         module = instantiate(module_config)
         params = module.init(key, jnp.ones(input_dim, dtype=jnp.float32))["params"]
-        
+
         if loss_fn_config is None:
             loss_fn = generator_loss_fn
         else:
@@ -76,12 +76,10 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
 def _update_jit(
     batch: Any,
     state: TrainState,
-    discriminator: Discriminator,
     **kwargs,
 ):
     new_state, info, stats_info = state.update(
         batch=batch,
-        discriminator=discriminator,
         **kwargs,
     )
     return new_state, info, stats_info
