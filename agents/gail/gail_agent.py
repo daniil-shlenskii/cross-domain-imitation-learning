@@ -52,13 +52,11 @@ class GAILAgent(Agent):
             high=high,
             _recursive_=False,
         )
-        
-        obs = np.ones(observation_dim)
-        discriminator_input_sample = jnp.concatenate([obs, obs], axis=-1)
+
         discriminator = instantiate(
             discriminator_config,
             seed=seed,
-            input_sample=discriminator_input_sample,
+            input_dim=observation_dim * 2,
             _recursive_=False,
         )
 
@@ -72,16 +70,6 @@ class GAILAgent(Agent):
                 max_length=expert_buffer_state.current_index,
                 add_batches=False,
             )
-        )
-
-        _save_attrs = kwargs.pop(
-            "_save_attrs",
-            ("agent", "discriminator")
-        )
-
-        _save_attrs = kwargs.pop(
-            "_save_attrs",
-            ("agent", "discriminator")
         )
 
         _save_attrs = kwargs.pop(
