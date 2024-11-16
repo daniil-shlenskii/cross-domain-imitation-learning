@@ -25,7 +25,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         cls,
         *,
         seed: int,
-        input_sample: jnp.ndarray,
+        input_dim: int,
         output_dim:  int,
         #
         module_config: DictConfig,
@@ -39,7 +39,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
 
         key = jax.random.key(seed)
         module = instantiate(module_config)
-        params = module.init(key, input_sample)["params"]
+        params = module.init(key, jnp.ones(input_dim, dtype=jnp.float32))["params"]
         
         if loss_fn_config is None:
             loss_fn = generator_loss_fn

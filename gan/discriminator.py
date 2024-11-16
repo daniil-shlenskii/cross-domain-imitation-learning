@@ -25,7 +25,7 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         cls,
         *,
         seed: int,
-        input_sample: jnp.ndarray,
+        input_dim: int,
         #
         module_config: DictConfig,
         optimizer_config: DictConfig,
@@ -39,7 +39,7 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         rng, key = jax.random.split(rng)
 
         module = instantiate(module_config)
-        params = module.init(key, input_sample)["params"]
+        params = module.init(key, jnp.ones(input_dim, dtype=jnp.float32))["params"]
         state = TrainState.create(
             loss_fn=_discr_loss_fn,
             apply_fn=module.apply,
