@@ -30,6 +30,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         #
         module_config: DictConfig,
         optimizer_config: DictConfig,
+        loss_fn_config: DictConfig = None,
         #
         info_key: str = "generator",
         **kwargs,
@@ -39,8 +40,14 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         key = jax.random.key(seed)
         module = instantiate(module_config)
         params = module.init(key, input_sample)["params"]
+        
+        if loss_fn_config is None:
+            loss_fn = _generator_loss_fn
+        else:
+            loss_fn = instantiate(loss_fn_config)
+
         state = TrainState.create(
-            loss_fn=_gan_loss_fn,
+            loss_fn=loss_fn,
             apply_fn=module.apply,
             params=params,
             tx=instantiate_optimizer(optimizer_config),
@@ -67,31 +74,26 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
     
-@functools.partial(jax.jit, static_argnames="process_discriminator_input")
 def _update_jit(
     batch: jnp.ndarray,
     state: TrainState,
     discriminator: Discriminator,
-    process_discriminator_input: Callable = lambda x: x,
     **kwargs,
 ):
     new_state, info, stats_info = state.update(
         batch=batch,
         discriminator=discriminator,
-        process_discriminator_input=process_discriminator_input,
         **kwargs,
     )
     return new_state, info, stats_info
 
-def _gan_loss_fn(
+def _generator_loss_fn(
     params: Params,
     state: TrainState,
     batch: jnp.ndarray,
     discriminator: Discriminator,
-    process_discriminator_input: Callable
 ):
     fake_batch = state.apply_fn({"params": params}, batch, train=True)
-    fake_batch = process_discriminator_input(fake_batch)
     fake_logits = discriminator(fake_batch)
     loss = g_nonsaturating_loss(fake_logits)
 
