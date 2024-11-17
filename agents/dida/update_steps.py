@@ -41,8 +41,11 @@ def update_encoders_and_domain_discrimiantor(
     # update domain discriminator
     new_domain_disc, domain_disc_info, domain_disc_stats_info = domain_discriminator.update(
         real_batch=encoded_batch["observations"],
-        fake_batch=encoded_expert_batch["observations"]
+        fake_batch=encoded_expert_batch["observations"],
+        return_logits=True,
     )
+    learner_domain_logits = domain_disc_info.pop("real_logits")
+    expert_domain_logits = domain_disc_info.pop("fake_logits")
 
     info = {**learner_encoder_info, **expert_encoder_info, **domain_disc_info}
     stats_info = {**learner_encoder_stats_info, **expert_encoder_stats_info, **domain_disc_stats_info}
@@ -52,6 +55,8 @@ def update_encoders_and_domain_discrimiantor(
         new_domain_disc,
         encoded_batch,
         encoded_expert_batch,
+        learner_domain_logits,
+        expert_domain_logits,
         info,
         stats_info,
     )

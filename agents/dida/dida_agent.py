@@ -146,7 +146,7 @@ class DIDAAgent(Agent):
             _recursive_=False,
         )
 
-        if domain_loss_scale_updater_kwargs is None:
+        if not use_das or domain_loss_scale_updater_kwargs is None:
             domain_loss_scale_updater = IdentityDomainLossScaleUpdater()
         else:
             domain_loss_scale_updater = instantiate(domain_loss_scale_updater_kwargs)
@@ -314,6 +314,8 @@ def _update_jit(
         batch,
         expert_batch,
         anchor_batch,
+        learner_domain_logits,
+        expert_domain_logits,
         info,
         stats_info,
     ) = _update_encoders_and_domain_discrimiantor_with_extra_preparation(
@@ -331,20 +333,15 @@ def _update_jit(
 
     # prepare mixed batch for policy discriminator updapte
     if use_das:
-        alpha, new_p_acc_ema, sar_info = self_adaptive_rate(
-            domain_discriminator=domain_discriminator,
-            learner_batch=batch,
-            expert_batch=expert_batch,
-            p=sar_p,
+        new_rng, mixed_batch, new_p_acc_ema, sar_info = domain_adversarial_sampling(
+            rng=rng,
+            encoded_learner_batch=batch,
+            encoded_anchor_batch=anchor_batch,
+            learner_domain_logits=learner_domain_logits,
+            expert_domain_logits=expert_domain_logits,
+            sar_p=sar_p,
             p_acc_ema=p_acc_ema,
             p_acc_ema_decay=p_acc_ema_decay,
-        )
-        new_rng, mixed_batch = domain_adversarial_sampling(
-            rng=new_rng,
-            embedded_learner_batch=batch,
-            embedded_anchor_batch=anchor_batch,
-            domain_discriminator=domain_discriminator,
-            alpha=alpha
         )
     else:
         mixed_batch = batch
@@ -358,6 +355,11 @@ def _update_jit(
         agent=agent,
         policy_discriminator=policy_discriminator,
     )
+
+    # ...
+    new_p_acc_ema = new_p_acc_ema.item()
+    for k, v in sar_info.items():
+        sar_info[k] = v.item()
 
     info.update({**info, **gail_info, **sar_info})
     stats_info.update({**gail_stats_info})
@@ -399,6 +401,8 @@ def _update_encoders_and_domain_discrimiantor_with_extra_preparation(
         new_domain_disc,
         batch,
         expert_batch,
+        learner_domain_logits,
+        expert_domain_logits,
         info,
         stats_info,
     ) = update_encoders_and_domain_discrimiantor(
@@ -423,6 +427,8 @@ def _update_encoders_and_domain_discrimiantor_with_extra_preparation(
         batch,
         expert_batch,
         anchor_batch,
+        learner_domain_logits,
+        expert_domain_logits,
         info,
         stats_info,
     )
