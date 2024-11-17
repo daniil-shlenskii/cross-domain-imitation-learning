@@ -6,9 +6,10 @@ from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
 from gan.discriminator import Discriminator
 from gan.generator import Generator
-from utils.types import DataType
+from utils.types import Buffer, BufferState, DataType, PRNGKey
 
 
+@jax.jit
 def update_encoders_and_domain_discrimiantor(
     *,
     batch: DataType,
@@ -55,6 +56,7 @@ def update_encoders_and_domain_discrimiantor(
         stats_info,
     )
 
+@jax.jit
 def update_gail(
     *,
     batch: DataType,

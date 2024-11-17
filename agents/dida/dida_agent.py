@@ -317,8 +317,11 @@ def _update_jit(
         info,
         stats_info,
     ) = _update_encoders_and_domain_discrimiantor_with_extra_preparation(
+        rng=rng,
         batch=batch,
-        expert_batch=expert_batch,
+        expert_buffer=expert_buffer,
+        expert_buffer_state=expert_buffer_state,
+        anchor_buffer_state=anchor_buffer_state,
         learner_encoder=learner_encoder,
         expert_encoder=expert_encoder,
         policy_discriminator=policy_discriminator,
@@ -348,7 +351,7 @@ def _update_jit(
         sar_info, new_p_acc_ema = {}, None
 
     # apply gail
-    new_agent, new_policy_disc, gail_info, gail_stats_info = _update_gail_jit(
+    new_agent, new_policy_disc, gail_info, gail_stats_info = update_gail(
         batch=batch,
         expert_batch=expert_batch,
         mixed_batch=mixed_batch,
@@ -423,83 +426,3 @@ def _update_encoders_and_domain_discrimiantor_with_extra_preparation(
         info,
         stats_info,
     )
-
-@functools.partial(jax.jit, static_argnames="expert_buffer")
-def _prepare_batches_jit(
-    *,
-    rng: PRNGKey,
-    expert_buffer: Buffer,
-    expert_buffer_state: BufferState,
-    anchor_buffer_state: BufferState
-):
-    return new_rng, expert_batch, anchor_batch
-
-@jax.jit
-def _update_encoders_and_domain_discrimiantor_jit(
-    *,
-    batch: DataType,
-    expert_batch: DataType,
-    learner_encoder: Generator,
-    expert_encoder: Generator,
-    policy_discriminator: Discriminator,
-    domain_discriminator: Discriminator,
-    domain_loss_scale: float,
-):
-    new_learner_encoder, learner_encoder_info, learner_encoder_stats_info = learner_encoder.update(
-        batch=batch,
-        policy_discriminator=policy_discriminator,
-        domain_discriminator=domain_discriminator,
-        domain_loss_scale=domain_loss_scale,
-        is_learner_encoder=True,
-    )
-    new_expert_encoder, expert_encoder_info, expert_encoder_stats_info = expert_encoder.update(
-        batch=expert_batch,
-        policy_discriminator=policy_discriminator,
-        domain_discriminator=domain_discriminator,
-        domain_loss_scale=domain_loss_scale,
-        is_learner_encoder=False,
-    )
-    encoded_batch = learner_encoder_info.pop("encoded_batch")
-    encoded_expert_batch = expert_encoder_info.pop("encoded_batch")
-
-    new_domain_disc, domain_disc_info, domain_disc_stats_info = domain_discriminator.update(
-        real_batch=encoded_batch["observations"],
-        fake_batch=encoded_expert_batch["observations"]
-    )
-
-    info = {**learner_encoder_info, **expert_encoder_info, **domain_disc_info}
-    stats_info = {**learner_encoder_stats_info, **expert_encoder_stats_info, **domain_disc_stats_info}
-    return (
-        new_learner_encoder,
-        new_expert_encoder,
-        new_domain_disc,
-        encoded_batch,
-        encoded_expert_batch,
-        info,
-        stats_info,
-    )
-
-@jax.jit
-def _update_gail_jit(
-    *,
-    batch: DataType,
-    expert_batch: DataType,
-    mixed_batch: DataType,
-    #
-    agent: Agent,
-    policy_discriminator: GAILDiscriminator
-):
-    policy_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=1)
-    expert_policy_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=1)
-    mixed_policy_batch = jnp.concatenate([mixed_batch["observations"], mixed_batch["observations_next"]], axis=1)
-
-    # update agent
-    batch["reward"] = policy_discriminator.get_rewards(policy_batch)
-    new_agent, agent_info, agent_stats_info = agent.update(batch)
-
-    # update discriminator
-    new_disc, disc_info, disc_stats_info = policy_discriminator.update(learner_batch=mixed_policy_batch, expert_batch=expert_policy_batch)
-
-    info = {**agent_info, **disc_info}
-    stats_info = {**agent_stats_info, **disc_stats_info}
-    return new_agent, new_disc, info, stats_info
