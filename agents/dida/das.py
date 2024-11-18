@@ -25,7 +25,6 @@ def domain_adversarial_sampling(
         new_p_acc_ema,
         p_acc,
     ) = _compute_sar_and_das_probs_jit(
-        rng=rng,
         learner_domain_logits=learner_domain_logits,
         expert_domain_logits=expert_domain_logits,
         sar_p=sar_p,
