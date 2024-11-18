@@ -17,7 +17,6 @@ from utils.utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
 class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
     rng: PRNGKey
     state: TrainState
-    gradient_penalty_coef: float
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     @classmethod
@@ -75,7 +74,6 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             real_batch=real_batch,
             fake_batch=fake_batch,
             state=self.state,
-            gradient_penalty_coef=self.gradient_penalty_coef,
             rng=self.rng,
         )
         if not return_logits:
@@ -91,8 +89,7 @@ def _update_jit(
     real_batch: jnp.ndarray,
     fake_batch: jnp.ndarray,
     state: TrainState,
-    gradient_penalty_coef: float,
 ) -> Tuple[TrainState, Dict, Dict]:
     new_rng, key = jax.random.split(rng)
-    new_state, info, stats_info = state.update(key=key, real_batch=real_batch, fake_batch=fake_batch, gradient_penalty_coef=gradient_penalty_coef)
+    new_state, info, stats_info = state.update(key=key, real_batch=real_batch, fake_batch=fake_batch)
     return new_rng, new_state, info, stats_info
