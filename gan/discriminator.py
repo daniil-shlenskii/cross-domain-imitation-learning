@@ -5,11 +5,10 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 from flax.struct import PyTreeNode
-from hydra.utils import instantiate
-from omegaconf.dictconfig import DictConfig
-
 from gan.losses import d_logistic_loss, gradient_penalty
+from hydra.utils import instantiate
 from nn.train_state import TrainState
+from omegaconf.dictconfig import DictConfig
 from utils.types import Params, PRNGKey
 from utils.utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
 
@@ -58,7 +57,7 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             **kwargs
         )
 
-    def update(self, *, real_batch: jnp.ndarray, fake_batch: jnp.ndarray):
+    def update(self, *, real_batch: jnp.ndarray, fake_batch: jnp.ndarray, return_logits: bool=False):
         (
             new_rng,
             new_state,
@@ -71,6 +70,8 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             gradient_penalty_coef=self.gradient_penalty_coef,
             rng=self.rng,
         )
+        if not return_logits:
+            del info["real_logits"], info["fake_logits"]
         return self.replace(rng=new_rng, state=new_state), info, stats_info
     
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
@@ -105,6 +106,8 @@ def _discr_loss_fn(
 
     info = {
         f"{state.info_key}_loss": loss,
-        f"{state.info_key}_gradient_penalty": penalty
+        f"{state.info_key}_gradient_penalty": penalty,
+        "real_logits": real_logits,
+        "fake_logits": fake_logits,
     }
     return loss + penalty * gradient_penalty_coef, info
