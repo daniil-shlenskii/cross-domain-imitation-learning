@@ -2,7 +2,7 @@ seed: &seed 0
 env_name: &env_name HalfCheetah-v5 # Hopper-v5
 
 n_iters_training: 1_000_000
-batch_size: &batch_size 256
+batch_size: &batch_size 1024
 
 precollect_buffer_size: &precollect_buffer_size 5_000
 
@@ -33,15 +33,15 @@ agent:
   expert_batch_size: *batch_size
   expert_buffer_state_path: experiments/sac/HalfCheetah-v5/0/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
   #
-  n_domain_discriminator_updates: 1
+  n_domain_discriminator_updates: 4
   #
-  use_das: False
+  use_das: True
   sar_p: 0.5
   p_acc_ema: 0.85
   #
   domain_loss_scale: 4.0
-  # domain_loss_scale_updater_kwargs:
-  #   _target_: agents.dida.domain_loss_scale_updaters.RangeDomainLossScaleUpdater
+  domain_loss_scale_updater_kwargs:
+    _target_: agents.dida.domain_loss_scale_updaters.RangeDomainLossScaleUpdater
   #
   agent_config:
     _target_: agents.sac.SACAgent.create
