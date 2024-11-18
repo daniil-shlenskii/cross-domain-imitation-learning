@@ -303,7 +303,7 @@ def _update_jit(
     sar_p: float,
     p_acc_ema: float,
     p_acc_ema_decay: float,
-    domain_loss_scale,
+    domain_loss_scale: float,
 ):
     # update encoders, domain discriminator, prepare batches for gail update
     (
@@ -356,7 +356,7 @@ def _update_jit(
         policy_discriminator=policy_discriminator,
     )
 
-    info.update({**info, **gail_info, **sar_info})
+    info.update({**gail_info, **sar_info})
     stats_info.update({**gail_stats_info})
     return (
         new_rng,
@@ -410,7 +410,7 @@ def _update_encoders_and_domain_discrimiantor_with_extra_preparation(
         domain_loss_scale=domain_loss_scale,
     )
 
-    # encode anchor batch for further usage in gail update step
+    # encode anchor batch for das method
     anchor_batch["observations"] = expert_encoder(anchor_batch["observations"])
     anchor_batch["observations_next"] = expert_encoder(anchor_batch["observations_next"])
 
