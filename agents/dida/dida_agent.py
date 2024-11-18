@@ -356,11 +356,6 @@ def _update_jit(
         policy_discriminator=policy_discriminator,
     )
 
-    # ...
-    new_p_acc_ema = new_p_acc_ema.item()
-    for k, v in sar_info.items():
-        sar_info[k] = v.item()
-
     info.update({**info, **gail_info, **sar_info})
     stats_info.update({**gail_stats_info})
     return (

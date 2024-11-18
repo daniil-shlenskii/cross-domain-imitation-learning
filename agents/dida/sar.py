@@ -25,5 +25,5 @@ def self_adaptive_rate(
     # compute alpha
     alpha = jnp.minimum(p_acc_ema / p, (1 - p_acc_ema) / (1 - p))
 
-    info = {"sar/alpha": alpha, "sar/p_acc": p_acc, "sar/p_acc_ema": p_acc_ema}
-    return alpha, p_acc_ema, info
+    # info = {"sar/alpha": alpha, "sar/p_acc": p_acc, "sar/p_acc_ema": p_acc_ema}
+    return alpha, p_acc_ema, p_acc

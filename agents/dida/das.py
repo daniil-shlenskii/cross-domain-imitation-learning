@@ -25,7 +25,7 @@ def domain_adversarial_sampling(
         das_probs,
         alpha,
         new_p_acc_ema,
-        sar_info,
+        p_acc,
     ) = _compute_sar_and_das_probs_jit(
         rng=rng,
         learner_domain_logits=learner_domain_logits,
@@ -46,6 +46,7 @@ def domain_adversarial_sampling(
     encoded_mixed_batch["observations_next"] = \
         encoded_mixed_batch["observations_next"].at[:num_to_mix].set(encoded_learner_batch["observations_next"].at[idcs].get())
 
+    sar_info = {"sar/alpha": alpha, "sar/p_acc": p_acc, "sar/p_acc_ema": p_acc_ema}
     return new_rng, encoded_mixed_batch, new_p_acc_ema, sar_info
 
 @jax.jit
@@ -59,7 +60,7 @@ def _compute_sar_and_das_probs_jit(
     p_acc_ema_decay: float,
 ):
     # compute sar
-    alpha, new_p_acc_ema, sar_info = self_adaptive_rate(
+    alpha, new_p_acc_ema, p_acc = self_adaptive_rate(
         learner_domain_logits=learner_domain_logits,
         expert_domain_logits=expert_domain_logits,
         p=sar_p,
@@ -81,5 +82,5 @@ def _compute_sar_and_das_probs_jit(
         das_probs,
         alpha,
         new_p_acc_ema,
-        sar_info,
+        p_acc,
     )
