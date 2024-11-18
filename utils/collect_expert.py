@@ -36,16 +36,27 @@ def main(args: argparse.Namespace):
     env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=args.num_episodes)
 
     # agent init
+    observation_space = env.observation_space
+    action_space = env.action_space
+
+    observation_dim = observation_space.sample().shape[-1]
+    action_dim = action_space.sample().shape[-1]
+    low, high = action_space.low, action_space.high
+    if np.any(low == -1) or np.any(high == 1):
+        low, high = None, None
+        
     agent = instantiate(
         config.agent,
-        observation_space=env.observation_space,
-        action_space=env.action_space,
+        observation_dim=observation_dim,
+        action_dim=action_dim,
+        low=low,
+        high=high,
         _recursive_=False,
     )
-    loaded_keys = agent.load(agent_dir)
+    agent, loaded_keys = agent.load(agent_dir)
     logger.info(
-        f"Agent is initialized with data under the path: {agent_dir}.\n" +
-        f"Loaded keys: {' '.join(loaded_keys)}."
+        f"Agent is initialized with data under the path: {agent_dir}.\n" + \
+        f"Loaded keys:\n----------------\n{OmegaConf.to_yaml(loaded_keys)}"
     )
 
     # buffer init
@@ -53,7 +64,7 @@ def main(args: argparse.Namespace):
     action = env.action_space.sample()
     observation, reward, done, _, _ = env.step(action)
 
-    buffer = instantiate(config.replay_buffer)
+    buffer = instantiate(config.replay_buffer, _recursive_=False)
     state = buffer.init(
         dict(
             observations=np.array(observation),

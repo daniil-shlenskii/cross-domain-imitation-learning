@@ -32,7 +32,7 @@ def main():
     # gan init
     gan = instantiate(
         config.gan,
-        input_sample=dataset[0],
+        input_dim=dataset[0].shape,
         generator_output_dim=dim,
         _recursive_=False,
     )

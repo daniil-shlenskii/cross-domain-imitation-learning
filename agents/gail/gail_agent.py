@@ -40,8 +40,6 @@ class GAILAgent(Agent):
         discriminator_config: DictConfig,
         **kwargs,
     ):
-        rng = jax.random.key(seed)
-
         # agent and discriminator init
         agent = instantiate(
             agent_config,
@@ -52,13 +50,11 @@ class GAILAgent(Agent):
             high=high,
             _recursive_=False,
         )
-        
-        obs = np.ones(observation_dim)
-        discriminator_input_sample = jnp.concatenate([obs, obs], axis=-1)
+
         discriminator = instantiate(
             discriminator_config,
             seed=seed,
-            input_sample=discriminator_input_sample,
+            input_dim=observation_dim * 2,
             _recursive_=False,
         )
 
@@ -79,18 +75,8 @@ class GAILAgent(Agent):
             ("agent", "discriminator")
         )
 
-        _save_attrs = kwargs.pop(
-            "_save_attrs",
-            ("agent", "discriminator")
-        )
-
-        _save_attrs = kwargs.pop(
-            "_save_attrs",
-            ("agent", "discriminator")
-        )
-
         return cls(
-            rng=rng,
+            rng=jax.random.key(seed),
             expert_buffer=expert_buffer,
             expert_buffer_state=expert_buffer_state,
             agent=agent,

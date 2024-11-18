@@ -24,7 +24,7 @@ class GAN(SaveLoadMixin):
         cls,
         *,
         seed: int,
-        input_sample: jnp.ndarray,
+        input_dim: int,
         generator_output_dim: int,
         #
         generator_config: DictConfig,
@@ -32,15 +32,15 @@ class GAN(SaveLoadMixin):
     ):
         generator = Generator.create(
             seed=seed,
-            input_sample=input_sample,
+            input_dim=input_dim,
             output_dim=generator_output_dim,
             **generator_config,
         )
         
-        discriminator_input_sample = generator(input_sample)
+        discriminator_input_dim = generator(jnp.ones(input_dim, dtype=jnp.float32)).shape
         discriminator = Discriminator.create(
             seed=seed,
-            input_sample=discriminator_input_sample,
+            input_dim=discriminator_input_dim,
             **discriminator_config,
         )
 

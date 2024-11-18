@@ -8,7 +8,6 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
-from frozendict import frozendict
 from sklearn.manifold import TSNE
 
 from utils.types import Buffer, BufferState
@@ -22,7 +21,7 @@ def process_policy_discriminator_input(x: jnp.ndarray):
     return x
 
 @jax.jit
-def encode_observation(encoder, observations):
+def encode_observation_jit(encoder, observations):
     return encoder(observations)
 
 def get_tsne_embeddings_scatter(
