@@ -1,28 +1,29 @@
-from typing import Callable
-
 import jax
 import jax.numpy as jnp
+from gan.base_losses import d_softplus_loss, gradient_penalty
+from nn.train_state import TrainState
+from utils.types import Params, PRNGKey
 
-from utils.types import PRNGKey
 
-
-def g_nonsaturating_loss(fake_logits: jnp.ndarray):
-    loss = jax.nn.softplus(-fake_logits).mean()
-    return loss
-
-def d_logistic_loss(real_logits: jnp.ndarray, fake_logits: jnp.ndarray):
-    real_loss = jax.nn.softplus(-real_logits).mean()
-    fake_loss = jax.nn.softplus(fake_logits).mean()
-    return real_loss + fake_loss
-
-def gradient_penalty(
-    key: PRNGKey,
+def d_softplus_loss_with_gradient_penalty(
+    params: Params,
+    state: TrainState,
     real_batch: jnp.ndarray,
     fake_batch: jnp.ndarray,
-    discriminator_grad_fn: Callable,
+    gradient_penalty_coef: float,
+    key: PRNGKey,
 ):
-    t = jax.random.uniform(key, shape=(real_batch.shape[0], 1))
-    interpolated_batch = real_batch * t + fake_batch * (1 - t)
-    grads = jax.vmap(discriminator_grad_fn)(interpolated_batch)
-    norms = jax.vmap(jnp.linalg.norm)(grads)
-    return norms.mean()
+    real_logits = state.apply_fn({"params": params}, real_batch, train=True)
+    fake_logits = state.apply_fn({"params": params}, fake_batch, train=True)
+    loss = d_softplus_loss(real_logits=real_logits, fake_logits=fake_logits)
+
+    disc_grad_fn = jax.grad(lambda x: state.apply_fn({"params": params}, x, train=True))
+    penalty = gradient_penalty(key=key, real_batch=real_batch, fake_batch=fake_batch, discriminator_grad_fn=disc_grad_fn)
+
+    info = {
+        f"{state.info_key}_loss": loss,
+        f"{state.info_key}_gradient_penalty": penalty,
+        "real_logits": real_logits,
+        "fake_logits": fake_logits,
+    }
+    return loss + penalty * gradient_penalty_coef, info

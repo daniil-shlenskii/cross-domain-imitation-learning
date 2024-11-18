@@ -6,12 +6,11 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 from flax.struct import PyTreeNode
-from hydra.utils import instantiate
-from omegaconf.dictconfig import DictConfig
-
+from gan.base_losses import g_nonsaturating_softplus_loss
 from gan.discriminator import Discriminator
-from gan.losses import g_nonsaturating_loss
+from hydra.utils import instantiate
 from nn.train_state import TrainState
+from omegaconf.dictconfig import DictConfig
 from utils.types import Params
 from utils.utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
 
@@ -92,7 +91,7 @@ def generator_loss_fn(
 ):
     fake_batch = state.apply_fn({"params": params}, batch, train=True)
     fake_logits = discriminator(fake_batch)
-    loss = g_nonsaturating_loss(fake_logits)
+    loss = g_nonsaturating_softplus_loss(fake_logits)
 
     info = {
         f"{state.info_key}_loss": loss,
