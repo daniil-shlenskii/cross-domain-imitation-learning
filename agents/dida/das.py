@@ -33,7 +33,7 @@ def domain_adversarial_sampling(
     )
 
     # mixed batch creation
-    new_rng, key = jax.split(rng)
+    new_rng, key = jax.random.split(rng)
 
     b_size = encoded_learner_batch["observations"].shape[0]
     num_to_mix = int(alpha * b_size)
