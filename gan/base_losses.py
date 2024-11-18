@@ -18,14 +18,14 @@ def g_nonsaturating_softplus_loss(fake_logits: jnp.ndarray):
 ##### discriminator losses #####
 
 def d_logistic_loss(real_logits: jnp.ndarray, fake_logits: jnp.ndarray):
-    real_loss = jnp.log(real_logits).mean()
-    fake_loss = jnp.log(1 - fake_logits).mean()
-    return (real_loss + fake_loss) * 0.5
+    real_loss = -jnp.log(real_logits).mean()
+    fake_loss = -jnp.log(1 - fake_logits).mean()
+    return real_loss + fake_loss
 
 def d_softplus_loss(real_logits: jnp.ndarray, fake_logits: jnp.ndarray):
     real_loss = jax.nn.softplus(-real_logits).mean()
     fake_loss = jax.nn.softplus(fake_logits).mean()
-    return (real_loss + fake_loss) * 0.5
+    return real_loss + fake_loss
 
 def gradient_penalty(
     key: PRNGKey,
