@@ -33,10 +33,10 @@ agent:
   expert_batch_size: *batch_size
   expert_buffer_state_path: experiments/sac/HalfCheetah-v5/0/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
   #
-  n_domain_discriminator_updates: 1
+  n_domain_discriminator_updates: 3
   #
   use_das: True
-  sar_p: 0.5
+  sar_p: 0.33
   p_acc_ema: 1.0
   #
   domain_loss_scale: 4.0
