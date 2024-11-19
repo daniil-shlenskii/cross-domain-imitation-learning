@@ -2,12 +2,14 @@ from typing import Callable
 
 import jax
 import jax.numpy as jnp
+
 from utils.types import PRNGKey
 
 ##### generator losses #####
 
 def g_nonsaturating_logistic_loss(fake_logits: jnp.ndarray):
-    loss = -jnp.log(fake_logits).mean()
+    fake_probs = jax.nn.sigmoid(fake_logits)
+    loss = -jnp.log(fake_probs).mean()
     return loss
 
 def g_nonsaturating_softplus_loss(fake_logits: jnp.ndarray):
@@ -18,14 +20,16 @@ def g_nonsaturating_softplus_loss(fake_logits: jnp.ndarray):
 ##### discriminator losses #####
 
 def d_logistic_loss(real_logits: jnp.ndarray, fake_logits: jnp.ndarray):
-    real_loss = -jnp.log(real_logits).mean()
-    fake_loss = -jnp.log(1 - fake_logits).mean()
-    return real_loss + fake_loss
+    real_probs = jax.nn.sigmoid(real_logits)
+    fake_probs = jax.nn.sigmoid(fake_logits)
+    real_loss = -jnp.log(real_probs).mean()
+    fake_loss = -jnp.log(1 - fake_probs).mean()
+    return (real_loss + fake_loss) * 0.5
 
 def d_softplus_loss(real_logits: jnp.ndarray, fake_logits: jnp.ndarray):
     real_loss = jax.nn.softplus(-real_logits).mean()
     fake_loss = jax.nn.softplus(fake_logits).mean()
-    return real_loss + fake_loss
+    return (real_loss + fake_loss) * 0.5
 
 def gradient_penalty(
     key: PRNGKey,

@@ -25,7 +25,7 @@ gan:
           learning_rate: 3e-4
     loss_fn_config:
       _target_: hydra.utils.get_method
-      path: gan.losses.g_softplus_loss
+      path: gan.losses.g_logistic_loss
   discriminator_config:
     module_config:
       _target_: networks.discriminator.Discriminator
@@ -37,7 +37,5 @@ gan:
         - _target_: optax.adamw
           learning_rate: 3e-4
     loss_fn_config:
-      _target_: utils.utils.get_method_partially
-      path: gan.losses.d_softplus_loss_with_gradient_penalty
-      params:
-        gradient_penalty_coef: 10.
+      _target_: hydra.utils.get_method
+      path: gan.losses.d_logistic_loss
