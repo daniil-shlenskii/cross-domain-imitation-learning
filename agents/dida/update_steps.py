@@ -30,7 +30,9 @@ def update_encoders_and_domain_discrimiantor(
     )
     new_expert_encoder, expert_encoder_info, expert_encoder_stats_info = expert_encoder.update(
         batch=expert_batch,
+        policy_discriminator=policy_discriminator,
         domain_discriminator=domain_discriminator,
+        domain_loss_scale=domain_loss_scale,
     )
     encoded_batch = learner_encoder_info.pop("encoded_batch")
     encoded_expert_batch = expert_encoder_info.pop("encoded_batch")
