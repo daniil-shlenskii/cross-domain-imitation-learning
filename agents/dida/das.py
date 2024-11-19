@@ -20,11 +20,14 @@ def domain_adversarial_sampling(
 ):
     # compute sar and das probs
     (
+        new_rng,
+        choice_key,
         das_probs,
         alpha,
         new_p_acc_ema,
         p_acc,
     ) = _compute_sar_and_das_probs_jit(
+        rng=rng,
         learner_domain_logits=learner_domain_logits,
         expert_domain_logits=expert_domain_logits,
         sar_p=sar_p,
@@ -33,11 +36,9 @@ def domain_adversarial_sampling(
     )
 
     # mixed batch creation
-    new_rng, key = jax.random.split(rng)
-
     b_size = encoded_learner_batch["observations"].shape[0]
     num_to_mix = int(alpha * b_size)
-    idcs = jax.random.choice(key, a=b_size, shape=(num_to_mix,), p=das_probs)
+    idcs = jax.random.choice(choice_key, a=b_size, shape=(num_to_mix,), p=das_probs)
 
     encoded_mixed_batch = encoded_anchor_batch
     encoded_mixed_batch["observations"] = \
@@ -51,6 +52,7 @@ def domain_adversarial_sampling(
 @jax.jit
 def _compute_sar_and_das_probs_jit(
     *,
+    rng: PRNGKey,
     learner_domain_logits: jnp.ndarray,
     expert_domain_logits: jnp.ndarray,
     sar_p: float,
@@ -71,7 +73,12 @@ def _compute_sar_and_das_probs_jit(
     confusion_probs = 1 - probs
     das_probs = confusion_probs / confusion_probs.sum()
 
+    # prepare key
+    new_rng, choice_key = jax.random.split(rng)
+
     return (
+        new_rng,
+        choice_key,
         das_probs,
         alpha,
         new_p_acc_ema,
