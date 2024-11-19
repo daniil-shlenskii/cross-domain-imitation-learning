@@ -2,11 +2,11 @@ seed: &seed 0
 env_name: &env_name HalfCheetah-v5 # Hopper-v5
 
 n_iters_training: 1_000_000
-batch_size: &batch_size 1024
+batch_size: &batch_size 256
 
 precollect_buffer_size: &precollect_buffer_size 5_000
 
-log_every: 1_000
+log_every: 10
 eval_every: 5_000
 save_every: 5_000
 
@@ -33,11 +33,11 @@ agent:
   expert_batch_size: *batch_size
   expert_buffer_state_path: experiments/sac/HalfCheetah-v5/0/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
   #
-  n_domain_discriminator_updates: 5
+  n_domain_discriminator_updates: 1
   #
   use_das: True
   sar_p: 0.5
-  p_acc_ema: 0.85
+  p_acc_ema: 1.0
   #
   domain_loss_scale: 4.0
   domain_loss_scale_updater_kwargs:
@@ -101,10 +101,17 @@ agent:
     module_config:
       _target_: networks.discriminator.Discriminator
       hidden_dims: [256, 256]
-    optimizer_config: *optimizer_config
+    optimizer_config:
+      transforms:
+        - _target_: optax.clip
+          max_delta: 1.0
+        - _target_: optax.adamw
+          learning_rate: 3e-4
     loss_fn_config:
-      _target_: hydra.utils.get_method
-      path: gan.losses.d_logistic_loss
+      _target_: utils.utils.get_method_partially
+      path: gan.losses.d_logistic_loss_with_gradient_penalty
+      params:
+        gradient_penalty_coef: 10.
 
 evaluation:
   seed: 42
