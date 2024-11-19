@@ -6,12 +6,11 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 from flax.struct import PyTreeNode
-from hydra.utils import instantiate
-from omegaconf.dictconfig import DictConfig
-
 from gan.discriminator import Discriminator
-from gan.losses import g_nonsaturating_loss
+from gan.losses import g_softplus_loss
+from hydra.utils import instantiate
 from nn.train_state import TrainState
+from omegaconf.dictconfig import DictConfig
 from utils.types import Params
 from utils.utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
 
@@ -42,7 +41,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         params = module.init(key, jnp.ones(input_dim, dtype=jnp.float32))["params"]
 
         if loss_fn_config is None:
-            loss_fn = generator_loss_fn
+            loss_fn = g_softplus_loss
         else:
             loss_fn = instantiate(loss_fn_config)
 
@@ -83,19 +82,3 @@ def _update_jit(
         **kwargs,
     )
     return new_state, info, stats_info
-
-def generator_loss_fn(
-    params: Params,
-    state: TrainState,
-    batch: jnp.ndarray,
-    discriminator: Discriminator,
-):
-    fake_batch = state.apply_fn({"params": params}, batch, train=True)
-    fake_logits = discriminator(fake_batch)
-    loss = g_nonsaturating_loss(fake_logits)
-
-    info = {
-        f"{state.info_key}_loss": loss,
-        "generations": fake_batch
-    }
-    return loss, info

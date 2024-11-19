@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+
 from gan.discriminator import Discriminator
 from utils.types import DataType
 
@@ -23,7 +24,5 @@ def self_adaptive_rate(
     p_acc_ema = p_acc_ema * p_acc_ema_decay + p_acc * (1 - p_acc_ema_decay)
 
     # compute alpha
-    alpha = jnp.minimum(p_acc_ema / p, (1 - p_acc_ema) / (1 - p))
-
-    # info = {"sar/alpha": alpha, "sar/p_acc": p_acc, "sar/p_acc_ema": p_acc_ema}
-    return alpha, p_acc_ema, p_acc
+    alpha = jnp.minimum(p / p_acc_ema, (1 - p) / (1 - p_acc_ema))
+    return alpha, p_acc_ema, learner_score, expert_score, p_acc

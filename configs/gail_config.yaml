@@ -59,7 +59,6 @@ agent:
       _target_: networks.discriminator.Discriminator
       hidden_dims: [256, 256]
     optimizer_config: *optimizer_config
-    gradient_penalty_coef: 10.
     reward_transform_config:
       _target_: agents.gail.reward_transforms.RewardStandartization.create
 

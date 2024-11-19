@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
+
 from agents.dida.sar import self_adaptive_rate
 from gan.discriminator import Discriminator
 from gan.generator import Generator
@@ -20,11 +21,16 @@ def domain_adversarial_sampling(
 ):
     # compute sar and das probs
     (
+        new_rng,
+        choice_key,
         das_probs,
         alpha,
         new_p_acc_ema,
+        learner_score,
+        expert_score,
         p_acc,
     ) = _compute_sar_and_das_probs_jit(
+        rng=rng,
         learner_domain_logits=learner_domain_logits,
         expert_domain_logits=expert_domain_logits,
         sar_p=sar_p,
@@ -33,11 +39,9 @@ def domain_adversarial_sampling(
     )
 
     # mixed batch creation
-    new_rng, key = jax.random.split(rng)
-
     b_size = encoded_learner_batch["observations"].shape[0]
     num_to_mix = int(alpha * b_size)
-    idcs = jax.random.choice(key, a=b_size, shape=(num_to_mix,), p=das_probs)
+    idcs = jax.random.choice(choice_key, a=b_size, shape=(num_to_mix,), p=das_probs)
 
     encoded_mixed_batch = encoded_anchor_batch
     encoded_mixed_batch["observations"] = \
@@ -45,12 +49,19 @@ def domain_adversarial_sampling(
     encoded_mixed_batch["observations_next"] = \
         encoded_mixed_batch["observations_next"].at[:num_to_mix].set(encoded_learner_batch["observations_next"].at[idcs].get())
 
-    sar_info = {"sar/alpha": alpha, "sar/p_acc": p_acc, "sar/p_acc_ema": p_acc_ema}
+    sar_info = {
+        "sar/alpha": alpha,
+        "sar/p_acc_ema": new_p_acc_ema,
+        "sar/learner_score": learner_score,
+        "sar/expert_score": expert_score,
+        "sar/p_acc": p_acc,
+    }
     return new_rng, encoded_mixed_batch, new_p_acc_ema, sar_info
 
 @jax.jit
 def _compute_sar_and_das_probs_jit(
     *,
+    rng: PRNGKey,
     learner_domain_logits: jnp.ndarray,
     expert_domain_logits: jnp.ndarray,
     sar_p: float,
@@ -58,7 +69,13 @@ def _compute_sar_and_das_probs_jit(
     p_acc_ema_decay: float,
 ):
     # compute sar
-    alpha, new_p_acc_ema, p_acc = self_adaptive_rate(
+    (
+        alpha,
+        new_p_acc_ema,
+        learner_score,
+        expert_score,
+        p_acc
+    )= self_adaptive_rate(
         learner_domain_logits=learner_domain_logits,
         expert_domain_logits=expert_domain_logits,
         p=sar_p,
@@ -71,9 +88,16 @@ def _compute_sar_and_das_probs_jit(
     confusion_probs = 1 - probs
     das_probs = confusion_probs / confusion_probs.sum()
 
+    # prepare key
+    new_rng, choice_key = jax.random.split(rng)
+
     return (
+        new_rng,
+        choice_key,
         das_probs,
         alpha,
         new_p_acc_ema,
+        learner_score,
+        expert_score,
         p_acc,
     )

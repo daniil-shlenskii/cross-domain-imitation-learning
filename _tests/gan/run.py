@@ -1,11 +1,10 @@
 import distrax
 import jax
 import jax.numpy as jnp
+import wandb
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 from tqdm import tqdm
-
-import wandb
 
 
 def main():
@@ -66,8 +65,12 @@ def main():
         # logging
         if (i + 1) % config.log_every == 0:
             for k, v in update_info.items():
+                if hasattr(v, "block_until_ready"):
+                    v = v.block_until_ready()
                 wandb.log({f"training/{k}": v}, step=i)
             for k, v in stats_info.items():
+                if hasattr(v, "block_until_ready"):
+                    v = v.block_until_ready()
                 wandb.log({f"training_stats/{k}": v}, step=i)
 
 
