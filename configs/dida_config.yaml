@@ -33,7 +33,7 @@ agent:
   expert_batch_size: *batch_size
   expert_buffer_state_path: experiments/sac/HalfCheetah-v5/0/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
   #
-  n_domain_discriminator_updates: 4
+  n_domain_discriminator_updates: 5
   #
   use_das: True
   sar_p: 0.5
@@ -71,7 +71,11 @@ agent:
       _target_: networks.discriminator.Discriminator
       hidden_dims: [256, 256]
     optimizer_config: *optimizer_config
-    gradient_penalty_coef: 10.
+    loss_fn_config:
+      _target_: utils.utils.get_method_partially
+      path: gan.losses.d_softplus_loss_with_gradient_penalty
+      params:
+        gradient_penalty_coef: 10.
     reward_transform_config:
       _target_: agents.gail.reward_transforms.RewardStandartization.create
   learner_encoder_config:
@@ -82,7 +86,7 @@ agent:
     optimizer_config: *optimizer_config
     loss_fn_config:
       _target_: hydra.utils.get_method
-      path: agents.dida.encoder_loss.encoder_loss_fn
+      path: agents.dida.encoder_loss.learner_encoder_loss
   expert_encoder_config:
     _target_: gan.generator.Generator.create
     module_config:
@@ -91,14 +95,16 @@ agent:
     optimizer_config: *optimizer_config
     loss_fn_config:
       _target_: hydra.utils.get_method
-      path: agents.dida.encoder_loss.encoder_loss_fn
+      path: agents.dida.encoder_loss.expert_encoder_loss
   domain_discriminator_config:
     _target_: gan.discriminator.Discriminator.create
     module_config:
       _target_: networks.discriminator.Discriminator
       hidden_dims: [256, 256]
     optimizer_config: *optimizer_config
-    gradient_penalty_coef: 10.
+    loss_fn_config:
+      _target_: hydra.utils.get_method
+      path: gan.losses.d_logistic_loss
 
 evaluation:
   seed: 42

@@ -2,6 +2,7 @@ import functools
 
 import jax
 import jax.numpy as jnp
+
 from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
 from gan.discriminator import Discriminator
@@ -26,14 +27,10 @@ def update_encoders_and_domain_discrimiantor(
         policy_discriminator=policy_discriminator,
         domain_discriminator=domain_discriminator,
         domain_loss_scale=domain_loss_scale,
-        is_learner_encoder=True,
     )
     new_expert_encoder, expert_encoder_info, expert_encoder_stats_info = expert_encoder.update(
         batch=expert_batch,
-        policy_discriminator=policy_discriminator,
         domain_discriminator=domain_discriminator,
-        domain_loss_scale=domain_loss_scale,
-        is_learner_encoder=False,
     )
     encoded_batch = learner_encoder_info.pop("encoded_batch")
     encoded_expert_batch = expert_encoder_info.pop("encoded_batch")
