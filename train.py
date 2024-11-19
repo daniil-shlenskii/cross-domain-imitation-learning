@@ -183,6 +183,8 @@ def main(args: argparse.Namespace):
                 n_samples_per_buffer=config.evaluation.get("n_samples_per_buffer", config.batch_size),
             )
             for k, v in eval_info.items():
+                if hasattr(v, "block_until_ready"):
+                    v = v.block_until_ready()
                 wandb.log({f"evaluation/{k}": v}, step=i)
 
         # sample actions
