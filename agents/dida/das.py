@@ -75,7 +75,7 @@ def _compute_sar_and_das_probs_jit(
         learner_score,
         expert_score,
         p_acc
-    )= self_adaptive_rate(
+    ) = self_adaptive_rate(
         learner_domain_logits=learner_domain_logits,
         expert_domain_logits=expert_domain_logits,
         p=sar_p,
@@ -86,7 +86,7 @@ def _compute_sar_and_das_probs_jit(
     # compute das probs
     probs = jax.nn.sigmoid(learner_domain_logits)
     confusion_probs = 1 - probs
-    das_probs = confusion_probs / confusion_probs.sum()
+    das_probs = confusion_probs / confusion_probs.sum() # TODO: maybe softmax is better 'cause of strogner higher values emphasizing
 
     # prepare key
     new_rng, choice_key = jax.random.split(rng)
