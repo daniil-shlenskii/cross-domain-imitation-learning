@@ -35,7 +35,7 @@ class DeterministicPolicy(nn.Module):
         actions = nn.tanh(features)
         if self.low is None or self.high is None:
             return actions
-        return _rescale_from_tanh(actions)
+        return _rescale_from_tanh(actions, low=self.low, high=self.high)
 
 class NormalTanhPolicy(nn.Module):
     hidden_dims: Sequence[int]

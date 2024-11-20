@@ -3,6 +3,8 @@ import warnings
 from pathlib import Path
 from pprint import pformat
 
+from gymnasium.wrappers import RescaleAction
+
 import jax
 import numpy as np
 from hydra.utils import instantiate
@@ -44,14 +46,17 @@ def main(args: argparse.Namespace):
     env = instantiate(config.environment)
     eval_env = instantiate(config.evaluation.environment)
 
+    env = RescaleAction(env, -1, 1) # TODO: env.low and env.high (logic repeatition 1)
+    eval_env = RescaleAction(eval_env, -1, 1)
+
     # agent init
-    observation_space = env.observation_space
+    observation_space = env.observation_space 
     action_space = env.action_space
 
     observation_dim = observation_space.sample().shape[-1]
     action_dim = action_space.sample().shape[-1]
-    low, high = action_space.low, action_space.high
-    if np.any(low == -1) or np.any(high == 1):
+    low, high = action_space.low, action_space.high # TODO: env.low and env.high (logic repeatition 1)
+    if np.all(low == -1) and np.all(high == 1):
         low, high = None, None
         
     agent = instantiate(
