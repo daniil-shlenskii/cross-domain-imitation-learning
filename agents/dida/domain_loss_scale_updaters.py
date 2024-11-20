@@ -17,14 +17,13 @@ class RangeDomainLossScaleUpdater:
         self,
         update_range: float = 0.03,
         unlock_range: float = 0.1,
-        factor: float = 0.5,
+        update_factor: float = 0.5,
         min_clip: float = 0.1,
     ):
         self.update_range = update_range
         self.unlock_range = unlock_range
 
-        self.update_factor = 0.1
-        self.unlock_factor = factor / self.update_factor
+        self.update_factor = update_factor
 
         self.min_clip = min_clip
         self._updated_recently = False
@@ -40,7 +39,6 @@ class RangeDomainLossScaleUpdater:
             )
             if unlock_condition:
                 self._updated_recently = False
-                domain_loss_scale = domain_loss_scale * self.unlock_factor
         else:
             if update_condition:
                 domain_loss_scale = domain_loss_scale * self.update_factor
