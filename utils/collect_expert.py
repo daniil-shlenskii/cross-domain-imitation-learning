@@ -3,6 +3,7 @@ import warnings
 from pathlib import Path
 
 import gymnasium as gym
+from gymnasium.wrappers import RescaleAction
 import numpy as np
 from hydra.utils import instantiate
 from loguru import logger
@@ -33,6 +34,7 @@ def main(args: argparse.Namespace):
     # environment init
     eval_config = config.evaluation
     env = instantiate(eval_config.environment)
+    env = RescaleAction(env, -1, 1)
     env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=args.num_episodes)
 
     # agent init
