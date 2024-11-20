@@ -11,6 +11,7 @@ import numpy as np
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 from sklearn.manifold import TSNE
+
 from utils.types import Buffer, BufferState, PRNGKey
 from utils.utils import get_buffer_state_size
 
@@ -30,25 +31,19 @@ def get_tsne_embeddings_scatter(
     seed: int,
     learner_buffer: Buffer,
     expert_buffer: Buffer,
+    anchor_buffer: BufferState,
     learner_buffer_state: BufferState,
     expert_buffer_state: BufferState,
-    anchor_buffer_state: BufferState,
     learner_encoder: ...,
     expert_encoder: ...,
     n_samples_per_buffer: int,
 ):
-    # prepare learner_random buffer state
-    learner_random_buffer_state = deepcopy(learner_buffer_state)
-    buffer_state_size = get_buffer_state_size(learner_random_buffer_state)
-    perm_idcs = np.random.choice(buffer_state_size)
-    learner_random_buffer_state.experience["observations_next"] = \
-        learner_random_buffer_state.experience["observations_next"].at[0, :buffer_state_size].set(
-            learner_random_buffer_state.experience["observations_next"][0, perm_idcs]
-        )
+    # prepare learner_random buffer 
+    random_learner_buffer = make_jitted_random_fbx_buffer(learner_buffer)
 
     # prepare learner_random, learner, expert_random (aka anchor), expert data info
-    buffers_tpl = (learner_buffer, learner_buffer, expert_buffer, expert_buffer)
-    buffer_states_tpl = (learner_random_buffer_state, learner_buffer_state, anchor_buffer_state, expert_buffer_state)
+    buffers_tpl = (random_learner_buffer, learner_buffer, anchor_buffer, expert_buffer)
+    buffer_states_tpl = (learner_buffer_state, learner_buffer_state, expert_buffer_state, expert_buffer_state)
     encoders_tpl = (learner_encoder, learner_encoder, expert_encoder, expert_encoder)
     scatter_params_tpl = (
         {"label": "TR", "c": "tab:green",  "marker": "*"},
@@ -131,16 +126,25 @@ def random_sample_decorator(buffer_sample):
         batch_size = batch["observations"].shape[0]
         new_observations_next = jax.random.choice(
             choice_key, batch["observations_next"], shape=(batch_size,)
-        )
+        )        
         batch["observations_next"] = new_observations_next
-        
+
         return_batch = return_batch.replace(experience=batch)
         return return_batch
     
     return random_sample
 
-def make_jitted_random_fbx_buffer(fbx_buffer_config: DictConfig):
+def instantiate_jitted_random_fbx_buffer(fbx_buffer_config: DictConfig):
     buffer = instantiate(fbx_buffer_config)
+    buffer = buffer.replace(
+        init = jax.jit(buffer.init),
+        add = jax.jit(buffer.add, donate_argnums=0),
+        sample = jax.jit(random_sample_decorator(buffer.sample)),
+        can_sample = jax.jit(buffer.can_sample),
+    )
+    return buffer
+
+def make_jitted_random_fbx_buffer(buffer: Buffer):
     buffer = buffer.replace(
         init = jax.jit(buffer.init),
         add = jax.jit(buffer.add, donate_argnums=0),

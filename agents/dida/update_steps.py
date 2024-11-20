@@ -15,6 +15,7 @@ def update_encoders_and_domain_discrimiantor(
     *,
     batch: DataType,
     expert_batch: DataType,
+    anchor_batch: DataType,
     learner_encoder: Generator,
     expert_encoder: Generator,
     policy_discriminator: GAILDiscriminator,
@@ -30,12 +31,14 @@ def update_encoders_and_domain_discrimiantor(
     )
     new_expert_encoder, expert_encoder_info, expert_encoder_stats_info = expert_encoder.update(
         batch=expert_batch,
+        random_batch=anchor_batch,
         policy_discriminator=policy_discriminator,
         domain_discriminator=domain_discriminator,
         domain_loss_scale=domain_loss_scale,
     )
     encoded_batch = learner_encoder_info.pop("encoded_batch")
     encoded_expert_batch = expert_encoder_info.pop("encoded_batch")
+    encoded_anchor_batch = expert_encoder_info.pop("encoded_random_batch")
 
     # update domain discriminator
     new_domain_disc, domain_disc_info, domain_disc_stats_info = domain_discriminator.update(
@@ -54,6 +57,7 @@ def update_encoders_and_domain_discrimiantor(
         new_domain_disc,
         encoded_batch,
         encoded_expert_batch,
+        encoded_anchor_batch,
         learner_domain_logits,
         expert_domain_logits,
         info,

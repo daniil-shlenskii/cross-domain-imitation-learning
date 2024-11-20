@@ -7,6 +7,10 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
+from flax import struct
+from hydra.utils import instantiate
+from omegaconf.dictconfig import DictConfig
+
 import wandb
 from agents.base_agent import Agent
 from agents.dida.das import domain_adversarial_sampling
@@ -17,13 +21,11 @@ from agents.dida.update_steps import (update_domain_discriminator_jit,
                                       update_encoders_and_domain_discrimiantor,
                                       update_gail)
 from agents.dida.utils import (encode_observation_jit,
-                               get_tsne_embeddings_scatter)
+                               get_tsne_embeddings_scatter,
+                               make_jitted_random_fbx_buffer)
 from agents.gail.gail_discriminator import GAILDiscriminator
-from flax import struct
 from gan.discriminator import Discriminator
 from gan.generator import Generator
-from hydra.utils import instantiate
-from omegaconf.dictconfig import DictConfig
 from utils.types import Buffer, BufferState, DataType, PRNGKey
 from utils.utils import (convert_figure_to_array, get_buffer_state_size,
                          load_pickle, make_jitted_fbx_buffer)
@@ -36,8 +38,8 @@ class DIDAAgent(Agent):
     policy_discriminator: Discriminator
     domain_discriminator: Discriminator
     expert_buffer: Buffer = struct.field(pytree_node=False)
+    anchor_buffer: BufferState = struct.field(pytree_node=False)
     expert_buffer_state: BufferState = struct.field(pytree_node=False)
-    anchor_buffer_state: BufferState = struct.field(pytree_node=False)
     use_das: float = struct.field(pytree_node=False)
     sar_p: float = struct.field(pytree_node=False)
     p_acc_ema: float = struct.field(pytree_node=False)
@@ -78,26 +80,16 @@ class DIDAAgent(Agent):
     ):  
         # expert buffer init
         expert_buffer_state = load_pickle(expert_buffer_state_path)
-        expert_buffer = flashbax.make_item_buffer(
-            sample_batch_size=expert_batch_size,
-            min_length=expert_buffer_state.current_index,
-            max_length=expert_buffer_state.current_index,
-            add_batches=False,
-        )
-        expert_buffer = expert_buffer.replace(
-            init = jax.jit(expert_buffer.init),
-            add = jax.jit(expert_buffer.add, donate_argnums=0),
-            sample = jax.jit(expert_buffer.sample),
-            can_sample = jax.jit(expert_buffer.can_sample),
-        )
+        expert_buffer = make_jitted_fbx_buffer({
+            "_target_": "flashbax.make_item_buffer",
+            "sample_batch_size": expert_batch_size,
+            "min_length": expert_buffer_state.current_index,
+            "max_length": expert_buffer_state.current_index,
+            "add_batches": False,
+        })
+
         # anchor buffer init
-        anchor_buffer_state = deepcopy(expert_buffer_state)
-        buffer_state_size = get_buffer_state_size(anchor_buffer_state)
-        perm_idcs = np.random.choice(buffer_state_size)
-        anchor_buffer_state.experience["observations_next"] = \
-            anchor_buffer_state.experience["observations_next"].at[0, :buffer_state_size].set(
-                anchor_buffer_state.experience["observations_next"][0, perm_idcs]
-            )
+        anchor_buffer = make_jitted_random_fbx_buffer(expert_buffer)
         
         # agent init
         agent = instantiate(
@@ -159,8 +151,8 @@ class DIDAAgent(Agent):
             policy_discriminator=policy_discriminator,
             domain_discriminator=domain_discriminator,
             expert_buffer=expert_buffer,
+            anchor_buffer=anchor_buffer,
             expert_buffer_state=expert_buffer_state,
-            anchor_buffer_state=anchor_buffer_state,
             use_das=use_das,
             sar_p=sar_p,
             p_acc_ema=p_acc_ema,
@@ -223,8 +215,8 @@ class DIDAAgent(Agent):
                 rng=self.rng,
                 batch=batch,
                 expert_buffer=self.expert_buffer,
+                anchor_buffer=self.anchor_buffer,
                 expert_buffer_state=self.expert_buffer_state,
-                anchor_buffer_state=self.anchor_buffer_state,
                 learner_encoder=self.learner_encoder,
                 expert_encoder=self.expert_encoder,
                 policy_discriminator=self.policy_discriminator,
@@ -268,9 +260,9 @@ class DIDAAgent(Agent):
             seed=seed,
             learner_buffer=learner_buffer,
             expert_buffer=self.expert_buffer,
+            anchor_buffer=self.anchor_buffer,
             learner_buffer_state=learner_buffer_state,
             expert_buffer_state=self.expert_buffer_state,
-            anchor_buffer_state=self.anchor_buffer_state,
             learner_encoder=self.learner_encoder,
             expert_encoder=self.expert_encoder,
             n_samples_per_buffer=n_samples_per_buffer,
@@ -290,8 +282,8 @@ def _update_jit(
     rng: PRNGKey,
     batch: DataType,
     expert_buffer: Buffer,
+    anchor_buffer: BufferState,
     expert_buffer_state: BufferState,
-    anchor_buffer_state: BufferState,
     #
     learner_encoder: Generator,
     expert_encoder: Generator,
@@ -322,8 +314,8 @@ def _update_jit(
         rng=rng,
         batch=batch,
         expert_buffer=expert_buffer,
+        anchor_buffer=anchor_buffer,
         expert_buffer_state=expert_buffer_state,
-        anchor_buffer_state=anchor_buffer_state,
         learner_encoder=learner_encoder,
         expert_encoder=expert_encoder,
         policy_discriminator=policy_discriminator,
@@ -370,14 +362,14 @@ def _update_jit(
         stats_info
     )
 
-@functools.partial(jax.jit, static_argnames="expert_buffer")
+@functools.partial(jax.jit, static_argnames=["expert_buffer", "anchor_buffer"])
 def _update_encoders_and_domain_discrimiantor_with_extra_preparation(
     *,
     rng: PRNGKey,
     batch: DataType,
     expert_buffer: Buffer,
+    anchor_buffer: BufferState,
     expert_buffer_state: BufferState,
-    anchor_buffer_state: BufferState,
     learner_encoder: Generator,
     expert_encoder: Generator,
     policy_discriminator: GAILDiscriminator,
@@ -387,7 +379,7 @@ def _update_encoders_and_domain_discrimiantor_with_extra_preparation(
     # prepare batches
     new_rng, expert_key, anchor_key = jax.random.split(rng, 3)
     expert_batch = expert_buffer.sample(expert_buffer_state, expert_key).experience
-    anchor_batch = expert_buffer.sample(anchor_buffer_state, anchor_key).experience
+    anchor_batch = anchor_buffer.sample(expert_buffer_state, anchor_key).experience
 
     # update step
     (
@@ -396,6 +388,7 @@ def _update_encoders_and_domain_discrimiantor_with_extra_preparation(
         new_domain_disc,
         batch,
         expert_batch,
+        anchor_batch,
         learner_domain_logits,
         expert_domain_logits,
         info,
@@ -403,16 +396,13 @@ def _update_encoders_and_domain_discrimiantor_with_extra_preparation(
     ) = update_encoders_and_domain_discrimiantor(
         batch=batch,
         expert_batch=expert_batch,
+        anchor_batch=anchor_batch,
         learner_encoder=learner_encoder,
         expert_encoder=expert_encoder,
         policy_discriminator=policy_discriminator,
         domain_discriminator=domain_discriminator,
         domain_loss_scale=domain_loss_scale,
     )
-
-    # encode anchor batch for das method
-    anchor_batch["observations"] = expert_encoder(anchor_batch["observations"])
-    anchor_batch["observations_next"] = expert_encoder(anchor_batch["observations_next"])
 
     return (
         new_rng,
