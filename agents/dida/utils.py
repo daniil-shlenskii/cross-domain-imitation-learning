@@ -8,9 +8,10 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
+from hydra.utils import instantiate
+from omegaconf.dictconfig import DictConfig
 from sklearn.manifold import TSNE
-
-from utils.types import Buffer, BufferState
+from utils.types import Buffer, BufferState, PRNGKey
 from utils.utils import get_buffer_state_size
 
 
@@ -120,3 +121,30 @@ def get_tsne_embeddings_scatter(
     plt.close()
 
     return state_figure, behavior_figure
+
+def random_sample_decorator(buffer_sample):
+    def random_sample(state: BufferState, key: PRNGKey):
+        sample_key, choice_key = jax.random.split(key)
+        return_batch = buffer_sample(state, sample_key)
+        
+        batch = return_batch.experience
+        batch_size = batch["observations"].shape[0]
+        new_observations_next = jax.random.choice(
+            choice_key, batch["observations_next"], shape=(batch_size,)
+        )
+        batch["observations_next"] = new_observations_next
+        
+        return_batch = return_batch.replace(experience=batch)
+        return return_batch
+    
+    return random_sample
+
+def make_jitted_random_fbx_buffer(fbx_buffer_config: DictConfig):
+    buffer = instantiate(fbx_buffer_config)
+    buffer = buffer.replace(
+        init = jax.jit(buffer.init),
+        add = jax.jit(buffer.add, donate_argnums=0),
+        sample = jax.jit(random_sample_decorator(buffer.sample)),
+        can_sample = jax.jit(buffer.can_sample),
+    )
+    return buffer
