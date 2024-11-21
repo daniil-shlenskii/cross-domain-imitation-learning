@@ -7,6 +7,10 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
+from flax import struct
+from hydra.utils import instantiate
+from omegaconf.dictconfig import DictConfig
+
 import wandb
 from agents.base_agent import Agent
 from agents.dida.das import domain_adversarial_sampling
@@ -19,14 +23,11 @@ from agents.dida.update_steps import (update_domain_discriminator_jit,
 from agents.dida.utils import (encode_observation_jit,
                                get_tsne_embeddings_scatter)
 from agents.gail.gail_discriminator import GAILDiscriminator
-from flax import struct
 from gan.discriminator import Discriminator
 from gan.generator import Generator
-from hydra.utils import instantiate
-from omegaconf.dictconfig import DictConfig
 from utils.types import Buffer, BufferState, DataType, PRNGKey
 from utils.utils import (convert_figure_to_array, get_buffer_state_size,
-                         load_pickle, make_jitted_fbx_buffer)
+                         instantiate_jitted_fbx_buffer, load_pickle)
 
 
 class DIDAAgent(Agent):
@@ -84,12 +85,14 @@ class DIDAAgent(Agent):
             max_length=expert_buffer_state.current_index,
             add_batches=False,
         )
-        expert_buffer = expert_buffer.replace(
-            init = jax.jit(expert_buffer.init),
-            add = jax.jit(expert_buffer.add, donate_argnums=0),
-            sample = jax.jit(expert_buffer.sample),
-            can_sample = jax.jit(expert_buffer.can_sample),
-        )
+        expert_buffer = instantiate_jitted_fbx_buffer({
+            "_target_": "flashbax.make_item_buffer",
+            "sample_batch_size": expert_batch_size,
+            "min_length": expert_buffer_state.current_index,
+            "max_length": expert_buffer_state.current_index,
+            "add_batches": False,
+        })
+
         # anchor buffer init
         anchor_buffer_state = deepcopy(expert_buffer_state)
         buffer_state_size = get_buffer_state_size(anchor_buffer_state)

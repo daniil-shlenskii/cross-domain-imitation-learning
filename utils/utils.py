@@ -14,6 +14,7 @@ from flax import struct
 from hydra.utils import instantiate
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from omegaconf.dictconfig import DictConfig
+
 from utils.types import Buffer, BufferState
 
 
@@ -111,7 +112,7 @@ def get_buffer_state_size(buffer_state: BufferState) -> int:
         size = buffer_state.current_index
     return int(size)
 
-def make_jitted_fbx_buffer(fbx_buffer_config: DictConfig):
+def instantiate_jitted_fbx_buffer(fbx_buffer_config: DictConfig):
     buffer = instantiate(fbx_buffer_config)
     buffer = buffer.replace(
         init = jax.jit(buffer.init),
