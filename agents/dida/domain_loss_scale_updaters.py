@@ -86,4 +86,6 @@ class ExponentialLossScaleUpdater:
                 1
             )
         )
-        return domain_loss_scale
+        if self.start_scale < self.end_scale:
+            return min(domain_loss_scale, self.end_scale)
+        return max(domain_loss_scale, self.end_scale)
