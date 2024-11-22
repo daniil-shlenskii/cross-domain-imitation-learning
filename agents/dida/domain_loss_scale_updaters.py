@@ -67,8 +67,8 @@ class ExponentialLossScaleUpdater:
         self,
         start_scale: float = 0.,
         end_scale: float = 0.5,
-        concavity_param: float = 10, 
-        max_n_iters: int = 500_000,
+        concavity_param: float = 10., 
+        max_n_iters: int = 1_000_000,
     ):
         self.start_scale = start_scale
         self.end_scale = end_scale
@@ -81,7 +81,7 @@ class ExponentialLossScaleUpdater:
         domain_loss_scale = (
             self.start_scale + 
             self.end_scale * (
-                2 / (1 / np.exp(-self.concavity_param * q))
+                2 / (1 + np.exp(-self.concavity_param * q))
                 -
                 1
             )
