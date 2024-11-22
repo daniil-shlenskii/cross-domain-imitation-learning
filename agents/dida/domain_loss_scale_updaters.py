@@ -44,3 +44,46 @@ class RangeDomainLossScaleUpdater:
                 domain_loss_scale = domain_loss_scale * self.update_factor
                 self._updated_recently = True
         return np.clip(domain_loss_scale, self.min_clip, None)
+
+
+class LinearLossScaleUpdater:
+    def __init__(
+        self,
+        start_scale: float = 0.,
+        end_scale: float = 0.5,
+        max_n_iters: int = 500_000,
+    ):
+        self.start_scale = start_scale
+        self.end_scale = end_scale
+        self.max_n_iters = max_n_iters
+
+    def update(self, dida_agent: "DIDAAgent") -> float:
+        curr_iter = dida_agent.learner_encoder.state.step
+        domain_loss_scale = self.start_scale + (self.end_scale - self.start_scale) * curr_iter / self.max_n_iters
+        return domain_loss_scale
+
+class ExponentialLossScaleUpdater:
+    def __init__(
+        self,
+        start_scale: float = 0.,
+        end_scale: float = 0.5,
+        concavity_param: float = 10, 
+        max_n_iters: int = 500_000,
+    ):
+        self.start_scale = start_scale
+        self.end_scale = end_scale
+        self.concavity_param = concavity_param
+        self.max_n_iters = max_n_iters
+
+    def update(self, dida_agent: "DIDAAgent") -> float:
+        curr_iter = dida_agent.learner_encoder.state.step
+        q = curr_iter / self. max_n_iters
+        domain_loss_scale = (
+            self.start_scale + 
+            self.end_scale * (
+                2 / (1 / np.exp(-self.concavity_param * q))
+                -
+                1
+            )
+        )
+        return domain_loss_scale
