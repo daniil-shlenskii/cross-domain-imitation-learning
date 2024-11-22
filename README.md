@@ -16,7 +16,6 @@ It saved under the path that set in the config in the following way:
 archive:
     agent_save_dir: archive/agents/sac
     agent_buffer_save_dir: archive/agents/sac
-	...
 ```
 The agent will be stored under the following directory path:
 ```bash
@@ -26,9 +25,8 @@ archive/agents/sac/<env_name>
 In order to load the agent, form config in the following way:
 ```yaml
 archive:
-	...
-	agent_load_dir: archive/agents/sac
-	agent_buffer_load_dir: archive/agents/sac
+    agent_load_dir: archive/agents/sac
+    agent_buffer_load_dir: archive/agents/sac
 ```
 
 *NOTE: if those directory paths are not set, the default ones will be used.*
