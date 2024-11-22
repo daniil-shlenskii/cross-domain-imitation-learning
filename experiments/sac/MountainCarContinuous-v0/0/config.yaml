@@ -1,0 +1,69 @@
+seed: &seed 0
+env_name: &env_name MountainCarContinuous-v0
+
+n_iters_training: 20_000
+batch_size: &batch_size 256
+
+precollect_buffer_size: &precollect_buffer_size 1_000
+
+log_every: 500
+eval_every: 1_000
+save_every: 1_000
+
+agent:
+  _target_: agents.sac.SACAgent.create
+  seed: *seed
+  actor_module_config:
+    _target_: networks.policy.NormalTanhPolicy
+    hidden_dims: [256, 256]
+  critic_module_config:
+    _target_: networks.critic.Critic
+    hidden_dims: [256, 256]
+  temperature_module_config:
+    _target_: agents.sac.Temperature
+    initial_temperature: 1.0
+  actor_optimizer_config: &optimizer_config
+    transforms:
+      - _target_: optax.clip
+        max_delta: 1.0
+      - _target_: optax.adamw
+        learning_rate: 3e-4
+  critic_optimizer_config: *optimizer_config
+  temperature_optimizer_config:
+    transforms:
+      - _target_: optax.sgd
+        learning_rate: 1e-5
+
+environment:
+  _target_: gymnasium.wrappers.TimeLimit
+  max_episode_steps: 1000
+  env:
+      _target_: gymnasium.make
+      id: *env_name
+
+evaluation:
+  seed: *seed
+  num_episodes: 10
+  environment:
+    _target_: gymnasium.wrappers.TimeLimit
+    max_episode_steps: 1000
+    env:
+        _target_: gymnasium.make
+        id: *env_name
+
+replay_buffer:
+  _target_: utils.utils.instantiate_jitted_fbx_buffer
+  fbx_buffer_config:
+    _target_: flashbax.make_item_buffer
+    max_length: 100_000
+    min_length: *precollect_buffer_size
+    sample_batch_size: *batch_size
+    add_batches: False
+
+archive:
+  agent_load_dir: &agent_dir experiments/sac/MountainCarContinuous-v0/0/archive
+  agent_save_dir: *agent_dir
+  agent_buffer_load_dir: *agent_dir
+  agent_buffer_save_dir: *agent_dir
+  random_buffer_load_dir: &random_buffer_dir archive/random_buffers
+  random_buffer_save_dir: *random_buffer_dir
