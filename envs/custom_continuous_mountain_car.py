@@ -21,7 +21,7 @@ class Custom_Continuous_MountainCarEnv(Continuous_MountainCarEnv):
         velocity = self.state[1]
         force = min(max(action[0], self.min_action), self.max_action)
 
-        velocity += (force * self.power - 0.0025 * math.cos(3 * position)) * self.h**2
+        velocity += (force * self.power - 0.0025 * math.cos(3 * position)) * self.h
         if velocity > self.max_speed:
             velocity = self.max_speed
         if velocity < -self.max_speed:
@@ -47,3 +47,15 @@ class Custom_Continuous_MountainCarEnv(Continuous_MountainCarEnv):
             self.render()
         # truncation=False as the time limit is handled by the `TimeLimit` wrapper added during `make`
         return self.state, reward, terminated, False, {}
+
+    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
+        super().reset(seed=seed)
+        # Note that if you use custom reset bounds, it may lead to out-of-bound
+        # state/observations.
+        low = self.min_position
+        high = -0.4
+        self.state = np.array([self.np_random.uniform(low=low, high=high), 0])
+
+        if self.render_mode == "human":
+            self.render()
+        return np.array(self.state, dtype=np.float32), {}
