@@ -21,8 +21,9 @@ def encoder_loss(
         domain_discriminator=domain_discriminator,
         domain_loss_scale=domain_loss_scale,
     )
-    for k, v in learner_info.items():
-        learner_info[f"learner_{k}"] = v
+    info_keys = set(learner_info.keys())
+    for k in info_keys:
+        learner_info[f"learner_{k}"] = learner_info.pop(k)
 
     expert_loss, expert_info = expert_encoder_loss(
         params=params,
@@ -32,8 +33,8 @@ def encoder_loss(
         domain_discriminator=domain_discriminator,
         domain_loss_scale=domain_loss_scale,
     )
-    for k, v in expert_info.items():
-        expert_info[f"expert_{k}"] = v
+    for k in info_keys:
+        expert_info[f"expert_{k}"] = expert_info.pop(k)
 
     loss = (learner_loss + expert_loss) * 0.5
     info = {
