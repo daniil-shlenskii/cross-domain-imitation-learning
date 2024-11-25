@@ -237,7 +237,7 @@ class BaseDIDAAgent(Agent):
         # prepare mixed batch for policy discriminator updapte
         if self.use_das:
             new_rng, mixed_batch, new_p_acc_ema, sar_info = domain_adversarial_sampling(
-                rng=self.rng,
+                rng=new_rng,
                 encoded_learner_batch=batch,
                 encoded_anchor_batch=anchor_batch,
                 learner_domain_logits=learner_domain_logits,
@@ -259,15 +259,19 @@ class BaseDIDAAgent(Agent):
             policy_discriminator=self.policy_discriminator,
         )
 
-        new_agent = self.replace(
+        # update agent with new params
+        new_agent_params = dict(
             rng=new_rng,
             learner_encoder=new_learner_encoder,
-            expert_encoder=new_expert_encoder,
             policy_discriminator=new_policy_disc,
             domain_discriminator=new_domain_disc,
             agent=new_rl_agent,
-            p_acc_ema=new_p_acc_ema,            
+            p_acc_ema=new_p_acc_ema,  
         )
+        if new_expert_encoder is not None:
+            new_agent_params["expert_encoder"] = new_expert_encoder
+        new_agent = self.replace(**new_agent_params)
+
         info.update({**gail_info, **sar_info})
         stats_info.update({**gail_stats_info})
         return new_agent, info, stats_info
