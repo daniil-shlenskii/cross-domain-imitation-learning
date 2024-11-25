@@ -36,5 +36,9 @@ def encoder_loss(
         expert_info[f"expert_{k}"] = v
 
     loss = (learner_loss + expert_loss) * 0.5
-    info = {**learner_info, **expert_info}
+    info = {
+        f"{state.info_key}_loss": loss,
+        **learner_info,
+        **expert_info
+    }
     return loss, info
