@@ -7,6 +7,12 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
+from flax import struct
+from hydra.utils import instantiate
+from omegaconf.dictconfig import DictConfig
+from typing_extensions import override
+
+import wandb
 from agents.base_agent import Agent
 from agents.dida.domain_loss_scale_updaters import \
     IdentityDomainLossScaleUpdater
@@ -14,16 +20,11 @@ from agents.dida.update_steps import update_domain_discriminator_only_jit
 from agents.dida.utils import (encode_observation_jit,
                                get_tsne_embeddings_scatter)
 from agents.gail.gail_discriminator import GAILDiscriminator
-from flax import struct
 from gan.discriminator import Discriminator
 from gan.generator import Generator
-from hydra.utils import instantiate
-from omegaconf.dictconfig import DictConfig
 from utils.types import Buffer, BufferState, DataType, PRNGKey
 from utils.utils import (convert_figure_to_array, get_buffer_state_size,
                          instantiate_jitted_fbx_buffer, load_pickle)
-
-import wandb
 
 
 class BaseDIDAAgent(Agent):
@@ -228,16 +229,7 @@ class BaseDIDAAgent(Agent):
             info,
             stats_info,
         ) = self._update_encoders_and_domain_discrimiantor_with_extra_preparation(
-            rng=self.rng,
-            batch=batch,
-            expert_buffer=self.expert_buffer,
-            expert_buffer_state=self.expert_buffer_state,
-            anchor_buffer_state=self.anchor_buffer_state,
-            learner_encoder=self.learner_encoder,
-            expert_encoder=self.expert_encoder,
-            policy_discriminator=self.policy_discriminator,
-            domain_discriminator=self.domain_discriminator,
-            domain_loss_scale=domain_loss_scale,
+            batch=batch, domain_loss_scale=domain_loss_scale,
         )
 
         # prepare mixed batch for policy discriminator updapte
@@ -314,3 +306,9 @@ class BaseDIDAAgent(Agent):
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
         return encode_observation_jit(self.learner_encoder, observations)
+
+    @override
+    def _update_encoders_and_domain_discrimiantor_with_extra_preparation(
+        self, batch: DataType, domain_loss_scale: float
+    ):
+        pass
