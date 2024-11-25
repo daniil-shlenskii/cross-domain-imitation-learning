@@ -29,7 +29,7 @@ def _encoder_loss(
 
     policy_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=1)
     policy_logits = policy_discriminator(policy_batch)
-    policy_loss = policy_loss_fn(-policy_logits)
+    policy_loss = policy_loss_fn(policy_logits)
 
     domain_batch = batch["observations"]
     domain_logits = domain_discriminator(domain_batch)
