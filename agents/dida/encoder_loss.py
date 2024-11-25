@@ -1,6 +1,5 @@
 import jax
 import jax.numpy as jnp
-
 from gan.base_losses import (g_nonsaturating_logistic_loss,
                              g_nonsaturating_softplus_loss)
 from gan.discriminator import Discriminator
@@ -21,7 +20,7 @@ def learner_encoder_loss(
 
     policy_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=1)
     policy_logits = policy_discriminator(policy_batch)
-    policy_loss = g_nonsaturating_softplus_loss(policy_logits)
+    policy_loss = g_nonsaturating_softplus_loss(-policy_logits)
 
     domain_batch = batch["observations"]
     domain_logits = domain_discriminator(domain_batch)
@@ -49,7 +48,7 @@ def expert_encoder_loss(
 
     policy_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=1)
     policy_logits = policy_discriminator(policy_batch)
-    policy_loss = g_nonsaturating_softplus_loss(-policy_logits)
+    policy_loss = g_nonsaturating_softplus_loss(policy_logits)
 
     domain_batch = batch["observations"]
     domain_logits = domain_discriminator(domain_batch)
