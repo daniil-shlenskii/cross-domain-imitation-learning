@@ -212,6 +212,72 @@ class BaseDIDAAgent(Agent):
             domain_discriminator=new_domain_discriminator,
         )
         return new_agent, info, stats_info
+
+    def _update(self, batch: DataType, domain_loss_scale: float):
+        # update encoders, domain discriminator, prepare batches for gail update
+        (
+            new_rng,
+            new_learner_encoder,
+            new_expert_encoder,
+            new_domain_disc,
+            batch,
+            expert_batch,
+            anchor_batch,
+            learner_domain_logits,
+            expert_domain_logits,
+            info,
+            stats_info,
+        ) = self._update_encoders_and_domain_discrimiantor_with_extra_preparation(
+            rng=self.rng,
+            batch=batch,
+            expert_buffer=self.expert_buffer,
+            expert_buffer_state=self.expert_buffer_state,
+            anchor_buffer_state=self.anchor_buffer_state,
+            learner_encoder=self.learner_encoder,
+            expert_encoder=self.expert_encoder,
+            policy_discriminator=self.policy_discriminator,
+            domain_discriminator=self.domain_discriminator,
+            domain_loss_scale=domain_loss_scale,
+        )
+
+        # prepare mixed batch for policy discriminator updapte
+        if use_das:
+            new_rng, mixed_batch, new_p_acc_ema, sar_info = domain_adversarial_sampling(
+                rng=rng,
+                encoded_learner_batch=batch,
+                encoded_anchor_batch=anchor_batch,
+                learner_domain_logits=learner_domain_logits,
+                expert_domain_logits=expert_domain_logits,
+                sar_p=sar_p,
+                p_acc_ema=p_acc_ema,
+                p_acc_ema_decay=p_acc_ema_decay,
+            )
+        else:
+            mixed_batch = batch
+            sar_info, new_p_acc_ema = {}, None
+
+        # apply gail
+        new_agent, new_policy_disc, gail_info, gail_stats_info = update_gail(
+            batch=batch,
+            expert_batch=expert_batch,
+            mixed_batch=mixed_batch,
+            agent=agent,
+            policy_discriminator=policy_discriminator,
+        )
+
+        info.update({**gail_info, **sar_info})
+        stats_info.update({**gail_stats_info})
+        return (
+            new_rng,
+            new_learner_encoder,
+            new_expert_encoder,
+            new_policy_disc,
+            new_domain_disc,
+            new_agent,
+            new_p_acc_ema,
+            info,
+            stats_info
+        )
     
     def evaluate(
         self,
