@@ -1,8 +1,10 @@
 import functools
+from copy import deepcopy
 from typing import Callable
 
 import jax
 import jax.numpy as jnp
+
 from gan.base_losses import (g_nonsaturating_logistic_loss,
                              g_nonsaturating_softplus_loss)
 from gan.discriminator import Discriminator
@@ -21,6 +23,7 @@ def _encoder_loss(
     policy_loss_fn: Callable,
     domain_loss_fn: Callable,
 ):
+    batch = deepcopy(batch)
     batch["observations"] = state.apply_fn({"params": params}, batch["observations"], train=True)
     batch["observations_next"] = state.apply_fn({"params": params}, batch["observations_next"], train=True)
 
@@ -49,6 +52,6 @@ learner_encoder_loss = functools.partial(
 
 expert_encoder_loss = functools.partial(
     _encoder_loss,
-    policy_loss_fn=lambda policy_logits: g_nonsaturating_softplus_loss(policy_logits),
-    domain_loss_fn=lambda domain_logits: g_nonsaturating_logistic_loss(domain_logits)
+    policy_loss_fn=g_nonsaturating_softplus_loss,
+    domain_loss_fn=g_nonsaturating_logistic_loss
 )
