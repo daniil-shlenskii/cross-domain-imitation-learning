@@ -8,11 +8,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from agents.base_agent import Agent
-from agents.dida.das import domain_adversarial_sampling
 from agents.dida.domain_loss_scale_updaters import \
     IdentityDomainLossScaleUpdater
-from agents.dida.update_steps import (update_domain_discriminator_only_jit,
-                                      update_gail)
+from agents.dida.update_steps import update_domain_discriminator_only_jit
 from agents.dida.utils import (encode_observation_jit,
                                get_tsne_embeddings_scatter)
 from agents.gail.gail_discriminator import GAILDiscriminator
@@ -141,7 +139,6 @@ class BaseDIDAAgent(Agent):
             (
                 "agent",
                 "learner_encoder",
-                "expert_encoder",
                 "policy_discriminator",
                 "domain_discriminator",
                 "p_acc_ema",
@@ -177,7 +174,6 @@ class BaseDIDAAgent(Agent):
             return self.learner_encoder    
         return super().__getattr__(item)
         
-
     def update(self, batch: DataType):
         update_domain_discriminator_only = (
             self.n_domain_discriminator_updates > 1 and
