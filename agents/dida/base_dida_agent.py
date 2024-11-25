@@ -14,9 +14,11 @@ from typing_extensions import override
 
 import wandb
 from agents.base_agent import Agent
+from agents.dida.das import domain_adversarial_sampling
 from agents.dida.domain_loss_scale_updaters import \
     IdentityDomainLossScaleUpdater
-from agents.dida.update_steps import update_domain_discriminator_only_jit
+from agents.dida.update_steps import (update_domain_discriminator_only_jit,
+                                      update_gail)
 from agents.dida.utils import (encode_observation_jit,
                                get_tsne_embeddings_scatter)
 from agents.gail.gail_discriminator import GAILDiscriminator
@@ -233,43 +235,42 @@ class BaseDIDAAgent(Agent):
         )
 
         # prepare mixed batch for policy discriminator updapte
-        if use_das:
+        if self.use_das:
             new_rng, mixed_batch, new_p_acc_ema, sar_info = domain_adversarial_sampling(
-                rng=rng,
+                rng=self.rng,
                 encoded_learner_batch=batch,
                 encoded_anchor_batch=anchor_batch,
                 learner_domain_logits=learner_domain_logits,
                 expert_domain_logits=expert_domain_logits,
-                sar_p=sar_p,
-                p_acc_ema=p_acc_ema,
-                p_acc_ema_decay=p_acc_ema_decay,
+                sar_p=self.sar_p,
+                p_acc_ema=self.p_acc_ema,
+                p_acc_ema_decay=self.p_acc_ema_decay,
             )
         else:
             mixed_batch = batch
             sar_info, new_p_acc_ema = {}, None
 
         # apply gail
-        new_agent, new_policy_disc, gail_info, gail_stats_info = update_gail(
+        new_rl_agent, new_policy_disc, gail_info, gail_stats_info = update_gail(
             batch=batch,
             expert_batch=expert_batch,
             mixed_batch=mixed_batch,
-            agent=agent,
-            policy_discriminator=policy_discriminator,
+            agent=self.agent,
+            policy_discriminator=self.policy_discriminator,
         )
 
+        new_agent = self.replace(
+            rng=new_rng,
+            learner_encoder=new_learner_encoder,
+            expert_encoder=new_expert_encoder,
+            policy_discriminator=new_policy_disc,
+            domain_discriminator=new_domain_disc,
+            agent=new_rl_agent,
+            p_acc_ema=new_p_acc_ema,            
+        )
         info.update({**gail_info, **sar_info})
         stats_info.update({**gail_stats_info})
-        return (
-            new_rng,
-            new_learner_encoder,
-            new_expert_encoder,
-            new_policy_disc,
-            new_domain_disc,
-            new_agent,
-            new_p_acc_ema,
-            info,
-            stats_info
-        )
+        return new_agent, info, stats_info
     
     def evaluate(
         self,
