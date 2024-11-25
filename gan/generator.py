@@ -6,11 +6,12 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 from flax.struct import PyTreeNode
+from hydra.utils import instantiate
+from omegaconf.dictconfig import DictConfig
+
 from gan.discriminator import Discriminator
 from gan.losses import g_softplus_loss
-from hydra.utils import instantiate
 from nn.train_state import TrainState
-from omegaconf.dictconfig import DictConfig
 from utils.types import Params
 from utils.utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
 
@@ -71,7 +72,8 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
     
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
-    
+
+@jax.jit    
 def _update_jit(
     batch: Any,
     state: TrainState,

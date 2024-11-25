@@ -2,63 +2,12 @@ import functools
 
 import jax
 import jax.numpy as jnp
-
 from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
 from gan.discriminator import Discriminator
 from gan.generator import Generator
 from utils.types import Buffer, BufferState, DataType, PRNGKey
 
-
-@jax.jit
-def update_encoders_and_domain_discrimiantor(
-    *,
-    batch: DataType,
-    expert_batch: DataType,
-    learner_encoder: Generator,
-    expert_encoder: Generator,
-    policy_discriminator: GAILDiscriminator,
-    domain_discriminator: Discriminator,
-    domain_loss_scale: float,
-):
-    # update encoders
-    new_learner_encoder, learner_encoder_info, learner_encoder_stats_info = learner_encoder.update(
-        batch=batch,
-        policy_discriminator=policy_discriminator,
-        domain_discriminator=domain_discriminator,
-        domain_loss_scale=domain_loss_scale,
-    )
-    new_expert_encoder, expert_encoder_info, expert_encoder_stats_info = expert_encoder.update(
-        batch=expert_batch,
-        policy_discriminator=policy_discriminator,
-        domain_discriminator=domain_discriminator,
-        domain_loss_scale=domain_loss_scale,
-    )
-    encoded_batch = learner_encoder_info.pop("encoded_batch")
-    encoded_expert_batch = expert_encoder_info.pop("encoded_batch")
-
-    # update domain discriminator
-    new_domain_disc, domain_disc_info, domain_disc_stats_info = domain_discriminator.update(
-        real_batch=encoded_batch["observations"],
-        fake_batch=encoded_expert_batch["observations"],
-        return_logits=True,
-    )
-    learner_domain_logits = domain_disc_info.pop("real_logits")
-    expert_domain_logits = domain_disc_info.pop("fake_logits")
-
-    info = {**learner_encoder_info, **expert_encoder_info, **domain_disc_info}
-    stats_info = {**learner_encoder_stats_info, **expert_encoder_stats_info, **domain_disc_stats_info}
-    return (
-        new_learner_encoder,
-        new_expert_encoder,
-        new_domain_disc,
-        encoded_batch,
-        encoded_expert_batch,
-        learner_domain_logits,
-        expert_domain_logits,
-        info,
-        stats_info,
-    )
 
 @jax.jit
 def update_gail(
@@ -87,7 +36,7 @@ def update_gail(
 
 
 @functools.partial(jax.jit, static_argnames="expert_buffer")
-def update_domain_discriminator_jit(
+def update_domain_discriminator_only_jit(
     *,
     rng: PRNGKey,
     batch: DataType,
