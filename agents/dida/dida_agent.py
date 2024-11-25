@@ -7,11 +7,6 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
-from flax import struct
-from hydra.utils import instantiate
-from omegaconf.dictconfig import DictConfig
-
-import wandb
 from agents.base_agent import Agent
 from agents.dida.das import domain_adversarial_sampling
 from agents.dida.domain_loss_scale_updaters import \
@@ -23,11 +18,16 @@ from agents.dida.update_steps import (update_domain_discriminator_jit,
 from agents.dida.utils import (encode_observation_jit,
                                get_tsne_embeddings_scatter)
 from agents.gail.gail_discriminator import GAILDiscriminator
+from flax import struct
 from gan.discriminator import Discriminator
 from gan.generator import Generator
+from hydra.utils import instantiate
+from omegaconf.dictconfig import DictConfig
 from utils.types import Buffer, BufferState, DataType, PRNGKey
 from utils.utils import (convert_figure_to_array, get_buffer_state_size,
                          instantiate_jitted_fbx_buffer, load_pickle)
+
+import wandb
 
 
 class DIDAAgent(Agent):
@@ -79,12 +79,6 @@ class DIDAAgent(Agent):
     ):  
         # expert buffer init
         expert_buffer_state = load_pickle(expert_buffer_state_path)
-        expert_buffer = flashbax.make_item_buffer(
-            sample_batch_size=expert_batch_size,
-            min_length=expert_buffer_state.current_index,
-            max_length=expert_buffer_state.current_index,
-            add_batches=False,
-        )
         expert_buffer = instantiate_jitted_fbx_buffer({
             "_target_": "flashbax.make_item_buffer",
             "sample_batch_size": expert_batch_size,
