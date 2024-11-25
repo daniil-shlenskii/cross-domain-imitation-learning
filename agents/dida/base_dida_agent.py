@@ -112,7 +112,7 @@ class BaseDIDAAgent(Agent):
             seed=seed,
             input_dim=observation_dim,
             output_dim=encoder_dim,
-            info_key="learner_encoder",
+            info_key="encoder",
             _recursive_=False,
         )
 
