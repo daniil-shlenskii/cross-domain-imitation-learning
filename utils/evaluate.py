@@ -1,12 +1,11 @@
 from typing import Dict
 
 import gymnasium as gym
+import jax
 import numpy as np
 
-from agents.base_agent import Agent
 
-
-def evaluate(agent: Agent, env: gym.Env, num_episodes: int, seed: int=0, return_trajectories: bool=False) -> Dict[str, float]:
+def evaluate(agent: "Agent", env: gym.Env, num_episodes: int, seed: int=0, return_trajectories: bool=False) -> Dict[str, float]:
     trajs = {"observations": [], "observations_next": []}
 
     env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=num_episodes)
@@ -27,3 +26,7 @@ def evaluate(agent: Agent, env: gym.Env, num_episodes: int, seed: int=0, return_
         trajs["observations_next"] = np.stack(trajs["observations_next"])
         return stats, trajs
     return stats
+
+@jax.jit
+def apply_model_jit(model, x):
+    return model(x)
