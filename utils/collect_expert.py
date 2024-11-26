@@ -3,8 +3,8 @@ import warnings
 from pathlib import Path
 
 import gymnasium as gym
-from gymnasium.wrappers import RescaleAction
 import numpy as np
+from gymnasium.wrappers import RescaleAction
 from hydra.utils import instantiate
 from loguru import logger
 from omegaconf import OmegaConf
@@ -93,7 +93,7 @@ def main(args: argparse.Namespace):
                     observations=np.array(observation),
                     actions=np.array(action),
                     rewards=np.array(reward),
-                    dones=np.array(done),
+                    dones=np.array(done or truncated),
                     observations_next=np.array(observation_next),
                 )
             )
