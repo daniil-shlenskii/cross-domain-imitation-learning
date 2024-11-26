@@ -20,7 +20,7 @@ from agents.dida.domain_loss_scale_updaters import \
 from agents.dida.update_steps import (update_domain_discriminator_only_jit,
                                       update_gail)
 from agents.dida.utils import (encode_observation_jit,
-                               get_domain_discriminator_hists,
+                               get_discriminators_hists,
                                get_state_and_policy_tsne_scatterplots)
 from agents.gail.gail_discriminator import GAILDiscriminator
 from gan.discriminator import Discriminator
@@ -309,18 +309,26 @@ class BaseDIDAAgent(Agent):
         eval_info["tsne_policy_scatter"] = tsne_policy_figure
 
         # domain discriminator historgrams
-        learner_hist, expert_hist = get_domain_discriminator_hists(
+        (
+            state_learner_hist,
+            state_expert_hist,
+            policy_learner_hist,
+            policy_expert_hist
+        ) = get_discriminators_hists(
             seed=seed,
             dida_agent=self,
             env=env,
             expert_buffer_state=self.expert_buffer_state,
-            domain_discrimiantor=self.domain_discriminator,
         )
         if convert_to_wandb_type:
-            learner_hist = wandb.Image(convert_figure_to_array(learner_hist), caption="Domain Discriminator Learner logits")
-            expert_hist = wandb.Image(convert_figure_to_array(expert_hist), caption="Domain Discriminator Expert logits")
-        eval_info["learner_hist"] = learner_hist
-        eval_info["expert_hist"] = expert_hist
+            state_learner_hist = wandb.Image(convert_figure_to_array(state_learner_hist), caption="Domain Discriminator Learner logits")
+            state_expert_hist = wandb.Image(convert_figure_to_array(state_expert_hist), caption="Domain Discriminator Expert logits")
+            policy_learner_hist = wandb.Image(convert_figure_to_array(policy_learner_hist), caption="Policy Discriminator Learner logits")
+            policy_expert_hist = wandb.Image(convert_figure_to_array(policy_expert_hist), caption="Policy Discriminator Expert logits")
+        eval_info["state_learner_hist"] = state_learner_hist
+        eval_info["state_expert_hist"] = state_expert_hist
+        eval_info["policy_learner_hist"] = policy_learner_hist
+        eval_info["policy_expert_hist"] = policy_expert_hist
 
         return eval_info
 

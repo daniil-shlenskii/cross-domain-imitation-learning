@@ -121,16 +121,16 @@ def get_state_and_policy_tsne_scatterplots(
 
     return state_figure, policy_figure
 
-def get_domain_discriminator_hists(
+def get_discriminators_hists(
     seed: int,
     #
     dida_agent: Agent,
     env: gym.Env,
     #
-    expert_buffer_state: BufferState,
-    #
-    domain_discrimiantor: Discriminator,
+    expert_buffer_state: BufferState
 ):
+    observation_keys = ["observations", "observations_next"]
+
     # learner trajectory
     _, learner_traj = evaluate(
         agent=dida_agent,
@@ -139,34 +139,48 @@ def get_domain_discriminator_hists(
         seed=seed,
         return_trajectories=True
     )
-    learner_traj = learner_traj["observations"]
 
     # expert trajectory
     expert_exp = expert_buffer_state.experience
     end_of_first_traj = np.argmax(expert_exp["dones"][0])
-    expert_traj = expert_exp["observations"][0, :end_of_first_traj]
+    expert_traj = {k: expert_buffer_state.experience[k][0, :end_of_first_traj] for k in observation_keys}
 
     # encode trjectories
-    learner_traj = apply_model_jit(dida_agent.learner_encoder, learner_traj)
-    expert_traj = apply_model_jit(dida_agent.expert_encoder, expert_traj)
+    for k in observation_keys:
+        learner_traj[k] = encode_observation_jit(dida_agent.learner_encoder, learner_traj[k])
+        expert_traj[k] = encode_observation_jit(dida_agent.expert_encoder, expert_traj[k])
 
-    # compute logits
-    learner_logits = apply_model_jit(domain_discrimiantor, learner_traj)
-    expert_logits = apply_model_jit(domain_discrimiantor, expert_traj)
+    # state and policy embeddings
+    learner_state_embeddings = learner_traj["observations"]
+    expert_state_embeddings = expert_traj["observations"]
 
-    # probs
-    learner_probs = jax.nn.sigmoid(learner_logits)
-    expert_probs = 1 - jax.nn.sigmoid(expert_logits)
+    learner_policy_embeddings = np.concatenate([learner_traj["observations"], learner_traj["observations_next"]], axis=1)
+    expert_policy_embeddings = np.concatenate([expert_traj["observations"], expert_traj["observations_next"]], axis=1)
+
+    # state and policy logits
+    state_learner_logits = apply_model_jit(dida_agent.domain_discriminator, learner_state_embeddings)
+    state_expert_logits = apply_model_jit(dida_agent.domain_discriminator, expert_state_embeddings)
+
+    policy_learner_logits = apply_model_jit(dida_agent.policy_discriminator, learner_policy_embeddings)
+    policy_expert_logits = apply_model_jit(dida_agent.policy_discriminator, expert_policy_embeddings)
 
     # plots
     figsize=(5, 5)
 
-    learner_figure = plt.figure(figsize=figsize)
-    plt.plot(learner_probs)
+    state_learner_figure = plt.figure(figsize=figsize)
+    plt.plot(state_learner_logits, "bo")
     plt.close()
 
-    expert_figure = plt.figure(figsize=figsize)
-    plt.plot(expert_probs)
+    state_expert_figure = plt.figure(figsize=figsize)
+    plt.plot(state_expert_logits, "bo")
     plt.close()
 
-    return learner_figure, expert_figure
+    policy_learner_figure = plt.figure(figsize=figsize)
+    plt.plot(policy_learner_logits, "bo")
+    plt.close()
+
+    policy_expert_figure = plt.figure(figsize=figsize)
+    plt.plot(policy_expert_logits, "bo")
+    plt.close()
+
+    return state_learner_figure, state_expert_figure, policy_learner_figure, policy_expert_figure
