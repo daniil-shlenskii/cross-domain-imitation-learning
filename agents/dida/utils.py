@@ -4,6 +4,7 @@ from collections import defaultdict
 from copy import deepcopy
 from typing import Dict
 
+import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -11,6 +12,10 @@ import numpy as np
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 from sklearn.manifold import TSNE
+
+from agents.base_agent import Agent
+from gan.discriminator import Discriminator
+from utils.evaluate import apply_model_jit, evaluate
 from utils.types import Buffer, BufferState, PRNGKey
 from utils.utils import get_buffer_state_size
 
@@ -19,126 +24,163 @@ from utils.utils import get_buffer_state_size
 def encode_observation_jit(encoder, observations):
     return encoder(observations)
 
-def get_tsne_embeddings_scatter(
-    *,
+def get_state_and_policy_tsne_scatterplots(
     seed: int,
-    learner_buffer: Buffer,
-    expert_buffer: Buffer,
-    learner_buffer_state: BufferState,
+    #
+    dida_agent: Agent,
+    env: gym.Env,
+    num_episodes: int,
+    #
     expert_buffer_state: BufferState,
     anchor_buffer_state: BufferState,
-    learner_encoder: ...,
-    expert_encoder: ...,
-    n_samples_per_buffer: int,
 ):
-    # prepare learner_random buffer state
-    learner_random_buffer_state = deepcopy(learner_buffer_state)
-    buffer_state_size = get_buffer_state_size(learner_random_buffer_state)
-    perm_idcs = np.random.choice(buffer_state_size)
-    learner_random_buffer_state.experience["observations_next"] = \
-        learner_random_buffer_state.experience["observations_next"].at[0, :buffer_state_size].set(
-            learner_random_buffer_state.experience["observations_next"][0, perm_idcs]
-        )
+    observation_keys = ["observations", "observations_next"]
 
-    # prepare learner_random, learner, expert_random (aka anchor), expert data info
-    buffers_tpl = (learner_buffer, learner_buffer, expert_buffer, expert_buffer)
-    buffer_states_tpl = (learner_random_buffer_state, learner_buffer_state, anchor_buffer_state, expert_buffer_state)
-    encoders_tpl = (learner_encoder, learner_encoder, expert_encoder, expert_encoder)
-    scatter_params_tpl = (
-        {"label": "TR", "c": "tab:green",  "marker": "*"},
+    # collect trajectories
+    _, learner_trajs = evaluate(
+        agent=dida_agent,
+        env=env,
+        num_episodes=num_episodes,
+        seed=seed,
+        return_trajectories=True
+    )
+    rollouts_size = learner_trajs["observations"].shape[0]
+    expert_trajs = {k: expert_buffer_state.experience[k][0, :rollouts_size] for k in observation_keys}
+    anchor_trajs = {k: anchor_buffer_state.experience[k][0, :rollouts_size] for k in observation_keys}
+    
+    # encode trjectories
+    for k in observation_keys:
+        learner_trajs[k] = encode_observation_jit(dida_agent.learner_encoder, learner_trajs[k])
+        expert_trajs[k] = encode_observation_jit(dida_agent.expert_encoder, expert_trajs[k])
+        anchor_trajs[k] = encode_observation_jit(dida_agent.expert_encoder, anchor_trajs[k])
+
+    # state and policy embeddings
+    learner_state_embeddings = learner_trajs["observations"]
+    expert_state_embeddings = expert_trajs["observations"]
+
+    learner_policy_embeddings = np.concatenate([learner_trajs["observations"], learner_trajs["observations_next"]], axis=1)
+    expert_policy_embeddings = np.concatenate([expert_trajs["observations"], expert_trajs["observations_next"]], axis=1)
+    anchor_policy_embeddings = np.concatenate([anchor_trajs["observations"], anchor_trajs["observations_next"]], axis=1)
+
+    # combine embeddings for further processing
+    state_embeddings_list = [
+        learner_state_embeddings,
+        expert_state_embeddings
+    ]
+    policy_embeddings_list = [
+        learner_policy_embeddings,
+        expert_policy_embeddings,
+        anchor_policy_embeddings,
+    ]
+
+    state_size_list = [0] + list(np.cumsum(list(map(
+        lambda embs: embs.shape[0],
+        state_embeddings_list,
+    ))))
+    policy_size_list = [0] + list(np.cumsum(list(map(
+        lambda embs: embs.shape[0],
+        policy_embeddings_list,
+    ))))
+
+    # tsne embeddings
+    tsne_state_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(state_embeddings_list))
+    tsne_policy_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(policy_embeddings_list))
+
+    tsne_state_embeddings_list = [
+        tsne_state_embeddings[
+            state_size_list[i]: state_size_list[i + 1]
+        ]
+        for i in range(len(state_embeddings_list))
+    ]
+    tsne_policy_embeddings_list = [
+        tsne_policy_embeddings[
+            policy_size_list[i]: policy_size_list[i + 1]
+        ]
+        for i in range(len(policy_embeddings_list))
+    ]
+
+    # scatterplots
+    scatter_params_list = (
         {"label": "TE", "c": "tab:blue",   "marker": "x"},
-        {"label": "SR", "c": "tab:orange", "marker": "s"},
         {"label": "SE", "c": "tab:red",    "marker": "o"},
+        {"label": "SR", "c": "tab:orange", "marker": "s"},
     )
-    n_iters_tpl = []
-    for buffer, buffer_state in zip(buffers_tpl, buffer_states_tpl):
-        batch = buffer.sample(buffer_state, jax.random.key(0)).experience
-        batch_size = batch["observations"].shape[0]
-        n_iters_tpl.append(math.ceil(n_samples_per_buffer / batch_size))
-    n_iters_tpl = tuple(n_iters_tpl)
-
-    # collect data and encode it
-    @functools.partial(jax.jit, static_argnames=("buffers_tpl", "n_iters_tpl"))
-    def compute_embeddings(seed, buffers_tpl, buffer_states_tpl, encoders_tpl, n_iters_tpl):
-        state_embeddings, behavior_embeddings = [[], [], [], []], [[], [], [], []]
-        
-        rng = jax.random.key(seed)
-        for i, (buffer, buffer_state, encoder, n_iters) in enumerate(zip(
-            buffers_tpl, buffer_states_tpl, encoders_tpl, n_iters_tpl
-        )):
-            for _ in range(n_iters):
-                rng, key = jax.random.split(rng)
-                batch = buffer.sample(buffer_state, key).experience
-                encoded_observations = encoder(batch["observations"]) 
-                encoded_observations_next = encoder(batch["observations_next"]) 
-                encoded_behavior = jnp.concatenate([encoded_observations, encoded_observations_next], axis=1)
-
-                state_embeddings[i].append(encoded_observations)
-                behavior_embeddings[i].append(encoded_behavior)
-
-            state_embeddings[i] = jnp.concatenate(state_embeddings[i])
-            behavior_embeddings[i] = jnp.concatenate(behavior_embeddings[i])
-
-        return state_embeddings, behavior_embeddings
-
-    # get embeddings
-    state_embeddings_tpl, behavior_embeddings_tpl = compute_embeddings(seed, buffers_tpl, buffer_states_tpl, encoders_tpl, n_iters_tpl)
-
-    state_embeddings_tpl = tuple(state_emb[:n_samples_per_buffer] for state_emb in state_embeddings_tpl)
-    behavior_embeddings_tpl = tuple(behavior_emb[:n_samples_per_buffer] for behavior_emb in behavior_embeddings_tpl)
-
-    # get tsne embeddings
-    tsne_state_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(state_embeddings_tpl))
-    tsne_state_embeddings_tpl = tuple(
-        tsne_state_embeddings[i * n_samples_per_buffer: (i + 1) * n_samples_per_buffer]
-        for i in range(len(buffers_tpl))
-    )
+    figsize=(5, 5)
     
-    tsne_behavior_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(behavior_embeddings_tpl))
-    tsne_behavior_embeddings_tpl = tuple(
-        tsne_behavior_embeddings[i * n_samples_per_buffer: (i + 1) * n_samples_per_buffer]
-        for i in range(len(buffers_tpl))
-    )
-    
-    # get scatterplot figure
-    state_figure = plt.figure(figsize=(4, 4)) 
-    for i, (tsne_state_embeddings, scatter_params) in enumerate(zip(tsne_state_embeddings_tpl, scatter_params_tpl)):
-        if i in {1, 3}:
-            plt.scatter(tsne_state_embeddings[:, 0], tsne_state_embeddings[:, 1], **scatter_params)
+    state_figure = plt.figure(figsize=figsize)
+    for tsne_state_embeddings, scatter_params in zip(tsne_state_embeddings_list, scatter_params_list):
+        plt.scatter(tsne_state_embeddings[:, 0], tsne_state_embeddings[:, 1], **scatter_params)
     plt.legend()
     plt.close()
 
-    behavior_figure = plt.figure(figsize=(4, 4)) 
-    for tsne_behavior_embeddings, scatter_params in zip(tsne_behavior_embeddings_tpl, scatter_params_tpl):
-        plt.scatter(tsne_behavior_embeddings[:, 0], tsne_behavior_embeddings[:, 1], **scatter_params)
+    policy_figure = plt.figure(figsize=figsize)
+    for tsne_policy_embeddings, scatter_params in zip(tsne_policy_embeddings_list, scatter_params_list):
+        plt.scatter(tsne_policy_embeddings[:, 0], tsne_policy_embeddings[:, 1], **scatter_params)
     plt.legend()
     plt.close()
 
-    return state_figure, behavior_figure
+    return state_figure, policy_figure
 
-def random_sample_decorator(buffer_sample):
-    def random_sample(state: BufferState, key: PRNGKey):
-        sample_key, choice_key = jax.random.split(key)
-        return_batch = buffer_sample(state, sample_key)
-        
-        batch = return_batch.experience
-        batch_size = batch["observations"].shape[0]
-        new_observations_next = jax.random.choice(
-            choice_key, batch["observations_next"], shape=(batch_size,)
-        )
-        batch["observations_next"] = new_observations_next
-        
-        return_batch = return_batch.replace(experience=batch)
-        return return_batch
-    
-    return random_sample
+def get_discriminators_hists(
+    seed: int,
+    #
+    dida_agent: Agent,
+    env: gym.Env,
+    #
+    expert_buffer_state: BufferState
+):
+    observation_keys = ["observations", "observations_next"]
 
-def make_jitted_random_fbx_buffer(fbx_buffer_config: DictConfig):
-    buffer = instantiate(fbx_buffer_config)
-    buffer = buffer.replace(
-        init = jax.jit(buffer.init),
-        add = jax.jit(buffer.add, donate_argnums=0),
-        sample = jax.jit(random_sample_decorator(buffer.sample)),
-        can_sample = jax.jit(buffer.can_sample),
+    # learner trajectory
+    _, learner_traj = evaluate(
+        agent=dida_agent,
+        env=env,
+        num_episodes=1,
+        seed=seed,
+        return_trajectories=True
     )
-    return buffer
+
+    # expert trajectory
+    expert_exp = expert_buffer_state.experience
+    end_of_first_traj = np.argmax(expert_exp["dones"][0])
+    expert_traj = {k: expert_buffer_state.experience[k][0, :end_of_first_traj] for k in observation_keys}
+
+    # encode trjectories
+    for k in observation_keys:
+        learner_traj[k] = encode_observation_jit(dida_agent.learner_encoder, learner_traj[k])
+        expert_traj[k] = encode_observation_jit(dida_agent.expert_encoder, expert_traj[k])
+
+    # state and policy embeddings
+    learner_state_embeddings = learner_traj["observations"]
+    expert_state_embeddings = expert_traj["observations"]
+
+    learner_policy_embeddings = np.concatenate([learner_traj["observations"], learner_traj["observations_next"]], axis=1)
+    expert_policy_embeddings = np.concatenate([expert_traj["observations"], expert_traj["observations_next"]], axis=1)
+
+    # state and policy logits
+    state_learner_logits = apply_model_jit(dida_agent.domain_discriminator, learner_state_embeddings)
+    state_expert_logits = apply_model_jit(dida_agent.domain_discriminator, expert_state_embeddings)
+
+    policy_learner_logits = apply_model_jit(dida_agent.policy_discriminator, learner_policy_embeddings)
+    policy_expert_logits = apply_model_jit(dida_agent.policy_discriminator, expert_policy_embeddings)
+
+    # plots
+    figsize=(5, 5)
+
+    state_learner_figure = plt.figure(figsize=figsize)
+    plt.plot(state_learner_logits, "bo")
+    plt.close()
+
+    state_expert_figure = plt.figure(figsize=figsize)
+    plt.plot(state_expert_logits, "bo")
+    plt.close()
+
+    policy_learner_figure = plt.figure(figsize=figsize)
+    plt.plot(policy_learner_logits, "bo")
+    plt.close()
+
+    policy_expert_figure = plt.figure(figsize=figsize)
+    plt.plot(policy_expert_logits, "bo")
+    plt.close()
+
+    return state_learner_figure, state_expert_figure, policy_learner_figure, policy_expert_figure
