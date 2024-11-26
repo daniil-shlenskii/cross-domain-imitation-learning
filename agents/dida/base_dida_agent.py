@@ -79,7 +79,13 @@ class BaseDIDAAgent(Agent):
     ):  
         # expert buffer init
         expert_buffer_state = load_pickle(expert_buffer_state_path)
-        # TODO: truncate state size with the current index value
+
+        expert_buffer_state_exp = expert_buffer_state.experience
+        new_expert_buffer_state_exp = {}
+        for k, v in expert_buffer_state_exp.items():
+            new_expert_buffer_state_exp[k] = v[0, :expert_buffer_state.current_index]
+        expert_buffer_state.replace(experience=new_expert_buffer_state_exp)
+
         expert_buffer = instantiate_jitted_fbx_buffer({
             "_target_": "flashbax.make_item_buffer",
             "sample_batch_size": expert_batch_size,
