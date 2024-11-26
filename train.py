@@ -182,9 +182,7 @@ def main(args: argparse.Namespace):
                 env=eval_env,
                 num_episodes=config.evaluation.num_episodes,
                 #
-                learner_buffer=buffer,
-                learner_buffer_state=state,
-                visualize_n_trajectories=config.evaluation.get("visualize_n_trajectories", 1), # TODO
+                **config.evaluation.get("extra_args", {})
             )
             for k, v in eval_info.items():
                 if hasattr(v, "block_until_ready"):

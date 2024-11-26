@@ -285,50 +285,52 @@ class BaseDIDAAgent(Agent):
         env: gym.Env,
         num_episodes: int,
         #
-        learner_buffer: Buffer,
-        learner_buffer_state: BufferState,
-        visualize_n_trajectories: int,
+        visualize_state_and_policy_scatterplots: bool = False,
+        visualize_state_and_policy_histograms: bool = False,
+        visualize_n_trajectories: int = 1,
         convert_to_wandb_type: bool = True,
     ) -> Dict[str, float]:
         eval_info = super().evaluate(seed=seed, env=env, num_episodes=num_episodes)
 
         # state and policy scatterplots
-        tsne_state_figure, tsne_policy_figure = get_state_and_policy_tsne_scatterplots(
-            seed=seed,
-            dida_agent=self,
-            env=env,
-            num_episodes=visualize_n_trajectories,
-            expert_buffer_state=self.expert_buffer_state,
-            anchor_buffer_state=self.anchor_buffer_state,
-        )
-        if convert_to_wandb_type:
-            tsne_state_figure = wandb.Image(convert_figure_to_array(tsne_state_figure), caption="TSNE plot of state feautures")
-            tsne_policy_figure = wandb.Image(convert_figure_to_array(tsne_policy_figure), caption="TSNE plot of policy feautures")
+        if visualize_state_and_policy_scatterplots:
+            tsne_state_figure, tsne_policy_figure = get_state_and_policy_tsne_scatterplots(
+                seed=seed,
+                dida_agent=self,
+                env=env,
+                num_episodes=visualize_n_trajectories,
+                expert_buffer_state=self.expert_buffer_state,
+                anchor_buffer_state=self.anchor_buffer_state,
+            )
+            if convert_to_wandb_type:
+                tsne_state_figure = wandb.Image(convert_figure_to_array(tsne_state_figure), caption="TSNE plot of state feautures")
+                tsne_policy_figure = wandb.Image(convert_figure_to_array(tsne_policy_figure), caption="TSNE plot of policy feautures")
 
-        eval_info["tsne_state_scatter"] = tsne_state_figure
-        eval_info["tsne_policy_scatter"] = tsne_policy_figure
+            eval_info["tsne_state_scatter"] = tsne_state_figure
+            eval_info["tsne_policy_scatter"] = tsne_policy_figure
 
         # domain discriminator historgrams
-        (
-            state_learner_hist,
-            state_expert_hist,
-            policy_learner_hist,
-            policy_expert_hist
-        ) = get_discriminators_hists(
-            seed=seed,
-            dida_agent=self,
-            env=env,
-            expert_buffer_state=self.expert_buffer_state,
-        )
-        if convert_to_wandb_type:
-            state_learner_hist = wandb.Image(convert_figure_to_array(state_learner_hist), caption="Domain Discriminator Learner logits")
-            state_expert_hist = wandb.Image(convert_figure_to_array(state_expert_hist), caption="Domain Discriminator Expert logits")
-            policy_learner_hist = wandb.Image(convert_figure_to_array(policy_learner_hist), caption="Policy Discriminator Learner logits")
-            policy_expert_hist = wandb.Image(convert_figure_to_array(policy_expert_hist), caption="Policy Discriminator Expert logits")
-        eval_info["state_learner_hist"] = state_learner_hist
-        eval_info["state_expert_hist"] = state_expert_hist
-        eval_info["policy_learner_hist"] = policy_learner_hist
-        eval_info["policy_expert_hist"] = policy_expert_hist
+        if visualize_state_and_policy_histograms:
+            (
+                state_learner_hist,
+                state_expert_hist,
+                policy_learner_hist,
+                policy_expert_hist
+            ) = get_discriminators_hists(
+                seed=seed,
+                dida_agent=self,
+                env=env,
+                expert_buffer_state=self.expert_buffer_state,
+            )
+            if convert_to_wandb_type:
+                state_learner_hist = wandb.Image(convert_figure_to_array(state_learner_hist), caption="Domain Discriminator Learner logits")
+                state_expert_hist = wandb.Image(convert_figure_to_array(state_expert_hist), caption="Domain Discriminator Expert logits")
+                policy_learner_hist = wandb.Image(convert_figure_to_array(policy_learner_hist), caption="Policy Discriminator Learner logits")
+                policy_expert_hist = wandb.Image(convert_figure_to_array(policy_expert_hist), caption="Policy Discriminator Expert logits")
+            eval_info["state_learner_hist"] = state_learner_hist
+            eval_info["state_expert_hist"] = state_expert_hist
+            eval_info["policy_learner_hist"] = policy_learner_hist
+            eval_info["policy_expert_hist"] = policy_expert_hist
 
         return eval_info
 
