@@ -14,7 +14,8 @@ from omegaconf.dictconfig import DictConfig
 from sklearn.manifold import TSNE
 
 from agents.base_agent import Agent
-from utils.evaluate import evaluate
+from gan.discriminator import Discriminator
+from utils.evaluate import apply_model_jit, evaluate
 from utils.types import Buffer, BufferState, PRNGKey
 from utils.utils import get_buffer_state_size
 
@@ -119,3 +120,53 @@ def get_state_and_policy_tsne_scatterplots(
     plt.close()
 
     return state_figure, policy_figure
+
+def get_domain_discriminator_hists(
+    seed: int,
+    #
+    dida_agent: Agent,
+    env: gym.Env,
+    #
+    expert_buffer_state: BufferState,
+    #
+    domain_discrimiantor: Discriminator,
+):
+    # learner trajectory
+    _, learner_traj = evaluate(
+        agent=dida_agent,
+        env=env,
+        num_episodes=1,
+        seed=seed,
+        return_trajectories=True
+    )
+    learner_traj = learner_traj["observations"]
+
+    # expert trajectory
+    expert_exp = expert_buffer_state.experience
+    end_of_first_traj = np.argmax(expert_exp["dones"][0])
+    expert_traj = expert_exp["observations"][0, :end_of_first_traj]
+
+    # encode trjectories
+    learner_traj = apply_model_jit(dida_agent.learner_encoder, learner_traj)
+    expert_traj = apply_model_jit(dida_agent.expert_encoder, expert_traj)
+
+    # compute logits
+    learner_logits = apply_model_jit(domain_discrimiantor, learner_traj)
+    expert_logits = apply_model_jit(domain_discrimiantor, expert_traj)
+
+    # probs
+    learner_probs = jax.nn.sigmoid(learner_logits)
+    expert_probs = 1 - jax.nn.sigmoid(expert_logits)
+
+    # plots
+    figsize=(5, 5)
+
+    learner_figure = plt.figure(figsize=figsize)
+    plt.plot(learner_probs)
+    plt.close()
+
+    expert_figure = plt.figure(figsize=figsize)
+    plt.plot(expert_probs)
+    plt.close()
+
+    return learner_figure, expert_figure
