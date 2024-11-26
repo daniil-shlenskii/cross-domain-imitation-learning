@@ -20,6 +20,7 @@ from agents.dida.domain_loss_scale_updaters import \
 from agents.dida.update_steps import (update_domain_discriminator_only_jit,
                                       update_gail)
 from agents.dida.utils import (encode_observation_jit,
+                               get_domain_discriminator_hists,
                                get_state_and_policy_tsne_scatterplots)
 from agents.gail.gail_discriminator import GAILDiscriminator
 from gan.discriminator import Discriminator
@@ -291,6 +292,7 @@ class BaseDIDAAgent(Agent):
     ) -> Dict[str, float]:
         eval_info = super().evaluate(seed=seed, env=env, num_episodes=num_episodes)
 
+        # state and policy scatterplots
         tsne_state_figure, tsne_policy_figure = get_state_and_policy_tsne_scatterplots(
             seed=seed,
             dida_agent=self,
@@ -305,6 +307,21 @@ class BaseDIDAAgent(Agent):
 
         eval_info["tsne_state_scatter"] = tsne_state_figure
         eval_info["tsne_policy_scatter"] = tsne_policy_figure
+
+        # domain discriminator historgrams
+        learner_hist, expert_hist = get_domain_discriminator_hists(
+            seed=seed,
+            dida_agent=self,
+            env=env,
+            expert_buffer_state=self.expert_buffer_state,
+            domain_discrimiantor=self.domain_discriminator,
+        )
+        if convert_to_wandb_type:
+            learner_hist = wandb.Image(convert_figure_to_array(learner_hist), caption="Domain Discriminator Learner logits")
+            expert_hist = wandb.Image(convert_figure_to_array(expert_hist), caption="Domain Discriminator Expert logits")
+        eval_info["learner_hist"] = learner_hist
+        eval_info["expert_hist"] = expert_hist
+
         return eval_info
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
