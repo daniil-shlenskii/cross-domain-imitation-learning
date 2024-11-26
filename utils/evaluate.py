@@ -23,5 +23,7 @@ def evaluate(agent: Agent, env: gym.Env, num_episodes: int, seed: int=0, return_
     
     stats = {"return": np.mean(env.return_queue), "length": np.mean(env.length_queue)}
     if return_trajectories:
+        trajs["observations"] = np.stack(trajs["observations"])
+        trajs["observations_next"] = np.stack(trajs["observations_next"])
         return stats, trajs
     return stats
