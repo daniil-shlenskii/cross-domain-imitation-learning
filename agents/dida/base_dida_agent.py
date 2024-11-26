@@ -20,7 +20,7 @@ from agents.dida.domain_loss_scale_updaters import \
 from agents.dida.update_steps import (update_domain_discriminator_only_jit,
                                       update_gail)
 from agents.dida.utils import (encode_observation_jit,
-                               get_tsne_embeddings_scatter)
+                               get_state_and_policy_tsne_scatterplots)
 from agents.gail.gail_discriminator import GAILDiscriminator
 from gan.discriminator import Discriminator
 from gan.generator import Generator
@@ -78,6 +78,7 @@ class BaseDIDAAgent(Agent):
     ):  
         # expert buffer init
         expert_buffer_state = load_pickle(expert_buffer_state_path)
+        # TODO: truncate state size with the current index value
         expert_buffer = instantiate_jitted_fbx_buffer({
             "_target_": "flashbax.make_item_buffer",
             "sample_batch_size": expert_batch_size,
@@ -285,28 +286,25 @@ class BaseDIDAAgent(Agent):
         #
         learner_buffer: Buffer,
         learner_buffer_state: BufferState,
-        n_samples_per_buffer: int,
+        visualize_n_trajectories: int,
         convert_to_wandb_type: bool = True,
     ) -> Dict[str, float]:
         eval_info = super().evaluate(seed=seed, env=env, num_episodes=num_episodes)
 
-        tsne_state_figure, tsne_behavior_figure = get_tsne_embeddings_scatter(
+        tsne_state_figure, tsne_policy_figure = get_state_and_policy_tsne_scatterplots(
             seed=seed,
-            learner_buffer=learner_buffer,
-            expert_buffer=self.expert_buffer,
-            learner_buffer_state=learner_buffer_state,
+            dida_agent=self,
+            env=env,
+            num_episodes=visualize_n_trajectories,
             expert_buffer_state=self.expert_buffer_state,
             anchor_buffer_state=self.anchor_buffer_state,
-            learner_encoder=self.learner_encoder,
-            expert_encoder=self.expert_encoder,
-            n_samples_per_buffer=n_samples_per_buffer,
         )
         if convert_to_wandb_type:
             tsne_state_figure = wandb.Image(convert_figure_to_array(tsne_state_figure), caption="TSNE plot of state feautures")
-            tsne_behavior_figure = wandb.Image(convert_figure_to_array(tsne_behavior_figure), caption="TSNE plot of behavior feautures")
+            tsne_policy_figure = wandb.Image(convert_figure_to_array(tsne_policy_figure), caption="TSNE plot of policy feautures")
 
         eval_info["tsne_state_scatter"] = tsne_state_figure
-        eval_info["tsne_behvaior_scatter"] = tsne_behavior_figure
+        eval_info["tsne_policy_scatter"] = tsne_policy_figure
         return eval_info
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:

@@ -3,10 +3,9 @@ import warnings
 from pathlib import Path
 from pprint import pformat
 
-from gymnasium.wrappers import RescaleAction
-
 import jax
 import numpy as np
+from gymnasium.wrappers import RescaleAction
 from hydra.utils import instantiate
 from loguru import logger
 from omegaconf import OmegaConf
@@ -185,7 +184,7 @@ def main(args: argparse.Namespace):
                 #
                 learner_buffer=buffer,
                 learner_buffer_state=state,
-                n_samples_per_buffer=config.evaluation.get("n_samples_per_buffer", config.batch_size),
+                visualize_n_trajectories=config.evaluation.get("visualize_n_trajectories", 1), # TODO
             )
             for k, v in eval_info.items():
                 if hasattr(v, "block_until_ready"):
