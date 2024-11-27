@@ -46,7 +46,31 @@ def load_pickle(path: str) -> Any:
 def load_buffer(state: Buffer, path: str):
     stored_state = load_pickle(path)
     if state.experience.keys() == stored_state.experience.keys():
-        state = stored_state
+        # define states sized
+        stored_state_size = get_buffer_state_size(stored_state)
+        state_max_size = state.experience["observations"][0].shape[0]
+        data_size = min(stored_state_size, state_max_size)
+
+        # create epxerience for new state
+        stored_state_exp = stored_state.experience
+        state_exp = state.experience
+        for k, v in stored_state_exp.items():
+            state_exp[k] = \
+                state_exp[k].at[0, :data_size].set(v[0, :data_size])
+
+        # define current index for new state
+        if data_size == state_max_size:
+            current_index = 0
+            is_full = True
+        else:
+            current_index = data_size
+            is_full = False
+
+        state = state.replace(
+            experience=state_exp,
+            current_index=current_index,
+            is_full=is_full,
+        )
     else:
         warnings.warn(
             "Given data is incompatible with the Buffer!\n" +
