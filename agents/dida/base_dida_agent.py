@@ -73,18 +73,24 @@ class BaseDIDAAgent(Agent):
         #
         n_domain_discriminator_updates: int = 1,
         domain_loss_scale: float = 1.0,
-        domain_loss_scale_updater_kwargs: DictConfig = None,
+        domain_loss_scale_updater_config: DictConfig = None,
         #
+        expert_buffer_state_preprocessing_config: DictConfig = None,
         **kwargs,
     ):  
         # expert buffer init
         expert_buffer_state = load_pickle(expert_buffer_state_path)
 
+        buffer_state_size = get_buffer_state_size(expert_buffer_state)
         expert_buffer_state_exp = expert_buffer_state.experience
         new_expert_buffer_state_exp = {}
         for k, v in expert_buffer_state_exp.items():
-            new_expert_buffer_state_exp[k] = v[0, :expert_buffer_state.current_index]
+            new_expert_buffer_state_exp[k] = v[0, :buffer_state_size]
         expert_buffer_state.replace(experience=new_expert_buffer_state_exp)
+
+        if expert_buffer_state_preprocessing_config is not None:
+            expert_buffer_state_preprocessing = instantiate(expert_buffer_state_preprocessing_config)
+            expert_buffer_state = expert_buffer_state_preprocessing(expert_buffer_state)
 
         expert_buffer = instantiate_jitted_fbx_buffer({
             "_target_": "flashbax.make_item_buffer",
@@ -96,13 +102,12 @@ class BaseDIDAAgent(Agent):
 
         # anchor buffer init
         anchor_buffer_state = deepcopy(expert_buffer_state)
-        buffer_state_size = get_buffer_state_size(anchor_buffer_state)
         perm_idcs = np.random.choice(buffer_state_size)
         anchor_buffer_state.experience["observations_next"] = \
-            anchor_buffer_state.experience["observations_next"].at[0, :buffer_state_size].set(
+            anchor_buffer_state.experience["observations_next"].at[0].set(
                 anchor_buffer_state.experience["observations_next"][0, perm_idcs]
             )
-        
+
         # agent init
         agent = instantiate(
             agent_config,
@@ -140,10 +145,10 @@ class BaseDIDAAgent(Agent):
             _recursive_=False,
         )
 
-        if not use_das or domain_loss_scale_updater_kwargs is None:
+        if not use_das or domain_loss_scale_updater_config is None:
             domain_loss_scale_updater = IdentityDomainLossScaleUpdater()
         else:
-            domain_loss_scale_updater = instantiate(domain_loss_scale_updater_kwargs)
+            domain_loss_scale_updater = instantiate(domain_loss_scale_updater_config)
 
         _save_attrs = kwargs.pop(
             "_save_attrs",
