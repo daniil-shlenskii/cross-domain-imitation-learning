@@ -2,6 +2,7 @@ import functools
 
 import jax
 import jax.numpy as jnp
+
 from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
 from gan.discriminator import Discriminator
@@ -24,7 +25,7 @@ def update_gail(
     mixed_policy_batch = jnp.concatenate([mixed_batch["observations"], mixed_batch["observations_next"]], axis=1)
 
     # update agent
-    batch["reward"] = policy_discriminator.get_rewards(policy_batch)
+    batch["rewards"] = policy_discriminator.get_rewards(policy_batch)
     new_agent, agent_info, agent_stats_info = agent.update(batch)
 
     # update discriminator
