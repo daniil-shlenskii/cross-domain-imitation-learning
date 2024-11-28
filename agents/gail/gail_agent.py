@@ -132,7 +132,7 @@ def _update_jit(
     expert_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=-1)
 
     # update agent
-    batch["reward"] = discriminator.get_rewards(learner_batch)
+    batch["rewards"] = discriminator.get_rewards(learner_batch)
     new_agent, agent_info, agent_stats_info = agent.update(batch)
 
     # update discriminator
