@@ -10,7 +10,6 @@ from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
 from gan.discriminator import Discriminator
-from gan.losses import g_softplus_loss
 from nn.train_state import TrainState
 from utils.types import Params
 from utils.utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
@@ -30,7 +29,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         #
         module_config: DictConfig,
         optimizer_config: DictConfig,
-        loss_fn_config: DictConfig = None,
+        loss_config: DictConfig = None,
         #
         info_key: str = "generator",
         **kwargs,
@@ -41,10 +40,11 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         module = instantiate(module_config)
         params = module.init(key, jnp.ones(input_dim, dtype=jnp.float32))["params"]
 
-        if loss_fn_config is None:
-            loss_fn = g_softplus_loss
-        else:
-            loss_fn = instantiate(loss_fn_config)
+        loss_fn = instantiate(
+            loss_config,
+            is_generator=True,
+            _recursive_=False,
+        )
 
         state = TrainState.create(
             loss_fn=loss_fn,
@@ -63,24 +63,9 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         )
 
     def update(self, *, batch: Any, **kwargs):
-        new_state, info, stats_info = _update_jit(
-            batch=batch,
-            state=self.state,
-            **kwargs
-        )
+        new_state, info, stats_info = self.state.update(batch=batch, **kwargs)
         return self.replace(state=new_state), info, stats_info
     
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
 
-@jax.jit    
-def _update_jit(
-    batch: Any,
-    state: TrainState,
-    **kwargs,
-):
-    new_state, info, stats_info = state.update(
-        batch=batch,
-        **kwargs,
-    )
-    return new_state, info, stats_info

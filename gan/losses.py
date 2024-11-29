@@ -1,113 +1,69 @@
 import functools
 from typing import Callable
 
-import jax
-import jax.numpy as jnp
-from gan.base_losses import d_logistic_loss as base_d_logistic_loss
-from gan.base_losses import d_softplus_loss as base_d_softplus_loss
-from gan.base_losses import \
-    g_nonsaturating_logistic_loss as base_g_nonsaturating_logistic_loss
-from gan.base_losses import \
-    g_nonsaturating_softplus_loss as base_g_nonsaturating_softplus_loss
-from gan.base_losses import gradient_penalty
-from nn.train_state import TrainState
-from utils.types import Params, PRNGKey
+from gan.loss_fns import (GradientPenaltyDecorator, d_logistic_loss,
+                          d_softplus_loss, g_logistic_loss, g_softplus_loss)
 
-#### generator losses (simple) ####
+#### gan losses (basic) ####
 
-def _g_loss_simple(
-    params: Params,
-    state: TrainState,
-    batch: jnp.ndarray,
-    discriminator: "Discriminator",
-    #
-    loss_fn: Callable,
-):
-    fake_batch = state.apply_fn({"params": params}, batch, train=True)
-    fake_logits = discriminator(fake_batch)
-    loss = loss_fn(fake_logits)
+class GANLoss:
+    def __init__(
+        self,
+        *,
+        generator_loss_fn: Callable,
+        discriminator_loss_fn: Callable,
+        is_generator: bool,
+    ):
+        if is_generator:
+            loss_fn = generator_loss_fn
+        else:
+            loss_fn = discriminator_loss_fn
 
-    info = {
-        f"{state.info_key}_loss": loss,
-        "generations": fake_batch
-    }
-    return loss, info
+        self.loss_fn = loss_fn
+        self.generator_loss_fn=generator_loss_fn
+        self.discriminator_loss_fn=discriminator_loss_fn
+    
+    def __call__(self, *args, **kwargs):
+        return self.loss_fn(*args, **kwargs)
 
-g_logistic_loss = functools.partial(
-    _g_loss_simple,
-    loss_fn=base_g_nonsaturating_logistic_loss
+LogisticLoss = functools.partial(
+    GANLoss,
+    generator_loss_fn=g_logistic_loss,
+    discriminator_loss_fn=d_logistic_loss,
 )
 
-g_softplus_loss = functools.partial(
-    _g_loss_simple,
-    loss_fn=base_g_nonsaturating_softplus_loss
+SoftplusLoss = functools.partial(
+    GANLoss,
+    generator_loss_fn=g_softplus_loss,
+    discriminator_loss_fn=d_softplus_loss,
 )
 
-#### discriminator losses (simple) ####
+class GANLossGP(GANLoss):
+    def __init__(
+        self,
+        *,
+        discriminator_loss_fn: Callable,
+        gradient_penalty_coef: float = 10.,
+        **kwargs,
+    ):
+        discriminator_loss_fn = GradientPenaltyDecorator(
+            d_loss_fn=discriminator_loss_fn,
+            gradient_penalty_coef=gradient_penalty_coef
+        )
 
-def _d_loss_simple(
-    params: Params,
-    state: TrainState,
-    real_batch: jnp.ndarray,
-    fake_batch: jnp.ndarray,
-    key: PRNGKey,
-    #
-    loss_fn: Callable,
-):
-    real_logits = state.apply_fn({"params": params}, real_batch, train=True)
-    fake_logits = state.apply_fn({"params": params}, fake_batch, train=True)
-    loss = loss_fn(real_logits=real_logits, fake_logits=fake_logits)
+        super().__init__(
+            discriminator_loss_fn=discriminator_loss_fn,
+            **kwargs,
+        )
 
-    info = {
-        f"{state.info_key}_loss": loss,
-        "real_logits": real_logits,
-        "fake_logits": fake_logits,
-    }
-    return loss, info
-
-d_logistic_loss = functools.partial(
-    _d_loss_simple,
-    loss_fn=base_d_logistic_loss
+LogisticLossGP = functools.partial(
+    GANLossGP,
+    generator_loss_fn=g_logistic_loss,
+    discriminator_loss_fn=d_logistic_loss,
 )
 
-d_softplus_loss = functools.partial(
-    _d_loss_simple,
-    loss_fn=base_d_softplus_loss
-)
-
-#### discriminator losses with gradient penalty ####
-
-def _d_loss_with_gradient_penalty(
-    params: Params,
-    state: TrainState,
-    real_batch: jnp.ndarray,
-    fake_batch: jnp.ndarray,
-    gradient_penalty_coef: float,
-    key: PRNGKey,
-    #
-    loss_fn: Callable,
-):
-    real_logits = state.apply_fn({"params": params}, real_batch, train=True)
-    fake_logits = state.apply_fn({"params": params}, fake_batch, train=True)
-    loss = loss_fn(real_logits=real_logits, fake_logits=fake_logits)
-
-    disc_grad_fn = jax.grad(lambda x: state.apply_fn({"params": params}, x, train=True))
-    penalty = gradient_penalty(key=key, real_batch=real_batch, fake_batch=fake_batch, discriminator_grad_fn=disc_grad_fn)
-
-    info = {
-        f"{state.info_key}_loss": loss,
-        f"{state.info_key}_gradient_penalty": penalty,
-        "real_logits": real_logits,
-        "fake_logits": fake_logits,
-    }
-    return loss + penalty * gradient_penalty_coef, info
-
-d_logistic_loss_with_gradient_penalty = functools.partial(
-    _d_loss_with_gradient_penalty,
-    loss_fn=base_d_logistic_loss
-)
-
-d_softplus_loss_with_gradient_penalty = functools.partial(
-    _d_loss_with_gradient_penalty,
-    loss_fn=base_d_softplus_loss
+SoftplusLossGP = functools.partial(
+    GANLossGP,
+    generator_loss_fn=g_softplus_loss,
+    discriminator_loss_fn=d_softplus_loss,
 )
