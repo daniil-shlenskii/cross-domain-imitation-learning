@@ -119,8 +119,8 @@ class GradientPenaltyDecorator:
         loss_with_gp = d_loss + self.penalty_coef * penalty
 
         info.update({
-            "loss_with_gp": loss_with_gp,
-            "gradient_penalty": penalty
+            f"{state.info_key}_loss_with_gradient_penalty": loss_with_gp,
+            f"{state.info_key}_gradient_penalty": penalty
         }) 
 
         return loss_with_gp, info
