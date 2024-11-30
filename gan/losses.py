@@ -41,7 +41,7 @@ class GANLoss:
     ):
         fake_batch = state.apply_fn({"params": params}, batch, train=train)
         fake_logits = discriminator(fake_batch)
-        loss = self.generator_loss_fn(fake_logits)
+        loss = self.generator_loss_fn(fake_logits).mean()
 
         info = {
             f"{state.info_key}_loss": loss,
@@ -59,7 +59,7 @@ class GANLoss:
     ):
         real_logits = state.apply_fn({"params": params}, real_batch, train=train)
         fake_logits = state.apply_fn({"params": params}, fake_batch, train=train)
-        loss = self.discriminator_loss_fn(real_logits=real_logits, fake_logits=fake_logits)
+        loss = self.discriminator_loss_fn(real_logits=real_logits, fake_logits=fake_logits).mean()
 
         info = {
             f"{state.info_key}_loss": loss,
@@ -67,7 +67,6 @@ class GANLoss:
             "fake_logits": fake_logits,
         }
         return loss, info
-
     
     def __call__(
         self,
@@ -105,7 +104,6 @@ class GradientPenaltyDecorator:
         self.d_loss_fn = d_loss_fn
         self.penalty_coef = gradient_penalty_coef
         
-    @property
     def key(self):
         if not hasattr(self, "rng"):
             self.rng = jax.random.key(0)
@@ -129,7 +127,7 @@ class GradientPenaltyDecorator:
         )
 
         disc_grad_fn = jax.grad(lambda x: state.apply_fn({"params": params}, x, train=True))
-        penalty = gradient_penalty(key=self.key, real_batch=real_batch, fake_batch=fake_batch, discriminator_grad_fn=disc_grad_fn)
+        penalty = gradient_penalty(key=jax.random.key(0), real_batch=real_batch, fake_batch=fake_batch, discriminator_grad_fn=disc_grad_fn).mean() # TODO:: hardcoded random.key
 
         loss_with_gp = d_loss + self.penalty_coef * penalty
 

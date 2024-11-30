@@ -9,11 +9,11 @@ from utils.types import PRNGKey
 
 def g_nonsaturating_logistic_loss(fake_logits: jnp.ndarray):
     fake_probs = jax.nn.sigmoid(fake_logits)
-    loss = -jnp.log(fake_probs).mean()
+    loss = -jnp.log(fake_probs)
     return loss
 
 def g_nonsaturating_softplus_loss(fake_logits: jnp.ndarray):
-    loss = jax.nn.softplus(-fake_logits).mean()
+    loss = jax.nn.softplus(-fake_logits)
     return loss
 
 
@@ -22,13 +22,13 @@ def g_nonsaturating_softplus_loss(fake_logits: jnp.ndarray):
 def d_logistic_loss(real_logits: jnp.ndarray, fake_logits: jnp.ndarray):
     real_probs = jax.nn.sigmoid(real_logits)
     fake_probs = jax.nn.sigmoid(fake_logits)
-    real_loss = -jnp.log(real_probs).mean()
-    fake_loss = -jnp.log(1 - fake_probs).mean()
+    real_loss = -jnp.log(real_probs)
+    fake_loss = -jnp.log(1 - fake_probs)
     return (real_loss + fake_loss) * 0.5
 
 def d_softplus_loss(real_logits: jnp.ndarray, fake_logits: jnp.ndarray):
-    real_loss = jax.nn.softplus(-real_logits).mean()
-    fake_loss = jax.nn.softplus(fake_logits).mean()
+    real_loss = jax.nn.softplus(-real_logits)
+    fake_loss = jax.nn.softplus(fake_logits)
     return (real_loss + fake_loss) * 0.5
 
 def gradient_penalty(
@@ -41,4 +41,4 @@ def gradient_penalty(
     interpolated_batch = real_batch * t + fake_batch * (1 - t)
     grads = jax.vmap(discriminator_grad_fn)(interpolated_batch)
     norms = jax.vmap(jnp.linalg.norm)(grads)
-    return norms.mean()
+    return norms
