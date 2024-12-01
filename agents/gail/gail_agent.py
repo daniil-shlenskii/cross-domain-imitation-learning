@@ -15,6 +15,7 @@ from agents.gail.gail_discriminator import GAILDiscriminator
 from agents.gail.utils import get_reward_stats
 from nn.train_state import TrainState
 from utils.types import *
+from utils.types import DataType
 from utils.utils import instantiate_jitted_fbx_buffer, load_pickle
 
 
@@ -112,33 +113,6 @@ class GAILAgent(Agent):
         )
         return new_agent, info, stats_info
 
-    def evaluate(
-        self,
-        *,
-        seed: int, 
-        env: gym.Env,
-        num_episodes: int,
-        return_trajectories: bool = False,
-        #
-        convert_to_wandb_type: bool = True,
-    ) -> Dict[str, float]:
-        eval_info, trajs = super().evaluate(
-            seed=seed,
-            env=env,
-            num_episodes=num_episodes,
-            return_trajectories=True
-        )
-
-        # compute reward statistics
-        rewards_info = get_reward_stats(gail_agent=self, trajectories=trajs)
-        
-        eval_info.update(rewards_info)
-
-        if return_trajectories:
-            return eval_info, trajs
-        return eval_info
-
-    
 @functools.partial(jax.jit, static_argnames="expert_buffer")
 def _update_jit(
     *,
@@ -152,19 +126,14 @@ def _update_jit(
     discriminator: GAILDiscriminator,
 ):
     new_rng, key = jax.random.split(rng)
-
-    # process batch
-    learner_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=-1)
-
     expert_batch = expert_buffer.sample(expert_buffer_state, key).experience
-    expert_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=-1)
 
     # update agent
-    batch["rewards"] = discriminator.get_rewards(learner_batch)
+    batch["rewards"] = discriminator.get_rewards(batch)
     new_agent, agent_info, agent_stats_info = agent.update(batch)
 
     # update discriminator
-    new_disc, disc_info, disc_stats_info = discriminator.update(learner_batch=learner_batch, expert_batch=expert_batch)
+    new_disc, disc_info, disc_stats_info = discriminator.update(learner_batch=batch, expert_batch=expert_batch)
 
     info = {**agent_info, **disc_info}
     stats_info = {**agent_stats_info, **disc_stats_info}

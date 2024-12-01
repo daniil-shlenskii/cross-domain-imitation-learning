@@ -26,39 +26,39 @@ class RewardTransform(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def update(self, rewards: jnp.ndarray) -> "RewardTransform":
         ...
 
-class RewardTransformList(PyTreeNode):
-    transforms: List[RewardTransform]
-
-    @classmethod
-    def create(cls, tranforms_config: List[Dict]) -> RewardTransform:
-        transforms = [
-            instantiate(tranform_config)
-            for tranform_config in tranforms_config
-        ]
-        return cls(
-            transforms=transforms,
-            _save_attrs=("transforms",)
-        )
-
-    def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
-        for transform in self.transforms:
-            rewards = transform(rewards)
-        return rewards
-        
-    def update(self, rewards: jnp.ndarray) -> RewardTransform:
-        new_transforms = []
-        for transform in self.transform:
-            new_transform = transform.update(rewards)
-            rewards = new_transform.transform(rewards)
-            new_transforms.append(new_transform)
-        return self.replace(transforms=new_transforms)
+# class RewardTransformList(PyTreeNode):
+#     transforms: List[RewardTransform]
+#
+#     @classmethod
+#     def create(cls, tranforms_config: List[Dict]) -> RewardTransform:
+#         transforms = [
+#             instantiate(tranform_config)
+#             for tranform_config in tranforms_config
+#         ]
+#         return cls(
+#             transforms=transforms,
+#             _save_attrs=("transforms",)
+#         )
+#
+#     def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
+#         for transform in self.transforms:
+#             rewards = transform(rewards)
+#         return rewards
+#         
+#     def update(self, rewards: jnp.ndarray) -> RewardTransform:
+#         new_transforms = []
+#         for transform in self.transform:
+#             new_transform = transform.update(rewards)
+#             rewards = new_transform.transform(rewards)
+#             new_transforms.append(new_transform)
+#         return self.replace(transforms=new_transforms)
 
 class IdentityRewardTransform(RewardTransform):
     def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
         return rewards
 
     def update(self, rewards: jnp.ndarray) -> "RewardTransform":
-        return self
+        return self, {}
 
 class RewardStandartization(RewardTransform):
     mean: jnp.ndarray
@@ -75,7 +75,7 @@ class RewardStandartization(RewardTransform):
             std=std,
             ema=ema,
             eps=eps,
-            _save_attrs=("mean", "std", "ema", "eps")
+            _save_attrs=("mean", "std")
         )
 
     def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
@@ -84,4 +84,8 @@ class RewardStandartization(RewardTransform):
     def update(self, rewards: jnp.ndarray) -> RewardTransform:
         new_mean = self.mean * self.ema + rewards.mean() * (1 - self.ema)
         new_std = self.std * self.ema + rewards.std() * (1 - self.ema)
-        return self.replace(mean=new_mean, std=new_std)
+        info = {
+            "reward_standartization/mean": new_mean,
+            "reward_standartization/std": new_std,
+        }
+        return self.replace(mean=new_mean, std=new_std), info
