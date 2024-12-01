@@ -1,5 +1,5 @@
 import functools
-from typing import Tuple
+from typing import Dict
 
 import flashbax
 import gymnasium as gym
@@ -12,6 +12,7 @@ from omegaconf.dictconfig import DictConfig
 
 from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
+from agents.gail.utils import get_reward_stats
 from nn.train_state import TrainState
 from utils.types import *
 from utils.utils import instantiate_jitted_fbx_buffer, load_pickle
@@ -110,6 +111,33 @@ class GAILAgent(Agent):
             discriminator=new_discriminator
         )
         return new_agent, info, stats_info
+
+    def evaluate(
+        self,
+        *,
+        seed: int, 
+        env: gym.Env,
+        num_episodes: int,
+        return_trajectories: bool = False,
+        #
+        convert_to_wandb_type: bool = True,
+    ) -> Dict[str, float]:
+        eval_info, trajs = super().evaluate(
+            seed=seed,
+            env=env,
+            num_episodes=num_episodes,
+            return_trajectories=True
+        )
+
+        # compute reward statistics
+        rewards_info = get_reward_stats(gail_agent=self, trajectories=trajs)
+        
+        eval_info.update(rewards_info)
+
+        if return_trajectories:
+            return eval_info, trajs
+        return eval_info
+
     
 @functools.partial(jax.jit, static_argnames="expert_buffer")
 def _update_jit(
