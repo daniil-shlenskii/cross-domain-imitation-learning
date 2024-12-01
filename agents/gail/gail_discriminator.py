@@ -5,7 +5,8 @@ import jax.numpy as jnp
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
-from agents.gail.reward_transforms import RewardTransform
+from agents.gail.reward_transforms import (IdentityRewardTransform,
+                                           RewardTransform)
 from gan.discriminator import Discriminator
 from gan.generator import Generator
 from utils.types import DataType
@@ -18,10 +19,13 @@ class GAILDiscriminator(Discriminator):
     def create(
         cls,
         *,
-        reward_transform_config: DictConfig,
+        reward_transform_config: DictConfig = None,
         **discriminator_kwargs,
     ):
-        reward_transform = instantiate(reward_transform_config)
+        if reward_transform_config is not None:
+            reward_transform = instantiate(reward_transform_config)
+        else:
+            reward_transform = IdentityRewardTransform.create()
         return super().create(
             reward_transform=reward_transform,
             _save_attrs=("state", "reward_transform"),
