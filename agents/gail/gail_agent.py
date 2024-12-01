@@ -96,12 +96,12 @@ class GAILAgent(Agent):
 
     def update(self, batch: DataType):
         train_agent = bool(
-                self.discriminator.state.step % self.n_discriminator_updates == 0
+                (self.discriminator.state.step + 1) % self.n_discriminator_updates == 0
         )
-        new_agent, info, stats_info = _update_jit(
+        new_gail_agent, info, stats_info = _update_jit(
             batch, gail_agent=self, train_agent=train_agent
         )
-        return new_agent, info, stats_info
+        return new_gail_agent, info, stats_info
 
 @functools.partial(jax.jit, static_argnames="train_agent")
 def _update_jit(
@@ -132,6 +132,6 @@ def _update_jit(
         info.update(agent_info)
         stats_info.update(agent_stats_info)
 
-    new_agent = gail_agent.replace(**new_params)
-    return new_agent, info, stats_info
+    new_gail_agent = gail_agent.replace(**new_params)
+    return new_gail_agent, info, stats_info
 
