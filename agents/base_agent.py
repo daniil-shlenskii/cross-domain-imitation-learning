@@ -12,6 +12,7 @@ from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
 from nn.train_state import TrainState
+from utils.evaluate import evaluate
 from utils.types import PRNGKey
 from utils.utils import SaveLoadFrozenDataclassMixin
 
@@ -37,28 +38,14 @@ class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
         return observations
     
-    def evaluate(self, *, seed: int, env: gym.Env, num_episodes: int, **kwargs) -> Dict[str, float]:
-        env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=num_episodes)
-        for i in range(num_episodes):
-            observation, _, done, truncated = *env.reset(seed=seed+i), False, False
-            while not (done or truncated):
-                action = self.eval_actions(observation)
-                observation, _, done, truncated, _ = env.step(action)
-
-        return {"return": np.mean(env.return_queue), "length": np.mean(env.length_queue)}
-
-    def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
-        return observations
-    
-    def evaluate(self, env: gym.Env, num_episodes: int, seed: int=0, **kwargs) -> Dict[str, float]:
-        env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=num_episodes)
-        for i in range(num_episodes):
-            observation, _, done, truncated = *env.reset(seed=seed+i), False, False
-            while not (done or truncated):
-                action = self.eval_actions(observation)
-                observation, _, done, truncated, _ = env.step(action)
-
-        return {"return": np.mean(env.return_queue), "length": np.mean(env.length_queue)}
+    def evaluate(self, *, seed: int, env: gym.Env, num_episodes: int, return_trajectories: bool=False, **kwargs) -> Dict[str, float]:
+        return evaluate(
+            seed=seed,
+            agent=self,
+            env=env,
+            num_episodes=num_episodes,
+            return_trajectories=return_trajectories,
+        )
 
 @jax.jit
 def _sample_actions_jit(key: PRNGKey, actor: TrainState, observations: np.ndarray) -> Tuple[PRNGKey, jnp.ndarray]:
