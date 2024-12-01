@@ -12,7 +12,6 @@ from omegaconf.dictconfig import DictConfig
 
 from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
-from agents.gail.utils import get_reward_stats
 from nn.train_state import TrainState
 from utils.types import *
 from utils.types import DataType
