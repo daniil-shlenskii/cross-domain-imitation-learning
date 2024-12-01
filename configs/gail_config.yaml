@@ -1,7 +1,7 @@
 seed: &seed 0
 env_name: &env_name HalfCheetah-v5
 
-n_iters_training: 1_000_000
+n_iters_training: 5_000_000
 
 batch_size: &batch_size 2048
 precollect_buffer_size: &precollect_buffer_size 3_000
@@ -31,14 +31,15 @@ agent:
   seed: *seed
   expert_batch_size: *batch_size
   expert_buffer_state_path: experiments/sac/HalfCheetah-v5/0/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
+  n_discriminator_updates: 1
   agent_config:
     _target_: agents.sac.SACAgent.create
     actor_module_config:
       _target_: networks.policy.NormalTanhPolicy
-      hidden_dims: [128, 128]
+      hidden_dims: [256, 256]
     critic_module_config:
       _target_: networks.critic.Critic
-      hidden_dims: [128, 128]
+      hidden_dims: [256, 256]
     temperature_module_config:
       _target_: agents.sac.Temperature
       initial_temperature: 0.2
@@ -47,7 +48,7 @@ agent:
         - _target_: optax.clip
           max_delta: 1.0
         - _target_: optax.adamw
-          learning_rate: 1e-4
+          learning_rate: 3e-4
     critic_optimizer_config: *optimizer_config
     temperature_optimizer_config:
       transforms:
@@ -57,12 +58,10 @@ agent:
     _target_: agents.gail.GAILDiscriminator.create
     module_config:
       _target_: networks.discriminator.Discriminator
-      hidden_dims: [128, 128]
+      hidden_dims: [256, 256]
     optimizer_config: *optimizer_config
     loss_config:
-      _target_: gan.losses.SoftplusLossGP
-    reward_transform_config:
-      _target_: agents.gail.reward_transforms.RewardStandartization.create
+      _target_: gan.losses.SoftplusLoss
 
 evaluation:
   seed: 42
