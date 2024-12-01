@@ -83,6 +83,5 @@ def _get_base_rewards(
     learner_state_pairs: jnp.ndarray,
 ):
     learner_logits = discriminator(learner_state_pairs)
-    base_rewards = -discriminator.state.loss_fn.generator_loss_fn(learner_logits)
+    base_rewards = learner_logits
     return base_rewards
-
