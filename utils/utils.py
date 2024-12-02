@@ -3,14 +3,13 @@ import json
 import pickle
 import warnings
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 
 import hydra
 import jax
 import matplotlib.pyplot as plt
 import numpy as np
 import optax
-from flax import struct
 from hydra.utils import instantiate
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from omegaconf.dictconfig import DictConfig
@@ -122,7 +121,7 @@ class SaveLoadMixin:
         for attr, value in attr_to_value.items():
             setattr(self, attr, value)
         return self, loaded_attrs
-    
+
 class SaveLoadFrozenDataclassMixin(SaveLoadMixin):
     def load(self, dir_path: str) -> None:
         attr_to_value, loaded_attrs = load_object_attr_pickle(self, self._save_attrs, dir_path)

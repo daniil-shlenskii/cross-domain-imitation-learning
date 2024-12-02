@@ -7,10 +7,9 @@ from gymnasium.wrappers import RescaleAction
 from hydra.utils import instantiate
 from loguru import logger
 from omegaconf import OmegaConf
-from tqdm import tqdm
 
 from agents.base_agent import Agent
-from utils.utils import save_json, save_pickle
+from utils import save_json, save_pickle
 
 
 def init() -> argparse.Namespace:
@@ -73,7 +72,7 @@ def main(args: argparse.Namespace):
     observation, _ = env.reset()
     action = env.action_space.sample()
     observation, reward, done, _, _ = env.step(action)
-    
+
     buffer_config = config.replay_buffer
     buffer_config["min_length"] = 0
     buffer_config["max_length"] = trajs["observations"].shape[0]

@@ -11,14 +11,21 @@ def evaluate(
     seed: int = 0,
     return_trajectories: bool = False,
 ) -> Dict[str, float]:
-    trajs = {"observations": [], "observations_next": []}
+    traj_keys = [
+        "observations",
+        "actions",
+        "rewards",
+        "dones",
+        "observations_next",
+    ]
+    trajs = {traj_key: [] for traj_key in traj_keys}
 
     env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=num_episodes)
     for i in range(num_episodes):
         observation, _, done, truncated = *env.reset(seed=seed+i), False, False
         while not (done or truncated):
             action = agent.eval_actions(observation)
-            next_observation, _, done, truncated, _ = env.step(action)
+            next_observation, reward, done, truncated, _ = env.step(action)
 
             trajs["observations"].append(observation)
             trajs["actions"].append(action)

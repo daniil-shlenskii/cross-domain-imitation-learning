@@ -9,8 +9,8 @@ from flax.struct import PyTreeNode
 
 from agents.utils import evaluate
 from nn.train_state import TrainState
+from utils import SaveLoadFrozenDataclassMixin
 from utils.types import PRNGKey
-from utils.utils import SaveLoadFrozenDataclassMixin
 
 
 class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
