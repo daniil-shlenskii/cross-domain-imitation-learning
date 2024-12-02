@@ -5,11 +5,12 @@ from flax import struct
 from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from jax import numpy as jnp
+from typing_extensions import override
 
 from utils.utils import SaveLoadFrozenDataclassMixin
 
 
-class RewardTransform(PyTreeNode, SaveLoadFrozenDataclassMixin):
+class BaseRewardTransform(PyTreeNode, SaveLoadFrozenDataclassMixin):
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     @classmethod
@@ -18,49 +19,15 @@ class RewardTransform(PyTreeNode, SaveLoadFrozenDataclassMixin):
             kwargs["_save_attrs"] = tuple()
         return cls(**kwargs)
 
-    @abc.abstractmethod
-    def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
-        ...
-
-    @abc.abstractmethod
-    def update(self, rewards: jnp.ndarray) -> "RewardTransform":
-        ...
-
-# class RewardTransformList(PyTreeNode):
-#     transforms: List[RewardTransform]
-#
-#     @classmethod
-#     def create(cls, tranforms_config: List[Dict]) -> RewardTransform:
-#         transforms = [
-#             instantiate(tranform_config)
-#             for tranform_config in tranforms_config
-#         ]
-#         return cls(
-#             transforms=transforms,
-#             _save_attrs=("transforms",)
-#         )
-#
-#     def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
-#         for transform in self.transforms:
-#             rewards = transform(rewards)
-#         return rewards
-#         
-#     def update(self, rewards: jnp.ndarray) -> RewardTransform:
-#         new_transforms = []
-#         for transform in self.transform:
-#             new_transform = transform.update(rewards)
-#             rewards = new_transform.transform(rewards)
-#             new_transforms.append(new_transform)
-#         return self.replace(transforms=new_transforms)
-
-class IdentityRewardTransform(RewardTransform):
+    @override
     def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
         return rewards
 
-    def update(self, rewards: jnp.ndarray) -> "RewardTransform":
+    @override
+    def update(self, rewards: jnp.ndarray) -> "BaseRewardTransform":
         return self, {}
 
-class RewardStandartization(RewardTransform):
+class RewardStandartization(BaseRewardTransform):
     mean: jnp.ndarray
     std: jnp.ndarray
     ema: float
@@ -69,7 +36,7 @@ class RewardStandartization(RewardTransform):
     @classmethod
     def create(
         cls, mean=0., std=1., ema=0.99, eps=1e-8,
-    ) -> RewardTransform:
+    ) -> BaseRewardTransform:
         return cls(
             mean=mean,
             std=std,
@@ -81,7 +48,7 @@ class RewardStandartization(RewardTransform):
     def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
         return (rewards - self.mean) / (self.std + self.eps)
     
-    def update(self, rewards: jnp.ndarray) -> RewardTransform:
+    def update(self, rewards: jnp.ndarray) -> BaseRewardTransform:
         new_mean = self.mean * self.ema + rewards.mean() * (1 - self.ema)
         new_std = self.std * self.ema + rewards.std() * (1 - self.ema)
         info = {
