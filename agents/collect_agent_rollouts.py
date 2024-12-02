@@ -2,7 +2,6 @@ import argparse
 import warnings
 from pathlib import Path
 
-import gymnasium as gym
 import numpy as np
 from gymnasium.wrappers import RescaleAction
 from hydra.utils import instantiate
@@ -10,6 +9,7 @@ from loguru import logger
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
+from agents.base_agent import Agent
 from utils.utils import save_json, save_pickle
 
 
@@ -24,7 +24,7 @@ def init() -> argparse.Namespace:
     return parser.parse_args()
 
 def main(args: argparse.Namespace):
-    # config init
+    # agent config init
     agent_dir = Path(args.archive_agent_dir)
     
     config = OmegaConf.load(agent_dir / "config.yaml")
@@ -34,7 +34,6 @@ def main(args: argparse.Namespace):
     eval_config = config.evaluation
     env = instantiate(eval_config.environment)
     env = RescaleAction(env, -1, 1)
-    env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=args.num_episodes)
 
     # agent init
     observation_space = env.observation_space
@@ -45,7 +44,7 @@ def main(args: argparse.Namespace):
     low, high = action_space.low, action_space.high
     if np.any(low == -1) or np.any(high == 1):
         low, high = None, None
-        
+
     agent = instantiate(
         config.agent,
         observation_dim=observation_dim,
@@ -60,10 +59,24 @@ def main(args: argparse.Namespace):
         f"Loaded keys:\n----------------\n{OmegaConf.to_yaml(loaded_keys)}"
     )
 
+    # collect rollouts
+    logger.info("Collecting..")
+    _, trajs = Agent.evaluate(
+        agent,
+        seed=eval_config.seed,
+        env=env,
+        num_episodes=args.num_episodes,
+        return_trajectories=True,
+    )
+
     # buffer init
     observation, _ = env.reset()
     action = env.action_space.sample()
     observation, reward, done, _, _ = env.step(action)
+    
+    buffer_config = config.replay_buffer
+    buffer_config["min_length"] = 0
+    buffer_config["max_length"] = trajs["observations"].shape[0]
 
     buffer = instantiate(config.replay_buffer, _recursive_=False)
     state = buffer.init(
@@ -76,28 +89,11 @@ def main(args: argparse.Namespace):
         )
     )
 
-    # collect roullouts
-    logger.info("Collecting..")
-    for i in tqdm(range(args.num_episodes)):
-        observation, _, done, truncated = *env.reset(seed=eval_config.seed+i), False, False
-        while not (done or truncated):
-            # do step in the environment
-            action = agent.eval_actions(observation)
-            observation_next, reward, done, truncated, _ = env.step(action)
-
-            # update buffer
-            state = buffer.add(
-                state, 
-                dict(
-                    observations=np.array(observation),
-                    actions=np.array(action),
-                    rewards=np.array(reward),
-                    dones=np.array(done or truncated),
-                    observations_next=np.array(observation_next),
-                )
-            )
-
-            observation = observation_next
+    # putting roullouts into buffer
+    new_state_exp = trajs
+    for k, v in new_state_exp.items():
+        new_state_exp[k] = v[None]
+    
 
     # save rollout and runs info
     info = {
@@ -110,7 +106,6 @@ def main(args: argparse.Namespace):
     save_dir = agent_dir
     if args.save_rollouts_dir is not None:
         save_dir = Path(args.save_rollouts_dir)
-    
     save_dir = save_dir / "collected_rollouts"
     save_dir.mkdir(exist_ok=True, parents=True)
 
