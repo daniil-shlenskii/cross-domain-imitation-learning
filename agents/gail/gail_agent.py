@@ -1,10 +1,7 @@
 import functools
-from typing import Dict
 
-import flashbax
 import gymnasium as gym
 import jax
-import jax.numpy as jnp
 import numpy as np
 from flax import struct
 from hydra.utils import instantiate
@@ -12,9 +9,7 @@ from omegaconf.dictconfig import DictConfig
 
 from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
-from nn.train_state import TrainState
-from utils.types import *
-from utils.types import DataType
+from utils.types import Buffer, BufferState, DataType
 from utils.utils import instantiate_jitted_fbx_buffer, load_pickle
 
 
@@ -110,12 +105,12 @@ def _update_jit(
     train_agent: bool,
 ):
     new_params = {}
-    
+
     # sample expert batch
     new_rng, key = jax.random.split(gail_agent.rng)
     expert_batch = gail_agent.expert_buffer.sample(gail_agent.expert_buffer_state, key).experience
     new_params["rng"] = new_rng
-   
+
     # update discriminator
     new_disc, info, stats_info = gail_agent.discriminator.update(
         learner_batch=batch,

@@ -1,9 +1,7 @@
-import abc
-from typing import Dict, List, Tuple
+from typing import Tuple
 
 from flax import struct
 from flax.struct import PyTreeNode
-from hydra.utils import instantiate
 from jax import numpy as jnp
 from typing_extensions import override
 
@@ -35,7 +33,7 @@ class RewardStandartization(BaseRewardTransform):
 
     @classmethod
     def create(
-        cls, mean=0., std=1., ema=0.99, eps=1e-8,
+        cls, *, mean=0., std=1., ema=0.99, eps=1e-8,
     ) -> BaseRewardTransform:
         return cls(
             mean=mean,
@@ -47,7 +45,7 @@ class RewardStandartization(BaseRewardTransform):
 
     def transform(self, rewards: jnp.ndarray) -> jnp.ndarray:
         return (rewards - self.mean) / (self.std + self.eps)
-    
+
     def update(self, rewards: jnp.ndarray) -> BaseRewardTransform:
         new_mean = self.mean * self.ema + rewards.mean() * (1 - self.ema)
         new_std = self.std * self.ema + rewards.std() * (1 - self.ema)
