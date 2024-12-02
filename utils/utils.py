@@ -98,7 +98,6 @@ def load_object_attr_pickle(obj, attrs, dir_path):
             if load_dir.exists():
                 value, loaded_subattrs = value.load(load_dir)
                 attr_to_value[attr] = value
-                # loaded_attrs.append(attr: loaded_subattrs)
                 loaded_attrs[attr] = loaded_subattrs
             else:
                 loaded_attrs[attr] = "-"
@@ -127,6 +126,7 @@ class SaveLoadFrozenDataclassMixin(SaveLoadMixin):
         attr_to_value, loaded_attrs = load_object_attr_pickle(self, self._save_attrs, dir_path)
         self = self.replace(**attr_to_value)
         return self, loaded_attrs
+
 def get_buffer_state_size(buffer_state: BufferState) -> int:
     if buffer_state.is_full:
         key = list(buffer_state.experience.keys())[0]
