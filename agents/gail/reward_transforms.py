@@ -5,7 +5,7 @@ from flax.struct import PyTreeNode
 from jax import numpy as jnp
 from typing_extensions import override
 
-from utils.utils import SaveLoadFrozenDataclassMixin
+from utils import SaveLoadFrozenDataclassMixin
 
 
 class BaseRewardTransform(PyTreeNode, SaveLoadFrozenDataclassMixin):

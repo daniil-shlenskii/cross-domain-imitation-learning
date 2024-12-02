@@ -9,8 +9,8 @@ from omegaconf.dictconfig import DictConfig
 
 from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
+from utils import instantiate_jitted_fbx_buffer, load_pickle
 from utils.types import Buffer, BufferState, DataType
-from utils.utils import instantiate_jitted_fbx_buffer, load_pickle
 
 
 class GAILAgent(Agent):

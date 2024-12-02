@@ -13,8 +13,8 @@ from agents.base_agent import Agent
 from agents.sac.losses import (actor_loss_fn, critic_loss_fn,
                                temperature_loss_fn)
 from nn.train_state import TrainState
+from utils import instantiate_optimizer
 from utils.types import DataType, Params
-from utils.utils import instantiate_optimizer
 
 
 class SACAgent(Agent): 
