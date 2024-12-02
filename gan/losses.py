@@ -127,7 +127,7 @@ class GradientPenaltyDecorator:
         )
 
         disc_grad_fn = jax.grad(lambda x: state.apply_fn({"params": params}, x, train=True))
-        penalty = gradient_penalty(key=jax.random.key(0), real_batch=real_batch, fake_batch=fake_batch, discriminator_grad_fn=disc_grad_fn).mean() # TODO:: hardcoded random.key
+        penalty = gradient_penalty(key=jax.random.key(state.step), real_batch=real_batch, fake_batch=fake_batch, discriminator_grad_fn=disc_grad_fn).mean() # TODO:: hardcoded random.key
 
         loss_with_gp = d_loss + self.penalty_coef * penalty
 
