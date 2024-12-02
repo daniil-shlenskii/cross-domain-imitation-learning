@@ -140,6 +140,7 @@ class SACAgent(Agent):
         new_agent, info, stats_info = _update_jit(batch=batch, agent=self)
         return new_agent, info, stats_info
 
+@jax.jit
 def _update_jit(
     *,
     batch: DataType,
