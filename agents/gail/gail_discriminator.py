@@ -33,24 +33,12 @@ class GAILDiscriminator(Discriminator):
         )
 
     def update(self, *, expert_batch: DataType, learner_batch: DataType): 
-        expert_state_pairs = jnp.concatenate([
-            expert_batch["observations"],
-            expert_batch["observations_next"]
-        ], axis=1)
-        learner_state_pairs = jnp.concatenate([
-            learner_batch["observations"],
-            learner_batch["observations_next"]
-        ], axis=1)
-        
-        new_state, info, stats_info = super().update(real_batch=expert_state_pairs, fake_batch=learner_state_pairs)
-        new_reward_transform, reward_transform_info = _update_reward_transform_jit(
-            discriminator=self,
-            learner_state_pairs=learner_state_pairs,
-            reward_transform=self.reward_transform,
+        new_gail_discriminator, info, stats_info = _update_jit(
+            expert_batch=expert_batch,
+            learner_batch=learner_batch,
+            gail_discriminator=self,
         )
-
-        info.update(reward_transform_info)
-        return new_state.replace(reward_transform=new_reward_transform), info, stats_info
+        return new_gail_discriminator, info, stats_info
     
     def get_rewards(self, learner_batch: jnp.ndarray) -> jnp.ndarray:
         learner_state_pairs = jnp.concatenate([
@@ -64,14 +52,35 @@ class GAILDiscriminator(Discriminator):
         )
 
 @jax.jit
-def _update_reward_transform_jit(
-    discriminator: Discriminator,
-    learner_state_pairs: jnp.ndarray,
-    reward_transform: RewardTransform,
-):  
+def _update_jit(
+    expert_batch: DataType,
+    learner_batch: DataType,
+    gail_discriminator: GAILDiscriminator,
+):
+    # prepare batches
+    expert_state_pairs = jnp.concatenate([
+        expert_batch["observations"],
+        expert_batch["observations_next"]
+    ], axis=1)
+    learner_state_pairs = jnp.concatenate([
+        learner_batch["observations"],
+        learner_batch["observations_next"]
+    ], axis=1)
+    
+    # update discriminator
+    new_gail_discrimiantor, info, stats_info = Discriminator.update(
+        self=gail_discriminator,
+        real_batch=expert_state_pairs,
+        fake_batch=learner_state_pairs
+    )
+
+    # update reward transform
     base_rewards = _get_base_rewards(discriminator, learner_state_pairs)
     new_reward_transform, info = reward_transform.update(base_rewards)
-    return new_reward_transform, info
+
+    new_gail_discrimiantor = new_gail_discrimiantor.replace(reward_transform=new_reward_transform)
+    info.update(reward_transform_info)
+    return new_gail_discrimiantor, info, stats_info
 
 @jax.jit
 def _get_rewards_jit(
