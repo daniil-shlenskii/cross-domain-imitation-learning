@@ -1,7 +1,6 @@
 import argparse
 import warnings
 from pathlib import Path
-from pprint import pformat
 
 import jax
 import numpy as np
@@ -45,25 +44,21 @@ def main(args: argparse.Namespace):
     env = instantiate(config.environment)
     eval_env = instantiate(config.evaluation.environment)
 
-    env = RescaleAction(env, -1, 1) # TODO: env.low and env.high (logic repeatition 1)
+    env = RescaleAction(env, -1, 1)
     eval_env = RescaleAction(eval_env, -1, 1)
 
     # agent init
-    observation_space = env.observation_space 
+    observation_space = env.observation_space
     action_space = env.action_space
 
     observation_dim = observation_space.sample().shape[-1]
     action_dim = action_space.sample().shape[-1]
-    low, high = action_space.low, action_space.high # TODO: env.low and env.high (logic repeatition 1)
-    if np.all(low == -1) and np.all(high == 1):
-        low, high = None, None
-        
     agent = instantiate(
         config.agent,
         observation_dim=observation_dim,
         action_dim=action_dim,
-        low=low,
-        high=high,
+        low=None,
+        high=None,
         _recursive_=False,
     )
 
@@ -185,8 +180,6 @@ def main(args: argparse.Namespace):
                 **config.evaluation.get("extra_args", {})
             )
             for k, v in eval_info.items():
-                if hasattr(v, "block_until_ready"):
-                    v = v.block_until_ready()
                 wandb.log({f"evaluation/{k}": v}, step=i)
 
         # sample actions
@@ -202,12 +195,8 @@ def main(args: argparse.Namespace):
         # logging
         if (i + 1) % config.log_every == 0:
             for k, v in update_info.items():
-                if hasattr(v, "block_until_ready"):
-                    v = v.block_until_ready()
                 wandb.log({f"training/{k}": v}, step=i)
             for k, v in stats_info.items():
-                if hasattr(v, "block_until_ready"):
-                    v = v.block_until_ready()
                 wandb.log({f"training_stats/{k}": v}, step=i)
 
         # save model
