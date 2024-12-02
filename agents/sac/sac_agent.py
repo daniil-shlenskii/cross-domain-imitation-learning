@@ -12,6 +12,8 @@ from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
 from agents.base_agent import Agent
+from agents.sac.losses import (actor_loss_fn, critic_loss_fn,
+                               temperature_loss_fn)
 from nn.train_state import TrainState
 from utils.types import DataType, Params, PRNGKey
 from utils.utils import instantiate_optimizer
@@ -75,28 +77,28 @@ class SACAgent(Agent):
         target_critic2_params = deepcopy(critic2_params)
 
         actor = TrainState.create(
-            loss_fn=_actor_loss_fn,
+            loss_fn=actor_loss_fn,
             apply_fn=actor_module.apply,
             params=actor_params,
             tx=instantiate_optimizer(actor_optimizer_config),
             info_key="actor",
         )
         critic1 = TrainState.create(
-            loss_fn=_critic_loss_fn,
+            loss_fn=critic_loss_fn,
             apply_fn=critic1_module.apply,
             params=critic1_params,
             tx=instantiate_optimizer(critic_optimizer_config),
             info_key="critic1",
         )
         critic2 = TrainState.create(
-            loss_fn=_critic_loss_fn,
+            loss_fn=critic_loss_fn,
             apply_fn=critic2_module.apply,
             params=critic2_params,
             tx=instantiate_optimizer(critic_optimizer_config),
             info_key="critic2",
         )
         temperature = TrainState.create(
-            loss_fn=_temperature_loss_fn,
+            loss_fn=temperature_loss_fn,
             apply_fn=temperature_module.apply,
             params=temperature_params,
             tx=instantiate_optimizer(temperature_optimizer_config),
@@ -107,8 +109,6 @@ class SACAgent(Agent):
         action_dim = action.shape[-1]
         if target_entropy is None:
             target_entropy = -action_dim
-        else:
-            target_entropy = target_entropy
 
         return cls(
             rng=rng,
@@ -137,144 +137,59 @@ class SACAgent(Agent):
         return self.critic1
 
     def update(self, batch: DataType):
-        (
-            new_rng,
-            new_actor,
-            new_critic1,
-            new_critic2,
-            new_target_critic1_params,
-            new_target_critic2_params,
-            new_temperature,
-            info,
-            stats_info,
-        ) = _update_jit(
-            rng=self.rng,
-            batch=batch,
-            actor=self.actor,
-            critic1=self.critic1,
-            critic2=self.critic2,
-            target_critic1_params=self.target_critic1_params,
-            target_critic2_params=self.target_critic2_params,
-            temperature=self.temperature,
-            target_entropy=self.target_entropy,
-            backup_entropy=self.backup_entropy,
-            discount=self.discount,
-            tau=self.tau,
-        )
-        new_agent = self.replace(
-            rng=new_rng,
-            actor=new_actor,
-            critic1=new_critic1,
-            critic2=new_critic2,
-            target_critic1_params=new_target_critic1_params,
-            target_critic2_params=new_target_critic2_params,
-            temperature=new_temperature,
-        )
+        new_agent, info, stats_info = _update_jit(batch=batch, agent=self)
         return new_agent, info, stats_info
 
-@functools.partial(jax.jit, static_argnames="backup_entropy")
+@jax.jit
 def _update_jit(
     *,
-    rng: PRNGKey,
     batch: DataType,
-    #
-    actor: TrainState,
-    critic1: TrainState,
-    critic2: TrainState,
-    target_critic1_params: Params,
-    target_critic2_params: Params,
-    temperature: TrainState,
-    #
-    target_entropy: float,
-    backup_entropy: bool,
-    discount: float,
-    tau: float,
+    agent: Agent,
 ):
     # temperature
-    temp = temperature()
+    temp = agent.temperature()
 
     # critic target
-    rng, key = jax.random.split(rng)
-    dist = actor(batch["observations_next"])
+    new_rng, key = jax.random.split(agent.rng)
+    dist = agent.actor(batch["observations_next"])
     actions_next, log_prob_next = dist.sample_and_log_prob(seed=key)
 
     state_action_value_next = jnp.minimum(
-        critic1.apply_fn({"params": target_critic1_params}, batch["observations_next"], actions_next),
-        critic2.apply_fn({"params": target_critic2_params}, batch["observations_next"], actions_next)
+        agent.critic1.apply_fn({"params": agent.target_critic1_params}, batch["observations_next"], actions_next),
+        agent.critic2.apply_fn({"params": agent.target_critic2_params}, batch["observations_next"], actions_next)
     )
 
-    critic_target = batch["rewards"] + (1 - batch["dones"]) * discount * state_action_value_next
-    if backup_entropy:
-        critic_target -= (1 - batch["dones"]) * discount * temp * log_prob_next
+    critic_target = batch["rewards"] + (1 - batch["dones"]) * agent.discount * state_action_value_next
+    if agent.backup_entropy:
+        critic_target -= (1 - batch["dones"]) * agent.discount * temp * log_prob_next
 
     # critic update
-    new_critic1, critic1_info, critic1_stats_info = critic1.update(batch=batch, target=critic_target)
-    new_critic2, critic2_info, critic2_stats_info = critic2.update(batch=batch, target=critic_target)
+    new_critic1, critic1_info, critic1_stats_info = agent.critic1.update(batch=batch, target=critic_target)
+    new_critic2, critic2_info, critic2_stats_info = agent.critic2.update(batch=batch, target=critic_target)
 
     # actor update
-    rng, key = jax.random.split(rng)
-    new_actor, actor_info, actor_stats_info = actor.update(batch=batch, critic1=new_critic1, critic2=new_critic2, temp=temp, key=key)
+    new_rng, key = jax.random.split(new_rng)
+    new_actor, actor_info, actor_stats_info = agent.actor.update(batch=batch, critic1=new_critic1, critic2=new_critic2, temp=temp, key=key)
 
     # temperature update
-    new_temperature, temperature_info, temperature_stats_info = temperature.update(entropy=actor_info["entropy"], target_entropy=target_entropy)
+    new_temperature, temperature_info, temperature_stats_info = agent.temperature.update(entropy=actor_info["entropy"], target_entropy=agent.target_entropy)
 
     # target_critic update
-    new_target_critic1_params = _update_target_net(new_critic1.params, target_critic1_params, tau)
-    new_target_critic2_params = _update_target_net(new_critic2.params, target_critic2_params, tau)
+    new_target_critic1_params = _update_target_net(new_critic1.params, agent.target_critic1_params, agent.tau)
+    new_target_critic2_params = _update_target_net(new_critic2.params, agent.target_critic2_params, agent.tau)
 
+    new_agent = agent.replace(
+        rng=new_rng,
+        actor=new_actor,
+        critic1=new_critic1,
+        critic2=new_critic2,
+        target_critic1_params=new_target_critic1_params,
+        target_critic2_params=new_target_critic2_params,
+        temperature=new_temperature,
+    )
     info = {**critic1_info, **critic2_info, **actor_info, **temperature_info}
     stats_info = {**critic1_stats_info, **critic2_stats_info, **actor_stats_info, **temperature_stats_info}
-    return (
-        rng,
-        new_actor,
-        new_critic1,
-        new_critic2,
-        new_target_critic1_params,
-        new_target_critic2_params,
-        new_temperature,
-        info,
-        stats_info,
-    )
-
-def _actor_loss_fn(
-    params: Params,
-    state: TrainState,
-    batch: DataType,
-    critic1: TrainState,
-    critic2: TrainState,
-    temp: float,
-    key: PRNGKey,
-) -> Tuple[TrainState, Dict[str, float]]:
-    dist = state.apply_fn({"params": params}, batch["observations"], train=True)
-    actions, log_prob = dist.sample_and_log_prob(seed=key)
-
-    state_action_value = jnp.minimum(
-        critic1(batch["observations"], actions),
-        critic2(batch["observations"], actions)
-    )
-
-    loss = (log_prob * temp - state_action_value).mean()
-    return loss, {f"{state.info_key}_loss": loss, "entropy": -log_prob.mean()}
-
-def _critic_loss_fn(
-    params: Params,
-    state: TrainState,
-    batch: DataType,
-    target: jnp.ndarray,
-) -> Tuple[TrainState, Dict[str, float]]:
-    preds = state.apply_fn({"params": params}, batch["observations"], batch["actions"], train=True)
-    loss = ((preds - target)**2).mean()
-    return loss, {f"{state.info_key}_loss": loss}
-
-def _temperature_loss_fn(
-    params: Params,
-    state: TrainState,
-    entropy: float,
-    target_entropy: float
-) -> Tuple[TrainState, Dict[str, float]]:
-    temp = state.apply_fn({"params": params})
-    loss =  temp * (entropy - target_entropy).mean()
-    return loss, {state.info_key: temp, f"{state.info_key}_loss": loss}
+    return new_agent, info, stats_info
 
 def _update_target_net(
     online_params: Params, target_params: Params, tau: int

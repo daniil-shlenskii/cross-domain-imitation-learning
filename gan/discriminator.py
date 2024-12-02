@@ -6,10 +6,10 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 from flax.struct import PyTreeNode
-from gan.losses import d_softplus_loss_with_gradient_penalty
 from hydra.utils import instantiate
-from nn.train_state import TrainState
 from omegaconf.dictconfig import DictConfig
+
+from nn.train_state import TrainState
 from utils.types import Params, PRNGKey
 from utils.utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
 
@@ -28,7 +28,7 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         #
         module_config: DictConfig,
         optimizer_config: DictConfig,
-        loss_fn_config: DictConfig = None,
+        loss_config: DictConfig = None,
         #
         info_key: str = "discriminator",
         **kwargs,
@@ -39,13 +39,11 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         module = instantiate(module_config)
         params = module.init(key, jnp.ones(input_dim, dtype=jnp.float32))["params"]
 
-        if loss_fn_config is None:
-            loss_fn = functools.partial(
-                d_softplus_loss_with_gradient_penalty,
-                gradient_penalty_coef=10.
-            )
-        else:
-            loss_fn = instantiate(loss_fn_config)
+        loss_fn = instantiate(
+            loss_config,
+            is_generator=False,
+            _recursive_=False,
+        )
 
         state = TrainState.create(
             loss_fn=loss_fn,
@@ -65,31 +63,11 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         )
 
     def update(self, *, real_batch: jnp.ndarray, fake_batch: jnp.ndarray, return_logits: bool=False):
-        (
-            new_rng,
-            new_state,
-            info,
-            stats_info
-        ) = _update_jit(
-            real_batch=real_batch,
-            fake_batch=fake_batch,
-            state=self.state,
-            rng=self.rng,
-        )
+        new_state, info, stats_info = self.state.update(real_batch=real_batch, fake_batch=fake_batch)
         if not return_logits:
             del info["real_logits"], info["fake_logits"]
-        return self.replace(rng=new_rng, state=new_state), info, stats_info
+        return self.replace(state=new_state), info, stats_info
     
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
     
-@jax.jit
-def _update_jit(
-    rng: PRNGKey,
-    real_batch: jnp.ndarray,
-    fake_batch: jnp.ndarray,
-    state: TrainState,
-) -> Tuple[TrainState, Dict, Dict]:
-    new_rng, key = jax.random.split(rng)
-    new_state, info, stats_info = state.update(key=key, real_batch=real_batch, fake_batch=fake_batch)
-    return new_rng, new_state, info, stats_info

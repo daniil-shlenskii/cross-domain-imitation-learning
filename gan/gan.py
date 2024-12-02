@@ -27,6 +27,7 @@ class GAN(SaveLoadMixin):
         input_dim: int,
         generator_output_dim: int,
         #
+        loss_config: DictConfig,
         generator_config: DictConfig,
         discriminator_config: DictConfig,
     ):
@@ -34,6 +35,7 @@ class GAN(SaveLoadMixin):
             seed=seed,
             input_dim=input_dim,
             output_dim=generator_output_dim,
+            loss_config=loss_config,
             **generator_config,
         )
         
@@ -41,6 +43,7 @@ class GAN(SaveLoadMixin):
         discriminator = Discriminator.create(
             seed=seed,
             input_dim=discriminator_input_dim,
+            loss_config=loss_config,
             **discriminator_config,
         )
 

@@ -1,5 +1,5 @@
 import functools
-from typing import Tuple
+from typing import Dict
 
 import flashbax
 import gymnasium as gym
@@ -14,6 +14,7 @@ from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
 from nn.train_state import TrainState
 from utils.types import *
+from utils.types import DataType
 from utils.utils import instantiate_jitted_fbx_buffer, load_pickle
 
 
@@ -22,6 +23,7 @@ class GAILAgent(Agent):
     discriminator: GAILDiscriminator
     expert_buffer: Buffer = struct.field(pytree_node=False)
     expert_buffer_state: BufferState = struct.field(pytree_node=False)
+    n_discriminator_updates: int = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -38,6 +40,8 @@ class GAILAgent(Agent):
         #
         agent_config: DictConfig,
         discriminator_config: DictConfig,
+        #
+        n_discriminator_updates: int = 1,
         **kwargs,
     ):
         # agent and discriminator init
@@ -81,6 +85,7 @@ class GAILAgent(Agent):
             expert_buffer_state=expert_buffer_state,
             agent=agent,
             discriminator=discriminator,
+            n_discriminator_updates=n_discriminator_updates,
             _save_attrs = _save_attrs,
             **kwargs,
         )
@@ -90,54 +95,43 @@ class GAILAgent(Agent):
         return self.agent.actor
 
     def update(self, batch: DataType):
-        (
-            new_rng,
-            new_agent,
-            new_discriminator,
-            info,
-            stats_info,
-        ) = _update_jit(
-            rng=self.rng,
-            batch=batch,
-            expert_buffer=self.expert_buffer,
-            expert_buffer_state=self.expert_buffer_state,
-            agent=self.agent,
-            discriminator=self.discriminator,
+        train_agent = bool(
+                (self.discriminator.state.step + 1) % self.n_discriminator_updates == 0
         )
-        new_agent = self.replace(
-            rng=new_rng,
-            agent=new_agent,
-            discriminator=new_discriminator
+        new_gail_agent, info, stats_info = _update_jit(
+            batch, gail_agent=self, train_agent=train_agent
         )
-        return new_agent, info, stats_info
-    
-@functools.partial(jax.jit, static_argnames="expert_buffer")
+        return new_gail_agent, info, stats_info
+
+@functools.partial(jax.jit, static_argnames="train_agent")
 def _update_jit(
-    *,
-    rng: PRNGKey,
     batch: DataType,
-    #
-    expert_buffer: Buffer,
-    expert_buffer_state: BufferState,
-    #
-    agent: Agent,
-    discriminator: GAILDiscriminator,
+    gail_agent: GAILAgent,
+    train_agent: bool,
 ):
-    new_rng, key = jax.random.split(rng)
-
-    # process batch
-    learner_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=-1)
-
-    expert_batch = expert_buffer.sample(expert_buffer_state, key).experience
-    expert_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=-1)
+    new_params = {}
+    
+    # sample expert batch
+    new_rng, key = jax.random.split(gail_agent.rng)
+    expert_batch = gail_agent.expert_buffer.sample(gail_agent.expert_buffer_state, key).experience
+    new_params["rng"] = new_rng
+   
+    # update discriminator
+    new_disc, info, stats_info = gail_agent.discriminator.update(
+        learner_batch=batch,
+        expert_batch=expert_batch,
+    )
+    new_params["discriminator"] = new_disc
 
     # update agent
-    batch["rewards"] = discriminator.get_rewards(learner_batch)
-    new_agent, agent_info, agent_stats_info = agent.update(batch)
+    if train_agent:
+        batch["rewards"] = new_disc.get_rewards(batch)
+        new_agent, agent_info, agent_stats_info = gail_agent.agent.update(batch)
 
-    # update discriminator
-    new_disc, disc_info, disc_stats_info = discriminator.update(learner_batch=learner_batch, expert_batch=expert_batch)
+        new_params["agent"] = new_agent
+        info.update(agent_info)
+        stats_info.update(agent_stats_info)
 
-    info = {**agent_info, **disc_info}
-    stats_info = {**agent_stats_info, **disc_stats_info}
-    return new_rng, new_agent, new_disc, info, stats_info
+    new_gail_agent = gail_agent.replace(**new_params)
+    return new_gail_agent, info, stats_info
+

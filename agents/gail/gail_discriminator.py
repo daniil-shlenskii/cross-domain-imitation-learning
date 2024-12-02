@@ -5,54 +5,96 @@ import jax.numpy as jnp
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
-from agents.gail.reward_transforms import RewardTransform
+from agents.gail.reward_transforms import BaseRewardTransform
 from gan.discriminator import Discriminator
+from gan.generator import Generator
+from utils.types import DataType
 
 
 class GAILDiscriminator(Discriminator):
-    reward_transform: RewardTransform
+    reward_transform: BaseRewardTransform
 
     @classmethod
     def create(
         cls,
         *,
-        reward_transform_config: DictConfig,
+        reward_transform_config: DictConfig = None,
         **discriminator_kwargs,
     ):
-        reward_transform = instantiate(reward_transform_config)
+        if reward_transform_config is not None:
+            reward_transform = instantiate(reward_transform_config)
+        else:
+            reward_transform = BaseRewardTransform.create()
         return super().create(
             reward_transform=reward_transform,
             _save_attrs=("state", "reward_transform"),
             **discriminator_kwargs
         )
 
-    def update(self, *, expert_batch: jnp.ndarray, learner_batch: jnp.ndarray):
-        new_state, info, stats_info = super().update(real_batch=expert_batch, fake_batch=learner_batch)
-        new_reward_transform = _update_reward_transform(
+    def update(self, *, expert_batch: DataType, learner_batch: DataType): 
+        new_gail_discriminator, info, stats_info = _update_jit(
+            expert_batch=expert_batch,
             learner_batch=learner_batch,
-            discriminator=new_state,
-            reward_transform=self.reward_transform
+            gail_discriminator=self,
         )
-        return new_state.replace(reward_transform=new_reward_transform), info, stats_info
+        return new_gail_discriminator, info, stats_info
     
-    def get_rewards(self, x: jnp.ndarray) -> jnp.ndarray:
+    def get_rewards(self, learner_batch: jnp.ndarray) -> jnp.ndarray:
+        learner_state_pairs = jnp.concatenate([
+            learner_batch["observations"],
+            learner_batch["observations_next"]
+        ], axis=1)
         return _get_rewards_jit(
-            x,
             discriminator=self,
-            reward_transform=self.reward_transform
+            learner_state_pairs=learner_state_pairs,
+            reward_transform=self.reward_transform,
         )
 
 @jax.jit
-def _update_reward_transform(
-    learner_batch: jnp.ndarray,
-    discriminator: Discriminator,
-    reward_transform: RewardTransform,
-):  
-    base_rewards = -jnp.log(discriminator(learner_batch))
-    new_reward_transform = reward_transform.update(base_rewards)
-    return new_reward_transform
+def _update_jit(
+    expert_batch: DataType,
+    learner_batch: DataType,
+    gail_discriminator: GAILDiscriminator,
+):
+    # prepare batches
+    expert_state_pairs = jnp.concatenate([
+        expert_batch["observations"],
+        expert_batch["observations_next"]
+    ], axis=1)
+    learner_state_pairs = jnp.concatenate([
+        learner_batch["observations"],
+        learner_batch["observations_next"]
+    ], axis=1)
+    
+    # update discriminator
+    new_gail_discr, gail_discr_info, gail_discr_stats_info = Discriminator.update(
+        self=gail_discriminator,
+        real_batch=expert_state_pairs,
+        fake_batch=learner_state_pairs
+    )
+
+    # update reward transform
+    base_rewards = _get_base_rewards(new_gail_discr, learner_state_pairs)
+    new_reward_transform, reward_transform_info = new_gail_discr.reward_transform.update(base_rewards)
+
+    new_gail_discr = new_gail_discr.replace(reward_transform=new_reward_transform)
+    info = {**gail_discr_info, **reward_transform_info}
+    stats_info = {**gail_discr_stats_info}
+    return new_gail_discr, info, stats_info
 
 @jax.jit
-def _get_rewards_jit(x: jnp.ndarray, discriminator: Discriminator, reward_transform: RewardTransform):
-    rewards = -jnp.log(discriminator(x))
-    return reward_transform.transform(rewards)
+def _get_rewards_jit(
+    discriminator: Discriminator,
+    learner_state_pairs: jnp.ndarray,
+    reward_transform: BaseRewardTransform,
+):
+    base_rewards = _get_base_rewards(discriminator, learner_state_pairs)
+    return reward_transform.transform(base_rewards)
+
+def _get_base_rewards(
+    discriminator: Discriminator,
+    learner_state_pairs: jnp.ndarray,
+):
+    learner_logits = discriminator(learner_state_pairs)
+    base_rewards = learner_logits
+    return base_rewards

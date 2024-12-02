@@ -13,6 +13,8 @@ dataset:
 gan:
   _target_: gan.gan.GAN.create
   seed: *seed
+  loss_config:
+    _target_: gan.losses.LogisticLossGP
   generator_config:
     module_config:
       _target_: networks.common.MLP
@@ -23,9 +25,6 @@ gan:
           max_delta: 1.0
         - _target_: optax.adamw
           learning_rate: 3e-4
-    loss_fn_config:
-      _target_: hydra.utils.get_method
-      path: gan.losses.g_logistic_loss
   discriminator_config:
     module_config:
       _target_: networks.discriminator.Discriminator
@@ -36,6 +35,3 @@ gan:
           max_delta: 1.0
         - _target_: optax.adamw
           learning_rate: 3e-4
-    loss_fn_config:
-      _target_: hydra.utils.get_method
-      path: gan.losses.d_logistic_loss
