@@ -1,6 +1,4 @@
-import functools
-from pathlib import Path
-from typing import Any, Callable, Tuple
+from typing import Any, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -9,10 +7,8 @@ from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
-from gan.discriminator import Discriminator
 from nn.train_state import TrainState
-from utils.types import Params
-from utils.utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
+from utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
 
 
 class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
@@ -65,7 +61,6 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def update(self, *, batch: Any, **kwargs):
         new_state, info, stats_info = self.state.update(batch=batch, **kwargs)
         return self.replace(state=new_state), info, stats_info
-    
+
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
-

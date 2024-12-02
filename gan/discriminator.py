@@ -1,6 +1,4 @@
-import functools
-from pathlib import Path
-from typing import Dict, Tuple
+from typing import Tuple
 
 import jax
 import jax.numpy as jnp
@@ -10,8 +8,8 @@ from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
 from nn.train_state import TrainState
-from utils.types import Params, PRNGKey
-from utils.utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
+from utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
+from utils.types import PRNGKey
 
 
 class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
@@ -67,7 +65,6 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         if not return_logits:
             del info["real_logits"], info["fake_logits"]
         return self.replace(state=new_state), info, stats_info
-    
+
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
-    
