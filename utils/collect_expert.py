@@ -10,7 +10,6 @@ from loguru import logger
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
-from utils.evaluate import evaluate
 from utils.utils import save_json, save_pickle
 
 
