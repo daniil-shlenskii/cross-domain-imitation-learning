@@ -11,7 +11,7 @@ dataset:
   sigma: [1, 1, 3]
 
 gan:
-  _target_: gan.gan.GAN.create
+  _target_: gan.GAN.create
   seed: *seed
   loss_config:
     _target_: gan.losses.LogisticLossGP
