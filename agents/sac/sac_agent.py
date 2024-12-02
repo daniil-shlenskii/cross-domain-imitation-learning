@@ -1,6 +1,4 @@
-import functools
 from copy import deepcopy
-from pathlib import Path
 from typing import Dict, Tuple
 
 import gymnasium as gym
@@ -15,7 +13,7 @@ from agents.base_agent import Agent
 from agents.sac.losses import (actor_loss_fn, critic_loss_fn,
                                temperature_loss_fn)
 from nn.train_state import TrainState
-from utils.types import DataType, Params, PRNGKey
+from utils.types import DataType, Params
 from utils.utils import instantiate_optimizer
 
 
@@ -53,7 +51,7 @@ class SACAgent(Agent):
         backup_entropy: bool = True,
         #
         discount: float = 0.99,
-        tau = 0.005,
+        tau: float = 0.005,
     ):
         # reproducibility keys
         rng = jax.random.key(seed)
@@ -192,7 +190,7 @@ def _update_jit(
     return new_agent, info, stats_info
 
 def _update_target_net(
-    online_params: Params, target_params: Params, tau: int
+    online_params: Params, target_params: Params, tau: float
 ) -> Tuple[TrainState, Dict[str, float]]:
     new_target_params = jax.tree.map(
         lambda t1, t2: t1 * tau + t2 * (1 - tau),
