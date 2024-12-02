@@ -60,7 +60,7 @@ def main(args: argparse.Namespace):
 
     # collect rollouts
     logger.info("Collecting..")
-    _, trajs = Agent.evaluate(
+    info, trajs = Agent.evaluate(
         agent,
         seed=eval_config.seed,
         env=env,
@@ -74,8 +74,8 @@ def main(args: argparse.Namespace):
     observation, reward, done, _, _ = env.step(action)
 
     buffer_config = config.replay_buffer
-    buffer_config["min_length"] = 0
-    buffer_config["max_length"] = trajs["observations"].shape[0]
+    buffer_config["fbx_buffer_config"]["min_length"] = 0
+    buffer_config["fbx_buffer_config"]["max_length"] = trajs["observations"].shape[0]
 
     buffer = instantiate(config.replay_buffer, _recursive_=False)
     state = buffer.init(
@@ -95,12 +95,7 @@ def main(args: argparse.Namespace):
     
 
     # save rollout and runs info
-    info = {
-        "num_episodes": args.num_episodes,
-        "average_return": np.mean(env.return_queue),
-        "average_length": np.mean(env.length_queue)
-    }
-
+    info.update({"num_episodes": args.num_episodes})
 
     save_dir = agent_dir
     if args.save_rollouts_dir is not None:
