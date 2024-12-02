@@ -68,19 +68,20 @@ def _update_jit(
     ], axis=1)
     
     # update discriminator
-    new_gail_discrimiantor, info, stats_info = Discriminator.update(
+    new_gail_discr, gail_discr_info, gail_discr_stats_info = Discriminator.update(
         self=gail_discriminator,
         real_batch=expert_state_pairs,
         fake_batch=learner_state_pairs
     )
 
     # update reward transform
-    base_rewards = _get_base_rewards(discriminator, learner_state_pairs)
-    new_reward_transform, info = reward_transform.update(base_rewards)
+    base_rewards = _get_base_rewards(new_gail_discr, learner_state_pairs)
+    new_reward_transform, reward_transform_info = new_gail_discr.reward_transform.update(base_rewards)
 
-    new_gail_discrimiantor = new_gail_discrimiantor.replace(reward_transform=new_reward_transform)
-    info.update(reward_transform_info)
-    return new_gail_discrimiantor, info, stats_info
+    new_gail_discr = new_gail_discr.replace(reward_transform=new_reward_transform)
+    info = {**gail_discr_info, **reward_transform_info}
+    stats_info = {**gail_discr_stats_info}
+    return new_gail_discr, info, stats_info
 
 @jax.jit
 def _get_rewards_jit(
