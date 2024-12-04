@@ -16,7 +16,7 @@ def init() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Collect rollout for the given agent."
     )
-    parser.add_argument("--archive_agent_dir",     type=str)
+    parser.add_argument("--agent_dir",             type=str)
     parser.add_argument("--num_episodes",          type=int)
     parser.add_argument("--save_rollouts_dir",     type=str, default=None)
     parser.add_argument("-w", "--ignore_warnings", action="store_true")
@@ -24,7 +24,7 @@ def init() -> argparse.Namespace:
 
 def main(args: argparse.Namespace):
     # agent config init
-    agent_dir = Path(args.archive_agent_dir)
+    agent_dir = Path(args.agent_dir)
     
     config = OmegaConf.load(agent_dir / "config.yaml")
     logger.info(f"\nCONFIG:\n-------\n{OmegaConf.to_yaml(config)}")
