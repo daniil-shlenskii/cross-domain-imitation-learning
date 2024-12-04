@@ -62,6 +62,7 @@ agent:
     optimizer_config: *optimizer_config
     loss_config:
       _target_: gan.losses.SoftplusLoss
+      is_generator: False
     reward_transform_config:
       _target_: agents.gail.reward_transforms.RewardStandartization.create
 
