@@ -3,10 +3,11 @@ import json
 import pickle
 import warnings
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Callable, Dict
 
 import hydra
 import jax
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 import optax
@@ -16,6 +17,10 @@ from omegaconf.dictconfig import DictConfig
 
 from utils.types import Buffer, BufferState
 
+
+@jax.jit
+def apply_model_jit(model: Callable, input: jnp.ndarray):
+    return model(input)
 
 def instantiate_optimizer(config: DictConfig):
     transforms = [
