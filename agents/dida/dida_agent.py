@@ -13,7 +13,7 @@ from gan.generator import Generator
 from utils import apply_model_jit, get_buffer_state_size
 from utils.types import BufferState, DataType
 
-from .das import domain_adversarial_sampling
+from .das import DomainAdversarialSampling
 from .domain_loss_scale_updaters import IdentityDomainLossScaleUpdater
 
 
@@ -21,10 +21,7 @@ class DIDAAgent(GAILAgent):
     learner_encoder: Generator
     domain_discriminator: Discriminator
     anchor_buffer_state: BufferState = struct.field(pytree_node=False, init=False)
-    use_das: float = struct.field(pytree_node=False)
-    sar_p: float = struct.field(pytree_node=False)
-    p_acc_ema: float = struct.field(pytree_node=False)
-    p_acc_ema_decay: float = struct.field(pytree_node=False)
+    das: float = struct.field(pytree_node=False)
     n_domain_discriminator_updates: int = struct.field(pytree_node=False)
     domain_loss_scale: float = struct.field(pytree_node=False)
     domain_loss_scale_updater: int = struct.field(pytree_node=False)
@@ -82,6 +79,15 @@ class DIDAAgent(GAILAgent):
             _recursive_=False,
         )
 
+        # DAS init
+        das = None
+        if use_das:
+            das = DomainAdversarialSampling(
+                sar_p=sar_p,
+                p_acc_ema=p_acc_ema,
+                p_acc_ema_decay=p_acc_ema_decay,
+            )
+
         # domain loss updater init
         if not use_das or domain_loss_scale_updater_config is None:
             domain_loss_scale_updater = IdentityDomainLossScaleUpdater()
@@ -95,7 +101,7 @@ class DIDAAgent(GAILAgent):
                 "learner_encoder",
                 "policy_discriminator",
                 "domain_discriminator",
-                "p_acc_ema",
+                "das",
             )
         )
 
@@ -112,11 +118,9 @@ class DIDAAgent(GAILAgent):
             n_policy_discriminator_updates=n_policy_discriminator_updates,
             #
             learner_encoder=learner_encoder,
-            use_das=use_das,
-            sar_p=sar_p,
-            p_acc_ema=p_acc_ema,
-            p_acc_ema_decay=p_acc_ema_decay,
+            das=das,
             domain_discriminator=domain_discriminator,
+            n_domain_discriminator_updates=n_domain_discriminator_updates,
             domain_loss_scale=domain_loss_scale,
             domain_loss_scale_updater=domain_loss_scale_updater,
             _save_attrs=_save_attrs,
@@ -175,7 +179,6 @@ class DIDAAgent(GAILAgent):
             )
             return new_dida_agent, domain_disc_info, domain_disc_stats_info
 
-
         # update encoders and domain discriminator
         new_domain_loss_scale = self.domain_loss_scale_updater.update(self)
         (
@@ -194,7 +197,7 @@ class DIDAAgent(GAILAgent):
         new_dida_agent = new_dida_agent.replace(domain_loss_scale=new_domain_loss_scale)
 
         # prepare mixed batch for policy discriminator update
-        if self.use_das:
+        if self.das is not None:
             # sample anchor batch
             new_rng, key = jax.random.split(new_rng)
             anchor_batch = self.anchor_buffer.sample(self.anchor_buffer_state, key)
@@ -203,22 +206,19 @@ class DIDAAgent(GAILAgent):
             anchor_batch["observations"] = apply_model_jit(anchor_batch["observations"])
             anchor_batch["observations_next"] = apply_model_jit(anchor_batch["observations_next"])
 
-            new_rng, mixed_batch, new_p_acc_ema, sar_info = domain_adversarial_sampling(
-                rng=new_rng,
+            # mix batches
+            mixed_batch, sar_info = self.das.mixed_batches(
                 encoded_learner_batch=batch,
                 encoded_anchor_batch=anchor_batch,
                 learner_domain_logits=learner_domain_logits,
                 expert_domain_logits=expert_domain_logits,
-                sar_p=self.sar_p,
-                p_acc_ema=self.p_acc_ema,
-                p_acc_ema_decay=self.p_acc_ema_decay,
             )
+            info.update(sar_info)
         else:
             mixed_batch = batch
-            sar_info, new_p_acc_ema = {}, None
 
         # update agent and policy discriminator
-        new_rl_agent, new_policy_disc, gail_info, gail_stats_info = self._update_gail(
+        new_dida_agent, gail_info, gail_stats_info = new_dida_agent._update_gail(
             batch=batch,
             expert_batch=expert_batch,
             policy_discriminator_learner_batch=mixed_batch,
@@ -226,14 +226,9 @@ class DIDAAgent(GAILAgent):
         )
 
         # update dida agent
-        new_dida_agent = new_dida_agent.replace(
-            rng=new_rng,
-            agent=new_rl_agent,
-            policy_discriminator=new_policy_disc,
-            new_p_acc_ema=new_p_acc_ema,
-        )
-        info.update({**gail_info, **sar_info})
-        stats_info.update({**gail_stats_info})
+        new_dida_agent = new_dida_agent.replace(rng=new_rng)
+        info.update(gail_info)
+        stats_info.update(gail_stats_info)
         return new_dida_agent, info, stats_info
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:

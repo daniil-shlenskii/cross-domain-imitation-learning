@@ -20,10 +20,6 @@ from utils.types import Buffer, BufferState, PRNGKey
 from utils.utils import get_buffer_state_size
 
 
-@jax.jit
-def encode_observation_jit(encoder, observations):
-    return encoder(observations)
-
 def get_state_and_policy_tsne_scatterplots(
     seed: int,
     #
