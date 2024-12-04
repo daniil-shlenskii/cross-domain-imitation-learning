@@ -66,7 +66,11 @@ class GAILAgent(Agent):
         new_expert_buffer_state_exp = {}
         for k, v in expert_buffer_state_exp.items():
             new_expert_buffer_state_exp[k] = v[0, :buffer_state_size]
-        expert_buffer_state.replace(experience=new_expert_buffer_state_exp)
+        expert_buffer_state.replace(
+            experience=new_expert_buffer_state_exp,
+            current_index=0,
+            is_full=True,
+        )
 
         expert_buffer = instantiate_jitted_fbx_buffer({
             "_target_": "flashbax.make_item_buffer",
