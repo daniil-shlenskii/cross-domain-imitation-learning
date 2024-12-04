@@ -1,7 +1,7 @@
 seed: &seed 0
-env_name: &env_name HalfCheetah-v5
+env_name: &env_name Swimmer-v5
 
-n_iters_training: 5_000_000
+n_iters_training: 1_000_000
 
 batch_size: &batch_size 2048
 precollect_buffer_size: &precollect_buffer_size 3_000
@@ -30,7 +30,7 @@ agent:
   _target_: agents.gail.GAILAgent.create
   seed: *seed
   expert_batch_size: *batch_size
-  expert_buffer_state_path: experiments/sac/HalfCheetah-v5/0/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
+  expert_buffer_state_path: experts/Swimmer-v5/archive/Swimmer-v5/collected_rollouts/buffer_state.pickle
   n_discriminator_updates: 1
   agent_config:
     _target_: agents.sac.SACAgent.create
