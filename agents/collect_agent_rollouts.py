@@ -92,7 +92,11 @@ def main(args: argparse.Namespace):
     new_state_exp = trajs
     for k, v in new_state_exp.items():
         new_state_exp[k] = v[None]
-    
+    state = state.replace(
+        experience=new_state_exp,
+        is_full=True,
+        current_index=0,
+    )
 
     # save rollout and runs info
     info.update({"num_episodes": args.num_episodes})
