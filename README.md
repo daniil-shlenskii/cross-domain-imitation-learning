@@ -4,7 +4,6 @@
 ```bash
 python train.py --config_path configs/sac_config.yaml -w --from_scratch
 python train.py --config_path configs/gail_config.yaml -w --from_scratch
-python train.py --config_path configs/dida_config.yaml -w --from_scratch
 ```
 
 **Agent saving and loading**
@@ -33,7 +32,7 @@ archive:
 
 **Agent's trajectories collecting example**
 ```bash
-python -m utils.collect_expert --archive_agent_dir archive/agents/sac/<env_name> --num_episodes 5
+python -m utils.collect_expert --agent_dir archive/agents/sac/<env_name> --num_episodes 5
 ```
 Collected rollouts with be under the following path:
 ```bash
