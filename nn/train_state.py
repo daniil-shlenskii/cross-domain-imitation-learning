@@ -1,4 +1,3 @@
-import functools
 from collections.abc import Callable
 from typing import Any, Tuple
 
@@ -7,7 +6,7 @@ import jax.numpy as jnp
 from flax import core, struct
 from flax.training.train_state import TrainState as FlaxTrainState
 
-from utils.utils import SaveLoadFrozenDataclassMixin
+from utils import SaveLoadFrozenDataclassMixin
 
 
 class TrainState(FlaxTrainState, SaveLoadFrozenDataclassMixin):

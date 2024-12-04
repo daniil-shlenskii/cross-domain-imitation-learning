@@ -1,10 +1,11 @@
 import distrax
 import jax
 import jax.numpy as jnp
-import wandb
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 from tqdm import tqdm
+
+import wandb
 
 
 def main():

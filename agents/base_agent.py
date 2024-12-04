@@ -1,20 +1,16 @@
-from pathlib import Path
 from typing import Dict, Tuple
 
-import flax.linen as nn
 import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
 from flax import struct
 from flax.struct import PyTreeNode
-from hydra.utils import instantiate
-from omegaconf.dictconfig import DictConfig
 
+from agents.utils import evaluate
 from nn.train_state import TrainState
-from utils.evaluate import evaluate
+from utils import SaveLoadFrozenDataclassMixin
 from utils.types import PRNGKey
-from utils.utils import SaveLoadFrozenDataclassMixin
 
 
 class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
@@ -34,10 +30,10 @@ class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def eval_log_probs(self, observations: np.ndarray, actions: np.ndarray) -> float:
         observations = self._preprocess_observations(observations)
         return _eval_log_probs_jit(self.actor, observations, actions)
-    
+
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
         return observations
-    
+
     def evaluate(self, *, seed: int, env: gym.Env, num_episodes: int, return_trajectories: bool=False, **kwargs) -> Dict[str, float]:
         return evaluate(
             seed=seed,

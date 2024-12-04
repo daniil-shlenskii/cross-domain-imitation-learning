@@ -1,16 +1,13 @@
-from pathlib import Path
 from typing import Tuple
 
 import jax
 import jax.numpy as jnp
-from flax.struct import PyTreeNode
-from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
-from gan.discriminator import Discriminator
-from gan.generator import Generator
-from utils.types import Params, PRNGKey
-from utils.utils import SaveLoadMixin
+from utils import SaveLoadMixin
+
+from .discriminator import Discriminator
+from .generator import Generator
 
 
 class GAN(SaveLoadMixin):
@@ -38,7 +35,7 @@ class GAN(SaveLoadMixin):
             loss_config=loss_config,
             **generator_config,
         )
-        
+
         discriminator_input_dim = generator(jnp.ones(input_dim, dtype=jnp.float32)).shape
         discriminator = Discriminator.create(
             seed=seed,
@@ -48,7 +45,7 @@ class GAN(SaveLoadMixin):
         )
 
         return cls(generator=generator, discriminator=discriminator)
-    
+
     def __init__(self, generator: Generator, discriminator: Discriminator):
         self.generator = generator
         self.discriminator = discriminator

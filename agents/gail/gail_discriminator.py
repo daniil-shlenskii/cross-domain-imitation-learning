@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import jax
 import jax.numpy as jnp
 from hydra.utils import instantiate
@@ -7,7 +5,6 @@ from omegaconf.dictconfig import DictConfig
 
 from agents.gail.reward_transforms import BaseRewardTransform
 from gan.discriminator import Discriminator
-from gan.generator import Generator
 from utils.types import DataType
 
 
@@ -38,7 +35,7 @@ class GAILDiscriminator(Discriminator):
             gail_discriminator=self,
         )
         return new_gail_discriminator, info, stats_info
-    
+
     def get_rewards(self, learner_batch: jnp.ndarray) -> jnp.ndarray:
         learner_state_pairs = jnp.concatenate([
             learner_batch["observations"],
@@ -65,7 +62,7 @@ def _update_jit(
         learner_batch["observations"],
         learner_batch["observations_next"]
     ], axis=1)
-    
+
     # update discriminator
     new_gail_discr, gail_discr_info, gail_discr_stats_info = Discriminator.update(
         self=gail_discriminator,

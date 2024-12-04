@@ -1,10 +1,7 @@
 import functools
-from typing import Dict
 
-import flashbax
 import gymnasium as gym
 import jax
-import jax.numpy as jnp
 import numpy as np
 from flax import struct
 from hydra.utils import instantiate
@@ -12,10 +9,9 @@ from omegaconf.dictconfig import DictConfig
 
 from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
-from nn.train_state import TrainState
-from utils.types import *
-from utils.types import DataType
-from utils.utils import instantiate_jitted_fbx_buffer, load_pickle
+from utils import (get_buffer_state_size, instantiate_jitted_fbx_buffer,
+                   load_pickle)
+from utils.types import Buffer, BufferState, DataType
 
 
 class GAILAgent(Agent):
@@ -64,15 +60,25 @@ class GAILAgent(Agent):
 
         # expert buffer init
         expert_buffer_state = load_pickle(expert_buffer_state_path)
-        expert_buffer = instantiate_jitted_fbx_buffer(
-            fbx_buffer_config=dict(
-                _target_="flashbax.make_item_buffer",
-                sample_batch_size=expert_batch_size,
-                min_length=expert_buffer_state.current_index,
-                max_length=expert_buffer_state.current_index,
-                add_batches=False,
-            )
+
+        buffer_state_size = get_buffer_state_size(expert_buffer_state)
+        expert_buffer_state_exp = expert_buffer_state.experience
+        new_expert_buffer_state_exp = {}
+        for k, v in expert_buffer_state_exp.items():
+            new_expert_buffer_state_exp[k] = v[0, :buffer_state_size]
+        expert_buffer_state.replace(
+            experience=new_expert_buffer_state_exp,
+            current_index=0,
+            is_full=True,
         )
+
+        expert_buffer = instantiate_jitted_fbx_buffer({
+            "_target_": "flashbax.make_item_buffer",
+            "sample_batch_size": expert_batch_size,
+            "min_length": buffer_state_size,
+            "max_length": buffer_state_size,
+            "add_batches": False,
+        })
 
         _save_attrs = kwargs.pop(
             "_save_attrs",
@@ -110,12 +116,12 @@ def _update_jit(
     train_agent: bool,
 ):
     new_params = {}
-    
+
     # sample expert batch
     new_rng, key = jax.random.split(gail_agent.rng)
     expert_batch = gail_agent.expert_buffer.sample(gail_agent.expert_buffer_state, key).experience
     new_params["rng"] = new_rng
-   
+
     # update discriminator
     new_disc, info, stats_info = gail_agent.discriminator.update(
         learner_batch=batch,
