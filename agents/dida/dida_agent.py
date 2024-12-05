@@ -223,11 +223,10 @@ class DIDAAgent(GAILAgent):
             mixed_batch = batch
 
         # update agent and policy discriminator
-        new_dida_agent, gail_info, gail_stats_info = new_dida_agent._update_gail(
+        new_dida_agent, gail_info, gail_stats_info = new_dida_agent.update_gail(
             batch=batch,
             expert_batch=expert_batch,
             policy_discriminator_learner_batch=mixed_batch,
-            update_agent=update_agent,
         )
 
         # update dida agent
