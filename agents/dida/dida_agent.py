@@ -168,7 +168,7 @@ class DIDAAgent(GAILAgent):
     def _update(self, batch: DataType, update_gail_agent: bool, update_agent: bool):
         # sample expert batch
         new_rng, key = jax.random.split(self.rng)
-        expert_batch = self.expert_buffer.sample(self.expert_buffer_state, key)
+        expert_batch = self.expert_buffer.sample(self.expert_buffer_state, key).experience
 
         # domain discriminator update only
         if not update_gail_agent:
@@ -204,7 +204,6 @@ class DIDAAgent(GAILAgent):
             expert_batch=expert_batch,
             domain_loss_scale=new_domain_loss_scale,
         )
-        new_dida_agent = new_dida_agent.replace(domain_loss_scale=new_domain_loss_scale)
 
         # prepare mixed batch for policy discriminator update
         if self.das is not None:
@@ -236,7 +235,7 @@ class DIDAAgent(GAILAgent):
         )
 
         # update dida agent
-        new_dida_agent = new_dida_agent.replace(rng=new_rng)
+        new_dida_agent = new_dida_agent.replace(rng=new_rng, domain_loss_scale=new_domain_loss_scale)
         info.update(gail_info)
         stats_info.update(gail_stats_info)
         return new_dida_agent, info, stats_info
@@ -262,8 +261,8 @@ class DIDAAgent(GAILAgent):
             fake_batch=expert_batch["observations"],
             return_logits=True,
         )
-        learner_domain_logits = domain_disc_info.pop("real_logits")
-        expert_domain_logits = domain_disc_info.pop("fake_logits")
+        expert_domain_logits = domain_disc_info.pop("real_logits")
+        learner_domain_logits = domain_disc_info.pop("fake_logits")
 
         # update dida agent
         new_dida_agent = self.replace(
