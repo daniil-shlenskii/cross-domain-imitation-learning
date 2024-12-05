@@ -97,7 +97,7 @@ class DIDAEncoderLoss(DIDAEncoderLossMixin):
         expert_loss, expert_info = self.expert_loss(
             params=params,
             state=state,
-            batch=batch,
+            batch=expert_batch,
             policy_discriminator=policy_discriminator,
             domain_discriminator=domain_discriminator,
             domain_loss_scale=domain_loss_scale,
