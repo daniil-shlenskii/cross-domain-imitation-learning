@@ -206,17 +206,17 @@ class DIDAAgent(GAILAgent):
         )
 
         # prepare mixed batch for policy discriminator update
-        if self.das is not None:
+        if new_dida_agent.das is not None:
             # sample anchor batch
             new_rng, key = jax.random.split(new_rng)
-            anchor_batch = self.anchor_buffer.sample(self.anchor_buffer_state, key)
+            anchor_batch = new_dida_agent.anchor_buffer.sample(new_dida_agent.anchor_buffer_state, key)
 
             # encode anchor batch
             anchor_batch["observations"] = apply_model_jit(anchor_batch["observations"])
             anchor_batch["observations_next"] = apply_model_jit(anchor_batch["observations_next"])
 
             # mix batches
-            mixed_batch, sar_info = self.das.mixed_batches(
+            mixed_batch, sar_info = new_dida_agent.das.mixed_batches(
                 encoded_learner_batch=batch,
                 encoded_anchor_batch=anchor_batch,
                 learner_domain_logits=learner_domain_logits,
@@ -238,6 +238,7 @@ class DIDAAgent(GAILAgent):
         new_dida_agent = new_dida_agent.replace(rng=new_rng, domain_loss_scale=new_domain_loss_scale)
         info.update(gail_info)
         stats_info.update(gail_stats_info)
+
         return new_dida_agent, info, stats_info
 
     @jax.jit
@@ -257,8 +258,8 @@ class DIDAAgent(GAILAgent):
 
         # update domain discriminator
         new_domain_disc, domain_disc_info, domain_disc_stats_info = self.domain_discriminator.update(
-            real_batch=batch["observations"],
-            fake_batch=expert_batch["observations"],
+            real_batch=expert_batch["observations"],
+            fake_batch=batch["observations"],
             return_logits=True,
         )
         expert_domain_logits = domain_disc_info.pop("real_logits")
