@@ -109,20 +109,32 @@ class GAILAgent(Agent):
         )
         return new_gail_agent, info, stats_info
 
+    @functools.partial(jax.jit, static_argnames="update_agent")
     def update_gail(
         self,
         batch: DataType,
         expert_batch: DataType,
         policy_discriminator_learner_batch: DataType,
+        update_agent: bool,
     ):
-        new_agent, new_policy_disc, info, stats_info = _update_gail_jit(
-            batch=batch,
+        new_params = {}
+
+        # update policy_discriminator
+        new_disc, info, stats_info = self.policy_discriminator.update(
+            learner_batch=policy_discriminator_learner_batch,
             expert_batch=expert_batch,
-            policy_discriminator_learner_batch=policy_discriminator_learner_batch,
-            agent=self.agent,
-            policy_discriminator=self.policy_discriminator,
         )
-        new_gail_agent = self.replace(agent=new_agent, policy_discriminator=new_policy_disc)        
+        new_params["policy_discriminator"] = new_disc
+
+        # update agent
+        if update_agent:
+            batch["rewards"] = new_disc.get_rewards(batch)
+            new_agent, agent_info, agent_stats_info = self.agent.update(batch)
+            new_params["agent"] = new_agent
+            info.update(agent_info)
+            stats_info.update(agent_stats_info)
+
+        new_gail_agent = self.replace(**new_params)
         return new_gail_agent, info, stats_info
 
 @functools.partial(jax.jit, static_argnames="update_agent")
@@ -137,40 +149,10 @@ def _update_jit(
     new_gail_agent = gail_agent.replace(rng=new_rng)
 
     # update agent and policy policy_discriminator
-    if update_agent:
-        new_gail_agent, info, stats_info = new_gail_agent.update_gail(
-            batch=batch,
-            expert_batch=expert_batch,
-            policy_discriminator_learner_batch=batch,
-        )
-    else:
-        new_disc, info, stats_info = new_gail_agent.policy_discriminator.update(
-            learner_batch=policy_discriminator_learner_batch,
-            expert_batch=expert_batch,
-        )
-        new_gail_agent = new_gail_agent.replace(policy_discriminator=new_disc)
-
-    return new_gail_agent, info, stats_info
-
-@jax.jit
-def _update_gail_jit(
-    batch: DataType,
-    expert_batch: DataType,
-    policy_discriminator_learner_batch: DataType,
-    agent: Agent,
-    policy_discriminator: GAILDiscriminator,
-):
-    # update policy_discriminator
-    new_disc, info, stats_info = policy_discriminator.update(
-        learner_batch=policy_discriminator_learner_batch,
+    new_gail_agent, info, stats_info = new_gail_agent.update_gail(
+        batch=batch,
         expert_batch=expert_batch,
+        policy_discriminator_learner_batch=batch,
+        update_agent=update_agent,
     )
-
-    # update agent
-    batch["rewards"] = new_disc.get_rewards(batch)
-    new_agent, agent_info, agent_stats_info = agent.update(batch)
-
-    info.update(agent_info)
-    stats_info.update(agent_stats_info)
-    return new_agent, new_disc, info, stats_info
-
+    return new_gail_agent, info, stats_info
