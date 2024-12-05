@@ -21,7 +21,7 @@ from .domain_loss_scale_updaters import IdentityDomainLossScaleUpdater
 class DIDAAgent(GAILAgent):
     learner_encoder: Generator
     domain_discriminator: Discriminator
-    anchor_buffer_state: BufferState = struct.field(pytree_node=False, init=False)
+    anchor_buffer_state: BufferState = struct.field(pytree_node=False)
     das: float = struct.field(pytree_node=False)
     n_domain_discriminator_updates: int = struct.field(pytree_node=False)
     domain_loss_scale: float = struct.field(pytree_node=False)
@@ -112,7 +112,7 @@ class DIDAAgent(GAILAgent):
             )
         )
 
-        return super().create(
+        dida_agent = super().create(
             seed=seed,
             observation_dim=observation_dim,
             action_dim=action_dim,
@@ -124,6 +124,7 @@ class DIDAAgent(GAILAgent):
             policy_discriminator_config=policy_discriminator_config,
             n_policy_discriminator_updates=n_policy_discriminator_updates,
             #
+            anchor_buffer_state=None,
             learner_encoder=learner_encoder,
             das=das,
             domain_discriminator=domain_discriminator,
@@ -134,14 +135,18 @@ class DIDAAgent(GAILAgent):
             **kwargs,
         )
 
-    def __post_init__(self):
         # anchor buffer init
-        buffer_state_size = get_buffer_state_size(self.expert_buffer_state)
-        anchor_buffer_state = deepcopy(self.expert_buffer_state)
+        buffer_state_size = get_buffer_state_size(dida_agent.expert_buffer_state)
+        anchor_buffer_state = deepcopy(dida_agent.expert_buffer_state)
         perm_idcs = np.random.choice(buffer_state_size)
         anchor_buffer_state.experience["observations_next"][0] = \
                 anchor_buffer_state.experience["observations_next"][0, perm_idcs]
-        object.__setattr__(self, "anchor_buffer_state", anchor_buffer_state)
+
+        dida_agent = dida_agent.replace(anchor_buffer_state=anchor_buffer_state)
+        return dida_agent
+
+    def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
+        return apply_model_jit(self.learner_encoder, observations)
 
     def __getattr__(self, item: str):
         if item == "expert_encoder":
@@ -227,6 +232,7 @@ class DIDAAgent(GAILAgent):
             batch=batch,
             expert_batch=expert_batch,
             policy_discriminator_learner_batch=mixed_batch,
+            update_agent=update_agent,
         )
 
         # update dida agent
@@ -235,9 +241,7 @@ class DIDAAgent(GAILAgent):
         stats_info.update(gail_stats_info)
         return new_dida_agent, info, stats_info
 
-    def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
-        return apply_model_jit(self.learner_encoder, observations)
-
+    @jax.jit
     def _update_encoders_and_domain_discrimiantor(
         self, batch: DataType, expert_batch: DataType, domain_loss_scale: float
     ):
