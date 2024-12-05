@@ -61,6 +61,12 @@ class DIDAAgent(GAILAgent):
         **kwargs,
     ):
         # encoders init
+        policy_loss = instantiate(policy_discriminator_config["loss_config"])
+        domain_loss = instantiate(domain_discriminator_config["loss_config"])
+        leanrer_encoder_config = learner_encoder_config.to_container()
+        leanrer_encoder_config["policy_loss"] = policy_loss
+        leanrer_encoder_config["domain_loss"] = domain_loss
+
         learner_encoder = instantiate(
             learner_encoder_config,
             seed=seed,
