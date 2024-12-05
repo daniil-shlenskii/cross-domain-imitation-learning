@@ -178,8 +178,8 @@ class DIDAAgent(GAILAgent):
 
             # update domain discriminator
             new_domain_disc, domain_disc_info, domain_disc_stats_info = self.domain_discriminator.update(
-                real_batch=batch["observations"],
-                fake_batch=expert_batch["observations"]
+                real_batch=expert_batch["observations"]
+                fake_batch=batch["observations"],
             )
 
             # update gail agent
