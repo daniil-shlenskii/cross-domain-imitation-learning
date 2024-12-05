@@ -11,7 +11,7 @@ from omegaconf.dictconfig import DictConfig
 from agents.gail.gail_agent import GAILAgent
 from gan.discriminator import Discriminator
 from gan.generator import Generator
-from utils import apply_model_jit, get_buffer_state_size
+from utils import apply_model_jit, get_buffer_state_size, sample_batch
 from utils.types import BufferState, DataType
 
 from .das import DomainAdversarialSampling
@@ -167,8 +167,9 @@ class DIDAAgent(GAILAgent):
 
     def _update(self, batch: DataType, update_gail_agent: bool, update_agent: bool):
         # sample expert batch
-        new_rng, key = jax.random.split(self.rng)
-        expert_batch = self.expert_buffer.sample(self.expert_buffer_state, key).experience
+        new_rng, expert_batch = sample_batch(
+            self.rng, self.expert_buffer, self.expert_buffer_state
+        )
 
         # domain discriminator update only
         if not update_gail_agent:
@@ -208,8 +209,9 @@ class DIDAAgent(GAILAgent):
         # prepare mixed batch for policy discriminator update
         if new_dida_agent.das is not None:
             # sample anchor batch
-            new_rng, key = jax.random.split(new_rng)
-            anchor_batch = new_dida_agent.anchor_buffer.sample(new_dida_agent.anchor_buffer_state, key)
+            new_rng, anchor_batch = sample_batch(
+                new_rng, self.expert_buffer, self.anchor_buffer_state
+            )
 
             # encode anchor batch
             anchor_batch["observations"] = apply_model_jit(anchor_batch["observations"])
@@ -227,6 +229,8 @@ class DIDAAgent(GAILAgent):
             mixed_batch = batch
 
         # update agent and policy discriminator
+        new_dida_agent = self
+        mixed_batch = batch
         new_dida_agent, gail_info, gail_stats_info = new_dida_agent.update_gail(
             batch=batch,
             expert_batch=expert_batch,
@@ -235,7 +239,9 @@ class DIDAAgent(GAILAgent):
         )
 
         # update dida agent
-        new_dida_agent = new_dida_agent.replace(rng=new_rng, domain_loss_scale=new_domain_loss_scale)
+        info, stats_info = {}, {}
+        # new_dida_agent = new_dida_agent.replace(rng=new_rng, domain_loss_scale=new_domain_loss_scale)
+        new_dida_agent = new_dida_agent.replace(rng=new_rng)
         info.update(gail_info)
         stats_info.update(gail_stats_info)
 
