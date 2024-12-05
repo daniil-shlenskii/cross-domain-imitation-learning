@@ -1,13 +1,10 @@
-import functools
 from copy import deepcopy
 from typing import Callable
 
 import jax.numpy as jnp
 
-from gan.base_losses import (g_nonsaturating_logistic_loss,
-                             g_nonsaturating_softplus_loss)
 from gan.discriminator import Discriminator
-from gan.losses import LogisticLoss, SoftplusLoss
+from gan.losses import GANLoss, LogisticLoss, SoftplusLoss
 from nn.train_state import TrainState
 from utils.types import DataType, Params
 
@@ -16,8 +13,8 @@ class DIDAEncoderLossMixin:
     def __init__(self, policy_loss: GANLoss, domain_loss: GANLoss):
         self.learner_policy_loss_fn = policy_loss.generator_loss_fn
         self.learner_domain_loss_fn = domain_loss.generator_loss_fn
-        self.expert_policy_loss_fn = _get_expert_loss_fn(policy_loss)
-        self.expert_domain_loss_fn = _get_expert_loss_fn(domain_loss)
+        self.expert_policy_loss_fn = self._get_expert_loss_fn(policy_loss)
+        self.expert_domain_loss_fn = self._get_expert_loss_fn(domain_loss)
 
     def _get_expert_loss_fn(self, loss: GANLoss):
         loss_fn = loss.generator_loss_fn
@@ -47,11 +44,11 @@ class DIDAEncoderLossMixin:
 
         policy_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=1)
         policy_logits = policy_discriminator(policy_batch)
-        policy_loss = policy_loss_fn(policy_logits)
+        policy_loss = policy_loss_fn(policy_logits).mean()
 
         domain_batch = batch["observations"]
         domain_logits = domain_discriminator(domain_batch)
-        domain_loss = domain_loss_fn(domain_logits)
+        domain_loss = domain_loss_fn(domain_logits).mean()
 
         loss = policy_loss + domain_loss_scale * domain_loss
         info = {
@@ -91,6 +88,7 @@ class DIDAEncoderLoss(DIDAEncoderLossMixin):
     ):
         learner_loss, learner_info = self.learner_loss(
             params=params,
+            state=state,
             batch=batch,
             policy_discriminator=policy_discriminator,
             domain_discriminator=domain_discriminator,
@@ -98,6 +96,7 @@ class DIDAEncoderLoss(DIDAEncoderLossMixin):
         )
         expert_loss, expert_info = self.expert_loss(
             params=params,
+            state=state,
             batch=batch,
             policy_discriminator=policy_discriminator,
             domain_discriminator=domain_discriminator,

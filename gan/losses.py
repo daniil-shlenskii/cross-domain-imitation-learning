@@ -80,18 +80,21 @@ class GANLoss:
             **kwargs
         )
 
-LogisticLoss = functools.partial(
-    GANLoss,
-    generator_loss_fn=g_nonsaturating_logistic_loss,
-    discriminator_loss_fn=d_logistic_loss,
-)
+class LogisticLoss(GANLoss):
+    def __init__(self, is_generator):
+        super().__init__(
+            generator_loss_fn=g_nonsaturating_logistic_loss,
+            discriminator_loss_fn=d_logistic_loss,
+            is_generator=is_generator,
+        )
 
-SoftplusLoss = functools.partial(
-    GANLoss,
-    generator_loss_fn=g_nonsaturating_softplus_loss,
-    discriminator_loss_fn=d_softplus_loss,
-)
-
+class SoftplusLoss(GANLoss):
+    def __init__(self, is_generator):
+        super().__init__(
+            generator_loss_fn=g_nonsaturating_softplus_loss,
+            discriminator_loss_fn=d_softplus_loss,
+            is_generator=is_generator,
+        )
 
 #### gan losses with gradient penalty ####
 
@@ -151,20 +154,23 @@ class GANLossGP(GANLoss):
             d_loss_fn=self.discriminator_loss,
             gradient_penalty_coef=gradient_penalty_coef
         )
-    
         super().__init__(
             discriminator_loss_fn=discriminator_loss_fn,
             **kwargs,
         )
 
-LogisticLossGP = functools.partial(
-    GANLossGP,
-    generator_loss_fn=g_nonsaturating_logistic_loss,
-    discriminator_loss_fn=d_logistic_loss,
-)
+class LogisticLossGP(GANLossGP):
+    def __init__(self, is_generator):
+        super().__init__(
+            generator_loss_fn=g_nonsaturating_logistic_loss,
+            discriminator_loss_fn=d_logistic_loss,
+            is_generator=is_generator,
+        )
 
-SoftplusLossGP = functools.partial(
-    GANLossGP,
-    generator_loss_fn=g_nonsaturating_softplus_loss,
-    discriminator_loss_fn=d_softplus_loss,
-)
+class SoftplusLossGP(GANLossGP):
+    def __init__(self, is_generator):
+        super().__init__(
+            generator_loss_fn=g_nonsaturating_softplus_loss,
+            discriminator_loss_fn=d_softplus_loss,
+            is_generator=is_generator,
+        )

@@ -5,6 +5,7 @@ import jax
 import numpy as np
 from flax import struct
 from hydra.utils import instantiate
+from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
 from agents.gail.gail_agent import GAILAgent
@@ -63,9 +64,9 @@ class DIDAAgent(GAILAgent):
         # encoders init
         policy_loss = instantiate(policy_discriminator_config["loss_config"])
         domain_loss = instantiate(domain_discriminator_config["loss_config"])
-        leanrer_encoder_config = learner_encoder_config.to_container()
-        leanrer_encoder_config["policy_loss"] = policy_loss
-        leanrer_encoder_config["domain_loss"] = domain_loss
+        learner_encoder_config = OmegaConf.to_container(learner_encoder_config)
+        learner_encoder_config["loss_config"]["policy_loss"] = policy_loss
+        learner_encoder_config["loss_config"]["domain_loss"] = domain_loss
 
         learner_encoder = instantiate(
             learner_encoder_config,
@@ -111,7 +112,7 @@ class DIDAAgent(GAILAgent):
             )
         )
 
-        return super().cls(
+        return super().create(
             seed=seed,
             observation_dim=observation_dim,
             action_dim=action_dim,
@@ -138,10 +139,8 @@ class DIDAAgent(GAILAgent):
         buffer_state_size = get_buffer_state_size(self.expert_buffer_state)
         anchor_buffer_state = deepcopy(self.expert_buffer_state)
         perm_idcs = np.random.choice(buffer_state_size)
-        anchor_buffer_state.experience["observations_next"] = \
-            anchor_buffer_state.experience["observations_next"].at[0].set(
+        anchor_buffer_state.experience["observations_next"][0] = \
                 anchor_buffer_state.experience["observations_next"][0, perm_idcs]
-            )
         object.__setattr__(self, "anchor_buffer_state", anchor_buffer_state)
 
     def __getattr__(self, item: str):
