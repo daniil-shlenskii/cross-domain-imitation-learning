@@ -97,8 +97,8 @@ def _get_self_adaptive_rate_jit(
     p_acc_ema_decay: float,
 ):
     # compute accuracy of the domain discriminator
-    learner_score = (learner_domain_logits > 0.).mean()
-    expert_score = (expert_domain_logits < 0.).mean()
+    learner_score = (learner_domain_logits < 0.).mean()
+    expert_score = (expert_domain_logits > 0.).mean()
 
     p_acc = (learner_score + expert_score) * 0.5
     p_acc_ema = p_acc_ema * p_acc_ema_decay + p_acc * (1 - p_acc_ema_decay)
