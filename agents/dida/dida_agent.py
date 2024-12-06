@@ -215,7 +215,6 @@ class DIDAAgent(GAILAgent):
                 policy_expert_hist
             ) = get_discriminators_hists(
                 dida_agent=self,
-                seed=seed,
                 learner_trajs=trajs,
             )
             if convert_to_wandb_type:
