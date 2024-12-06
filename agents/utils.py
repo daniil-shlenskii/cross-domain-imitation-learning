@@ -30,7 +30,7 @@ def evaluate(
             trajs["observations"].append(observation)
             trajs["actions"].append(action)
             trajs["rewards"].append(reward)
-            trajs["dones"].append(done)
+            trajs["dones"].append(done or truncated)
             trajs["observations_next"].append(next_observation)
 
             observation = next_observation
