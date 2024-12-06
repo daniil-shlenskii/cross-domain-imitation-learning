@@ -24,6 +24,7 @@ class GAILDiscriminator(Discriminator):
             reward_transform = BaseRewardTransform.create()
         return super().create(
             reward_transform=reward_transform,
+            info_key="policy_discriminator",
             _save_attrs=("state", "reward_transform"),
             **discriminator_kwargs
         )
