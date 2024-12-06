@@ -14,8 +14,10 @@ from gan.generator import Generator
 from utils import apply_model_jit, get_buffer_state_size, sample_batch
 from utils.types import BufferState, DataType
 
-from .das import DomainAdversarialSampling
+from .das import DomainAdversarialSampling, _prepare_anchor_batch_jit
 from .domain_loss_scale_updaters import IdentityDomainLossScaleUpdater
+from .update_steps import (_update_domain_discriminator_only_jit,
+                           _update_encoders_and_domain_discriminator_jit)
 
 
 class DIDAAgent(GAILAgent):
@@ -154,97 +156,26 @@ class DIDAAgent(GAILAgent):
         return super().__getattr__(item)
 
     def update(self, batch: DataType):
-        update_gail_agent = bool(
-                (self.domain_discriminator.state.step + 1) % self.n_domain_discriminator_updates == 0
+        update_domain_discriminator_only = bool(
+            (self.domain_discriminator.state.step + 1) % self.n_domain_discriminator_updates != 0
         )
-        update_agent = update_gail_agent and bool(
+        if update_domain_discriminator_only:
+            new_dida_agent, info, stats_info = _update_domain_discriminator_only_jit(
+                dida_agent=self,
+                batch=batch
+            )
+            return new_dida_agent, info, stats_info
+
+        update_agent = bool(
                 (self.policy_discriminator.state.step + 1) % self.n_policy_discriminator_updates == 0
         )
-        new_dida_agent, info, stats_info = self._update(
-            batch, update_gail_agent=update_gail_agent, update_agent=update_agent
+        new_dida_agent, info, stats_info = _update_jit(
+            dida_agent=self,
+            batch=batch,
+            update_agent=update_agent
         )
         return new_dida_agent, info, stats_info
 
-    def _update(self, batch: DataType, update_gail_agent: bool, update_agent: bool):
-        # sample expert batch
-        new_rng, expert_batch = sample_batch(
-            self.rng, self.expert_buffer, self.expert_buffer_state
-        )
-
-        # domain discriminator update only
-        if not update_gail_agent:
-            # encode observations
-            batch["observations"] = apply_model_jit(self.learner_encoder, batch["observations"])
-            expert_batch["observations"] = apply_model_jit(self.expert_encoder, expert_batch["observations"])
-
-            # update domain discriminator
-            new_domain_disc, domain_disc_info, domain_disc_stats_info = self.domain_discriminator.update(
-                real_batch=expert_batch["observations"],
-                fake_batch=batch["observations"],
-            )
-
-            # update gail agent
-            new_dida_agent = self.replace(
-                rng=new_rng,
-                domain_discriminator=new_domain_disc
-            )
-            return new_dida_agent, domain_disc_info, domain_disc_stats_info
-
-        # update encoders and domain discriminator
-        new_domain_loss_scale = self.domain_loss_scale_updater.update(self)
-        (
-            new_dida_agent,
-            batch,
-            expert_batch,
-            learner_domain_logits,
-            expert_domain_logits,
-            info,
-            stats_info,
-        ) = self._update_encoders_and_domain_discrimiantor(
-            batch=batch,
-            expert_batch=expert_batch,
-            domain_loss_scale=new_domain_loss_scale,
-        )
-
-        # prepare mixed batch for policy discriminator update
-        if new_dida_agent.das is not None:
-            # sample anchor batch
-            new_rng, anchor_batch = sample_batch(
-                new_rng, self.expert_buffer, self.anchor_buffer_state
-            )
-
-            # encode anchor batch
-            anchor_batch["observations"] = apply_model_jit(self.expert_encoder, anchor_batch["observations"])
-            anchor_batch["observations_next"] = apply_model_jit(self.expert_encoder, anchor_batch["observations_next"])
-
-            # mix batches
-            mixed_batch, sar_info = new_dida_agent.das.mix_batches(
-                learner_batch=batch,
-                anchor_batch=anchor_batch,
-                learner_domain_logits=learner_domain_logits,
-                expert_domain_logits=expert_domain_logits,
-            )
-            info.update(sar_info)
-        else:
-            mixed_batch = batch
-
-        # update agent and policy discriminator
-        new_dida_agent, gail_info, gail_stats_info = new_dida_agent.update_gail(
-            batch=batch,
-            expert_batch=expert_batch,
-            policy_discriminator_learner_batch=mixed_batch,
-            update_agent=update_agent,
-        )
-
-        # update dida agent
-        new_dida_agent = new_dida_agent.replace(rng=new_rng, domain_loss_scale=new_domain_loss_scale)
-        new_dida_agent = new_dida_agent.replace(rng=new_rng)
-        info.update(gail_info)
-        stats_info.update(gail_stats_info)
-
-        return new_dida_agent, info, stats_info
-
-    @jax.jit
     def _update_encoders_and_domain_discrimiantor(
         self, batch: DataType, expert_batch: DataType, domain_loss_scale: float
     ):
@@ -285,3 +216,49 @@ class DIDAAgent(GAILAgent):
             info,
             stats_info,
         )
+
+def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
+    # update encoders and domain discriminator
+    new_domain_loss_scale = dida_agent.domain_loss_scale_updater.update(dida_agent)
+    (
+        new_dida_agent,
+        batch,
+        expert_batch,
+        learner_domain_logits,
+        expert_domain_logits,
+        info,
+        stats_info,
+    ) = _update_encoders_and_domain_discriminator_jit(
+        dida_agent=dida_agent,
+        batch=deepcopy(batch),
+        domain_loss_scale=new_domain_loss_scale,
+    )
+    new_dida_agent = new_dida_agent.replace(domain_loss_scale=new_domain_loss_scale)
+
+    # prepare mixed batch for policy discriminator update
+    if new_dida_agent.das is not None:
+        # prepare anchor batch
+        anchor_batch = _prepare_anchor_batch_jit(dida_agent=dida_agent)
+
+        # mix learner and anchor batches
+        mixed_batch, sar_info = new_dida_agent.das.mix_batches(
+            learner_batch=batch,
+            anchor_batch=anchor_batch,
+            learner_domain_logits=learner_domain_logits,
+            expert_domain_logits=expert_domain_logits,
+        )
+        info.update(sar_info)
+    else:
+        mixed_batch = batch
+
+    # update agent and policy discriminator
+    new_dida_agent, gail_info, gail_stats_info = new_dida_agent.update_gail(
+        batch=batch,
+        expert_batch=expert_batch,
+        policy_discriminator_learner_batch=mixed_batch,
+        update_agent=update_agent,
+    )
+
+    info.update(gail_info)
+    stats_info.update(gail_stats_info)
+    return new_dida_agent, info, stats_info

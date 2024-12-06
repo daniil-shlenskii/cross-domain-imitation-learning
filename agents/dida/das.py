@@ -1,8 +1,23 @@
 import jax
 import jax.numpy as jnp
 
+from utils import sample_batch
 from utils.types import DataType
 
+
+@jax.jit
+def _prepare_anchor_batch_jit(dida_agent: "DIDAAgent"):
+    # sample anchor batch
+    new_rng, anchor_batch = sample_batch(
+        dida_agent.rng, dida_agent.expert_buffer, dida_agent.anchor_buffer_state
+    )
+
+    # encode anchor batch
+    anchor_batch["observations"] = dida_agent.expert_encoder(anchor_batch["observations"])
+    anchor_batch["observations_next"] = dida_agent.expert_encoder(anchor_batch["observations_next"])
+
+    dida_agent = dida_agent.replace(rng=new_rng)
+    return anchor_batch
 
 class DomainAdversarialSampling:
     def __init__(
