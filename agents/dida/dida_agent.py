@@ -141,12 +141,25 @@ class DIDAAgent(GAILAgent):
             **kwargs,
         )
 
+        if expert_buffer_state_preprocessing_config is not None:
+            expert_buffer_state_preprocessing = instantiate(expert_buffer_state_preprocessing_config)
+            new_expert_buffer_state = expert_buffer_state_preprocessing(dida_agent.expert_buffer_state)
+            dida_agent = dida_agent.replace(expert_buffer_state=new_expert_buffer_state)
+
         # anchor buffer init
         buffer_state_size = get_buffer_state_size(dida_agent.expert_buffer_state)
         anchor_buffer_state = deepcopy(dida_agent.expert_buffer_state)
         perm_idcs = np.random.choice(buffer_state_size)
-        anchor_buffer_state.experience["observations_next"][0] = \
-                anchor_buffer_state.experience["observations_next"][0, perm_idcs]
+
+        buffer_data = anchor_buffer_state.experience["observations_next"].dtype
+        if isinstance(buffer_data, np.ndarray):
+            anchor_buffer_state.experience["observations_next"][0] = \
+                    anchor_buffer_state.experience["observations_next"][0, perm_idcs]
+        else:
+            anchor_buffer_state.experience["observations_next"] = \
+                anchor_buffer_state.experience["observations_next"].at[0].set(
+                    anchor_buffer_state.experience["observations_next"][0, perm_idcs]
+                )
 
         dida_agent = dida_agent.replace(anchor_buffer_state=anchor_buffer_state)
         return dida_agent
