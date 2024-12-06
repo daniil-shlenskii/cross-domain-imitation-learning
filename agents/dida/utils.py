@@ -4,7 +4,7 @@ from sklearn.manifold import TSNE
 
 from agents.base_agent import Agent
 from utils import apply_model_jit
-from utils.types import BufferState, DataType
+from utils.types import DataType
 
 
 def get_state_and_policy_tsne_scatterplots(
