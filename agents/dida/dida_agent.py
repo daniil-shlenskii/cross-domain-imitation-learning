@@ -214,13 +214,13 @@ class DIDAAgent(GAILAgent):
             )
 
             # encode anchor batch
-            anchor_batch["observations"] = apply_model_jit(anchor_batch["observations"])
-            anchor_batch["observations_next"] = apply_model_jit(anchor_batch["observations_next"])
+            anchor_batch["observations"] = apply_model_jit(self.expert_encoder, anchor_batch["observations"])
+            anchor_batch["observations_next"] = apply_model_jit(self.expert_encoder, anchor_batch["observations_next"])
 
             # mix batches
-            mixed_batch, sar_info = new_dida_agent.das.mixed_batches(
-                encoded_learner_batch=batch,
-                encoded_anchor_batch=anchor_batch,
+            mixed_batch, sar_info = new_dida_agent.das.mix_batches(
+                learner_batch=batch,
+                anchor_batch=anchor_batch,
                 learner_domain_logits=learner_domain_logits,
                 expert_domain_logits=expert_domain_logits,
             )
@@ -229,8 +229,6 @@ class DIDAAgent(GAILAgent):
             mixed_batch = batch
 
         # update agent and policy discriminator
-        new_dida_agent = self
-        mixed_batch = batch
         new_dida_agent, gail_info, gail_stats_info = new_dida_agent.update_gail(
             batch=batch,
             expert_batch=expert_batch,
@@ -239,8 +237,7 @@ class DIDAAgent(GAILAgent):
         )
 
         # update dida agent
-        info, stats_info = {}, {}
-        # new_dida_agent = new_dida_agent.replace(rng=new_rng, domain_loss_scale=new_domain_loss_scale)
+        new_dida_agent = new_dida_agent.replace(rng=new_rng, domain_loss_scale=new_domain_loss_scale)
         new_dida_agent = new_dida_agent.replace(rng=new_rng)
         info.update(gail_info)
         stats_info.update(gail_stats_info)
