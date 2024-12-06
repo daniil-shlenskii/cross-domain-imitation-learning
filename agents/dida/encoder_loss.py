@@ -16,7 +16,7 @@ class DIDAEncoderLossMixin:
         self.expert_policy_loss_fn = self._get_expert_policy_loss_fn(policy_loss)
         self.expert_domain_loss_fn = self.learner_domain_loss_fn
 
-    def _get_expert_policy_loss_fn(self, loss: GANLoss, is_policy: bool):
+    def _get_expert_policy_loss_fn(self, loss: GANLoss):
         loss_fn = loss.generator_loss_fn
         if isinstance(loss, LogisticLoss):
             expert_loss_fn = lambda logits: -loss_fn(logits)
