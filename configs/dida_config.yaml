@@ -29,7 +29,7 @@ replay_buffer:
 agent:
   _target_: agents.DIDAAgent.create
   seed: *seed
-  encoder_dim: 17
+  encoder_dim: 10
   expert_batch_size: *batch_size
   expert_buffer_state_path: experts/Hopper-v5/archive/Hopper-v5/collected_rollouts/buffer_state.pickle
   expert_buffer_state_preprocessing_config:
@@ -38,6 +38,11 @@ agent:
     sigma: 0.1
   #
   n_domain_discriminator_updates: 5
+  domain_loss_scale_fn_config:
+    _target_: agents.dida.domain_loss_scale_fns.ExponentialDomainLossScale
+    start_scale: 0.
+    end_scale: 0.2
+    max_n_iters: 100_000
   #
   use_das: True
   #
@@ -89,7 +94,7 @@ agent:
       hidden_dims: [128, 128]
     optimizer_config: *optimizer_config
     loss_config:
-      _target_: gan.losses.LogisticLoss
+      _target_: gan.losses.SoftplusLoss
       is_generator: False
 
 evaluation:
