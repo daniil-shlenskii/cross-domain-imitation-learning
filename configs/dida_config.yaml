@@ -1,8 +1,8 @@
 seed: &seed 0
-env_name: &env_name HalfCheetah-v5
+env_name: &env_name Hopper-v5
 
 n_iters_training: 1_000_000
-batch_size: &batch_size 256
+batch_size: &batch_size 2048
 
 precollect_buffer_size: &precollect_buffer_size 5_000
 
@@ -31,13 +31,13 @@ agent:
   seed: *seed
   encoder_dim: 17
   expert_batch_size: *batch_size
-  expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
+  expert_buffer_state_path: experts/Hopper-v5/archive/Hopper-v5/collected_rollouts/buffer_state.pickle
   expert_buffer_state_preprocessing_config:
     _target_: agents.dida.expert_transforms.GaussianTransform
     mu: 0.
     sigma: 0.1
   #
-  n_domain_discriminator_updates: 1
+  n_domain_discriminator_updates: 5
   #
   use_das: True
   #
@@ -45,10 +45,10 @@ agent:
     _target_: agents.SACAgent.create
     actor_module_config:
       _target_: networks.policy.NormalTanhPolicy
-      hidden_dims: [256, 256]
+      hidden_dims: [128, 128]
     critic_module_config:
       _target_: networks.critic.Critic
-      hidden_dims: [256, 256]
+      hidden_dims: [128, 128]
     temperature_module_config:
       _target_: agents.sac.Temperature
       initial_temperature: 0.2
@@ -67,7 +67,7 @@ agent:
     _target_: agents.gail.GAILDiscriminator.create
     module_config:
       _target_: networks.discriminator.Discriminator
-      hidden_dims: [256, 256]
+      hidden_dims: [128, 128]
     optimizer_config: *optimizer_config
     loss_config:
       _target_: gan.losses.SoftplusLoss
@@ -78,7 +78,7 @@ agent:
     _target_: gan.generator.Generator.create
     module_config:
       _target_: networks.common.MLP
-      hidden_dims: [256, 256]
+      hidden_dims: [128, 128]
     optimizer_config: *optimizer_config
     loss_config:
       _target_: agents.dida.encoder_loss.DIDAEncoderLoss
@@ -86,7 +86,7 @@ agent:
     _target_: gan.discriminator.Discriminator.create
     module_config:
       _target_: networks.discriminator.Discriminator
-      hidden_dims: [256, 256]
+      hidden_dims: [128, 128]
     optimizer_config: *optimizer_config
     loss_config:
       _target_: gan.losses.LogisticLoss
