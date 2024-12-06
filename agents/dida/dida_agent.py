@@ -297,9 +297,7 @@ def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
     ) = _update_encoders_and_domain_discriminator_jit(
         dida_agent=dida_agent,
         batch=deepcopy(batch),
-        domain_loss_scale=new_domain_loss_scale,
     )
-    new_dida_agent = new_dida_agent.replace(domain_loss_scale=new_domain_loss_scale)
 
     # prepare mixed batch for policy discriminator update
     if new_dida_agent.das is not None:
