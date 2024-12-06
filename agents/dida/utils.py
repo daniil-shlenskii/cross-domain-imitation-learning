@@ -127,22 +127,16 @@ def get_discriminators_hists(
     policy_expert_logits = apply_model_jit(dida_agent.policy_discriminator, expert_policy_embeddings)
 
     # plots
-    figsize=(5, 5)
+    def logits_to_plot(logits):
+        figure = plt.figure(figsize=(5, 5))
+        plt.plot(logits, "bo")
+        plt.axhline(y=0., color='r', linestyle='-')
+        plt.close()
+        return figure
 
-    state_learner_figure = plt.figure(figsize=figsize)
-    plt.plot(state_learner_logits, "bo")
-    plt.close()
-
-    state_expert_figure = plt.figure(figsize=figsize)
-    plt.plot(state_expert_logits, "bo")
-    plt.close()
-
-    policy_learner_figure = plt.figure(figsize=figsize)
-    plt.plot(policy_learner_logits, "bo")
-    plt.close()
-
-    policy_expert_figure = plt.figure(figsize=figsize)
-    plt.plot(policy_expert_logits, "bo")
-    plt.close()
+    state_learner_figure = logits_to_plot(state_learner_logits)
+    state_expert_figure = logits_to_plot(state_expert_logits)
+    policy_learner_figure = logits_to_plot(policy_learner_logits)
+    policy_expert_figure = logits_to_plot(policy_expert_logits)
 
     return state_learner_figure, state_expert_figure, policy_learner_figure, policy_expert_figure
