@@ -6,6 +6,7 @@ from agents.base_agent import Agent
 from utils import apply_model_jit
 from utils.types import DataType
 
+MIN_TRAJECTORY_SIZE = 100
 
 def get_state_and_policy_tsne_scatterplots(
     dida_agent: Agent,
@@ -16,6 +17,7 @@ def get_state_and_policy_tsne_scatterplots(
 
     # get trajectories
     end_of_firt_traj_idx = np.argmax(learner_trajs["dones"])
+    end_of_firt_traj_idx = max(end_of_firt_traj_idx, MIN_TRAJECTORY_SIZE)
     learner_traj = {k: learner_trajs[k][:end_of_firt_traj_idx] for k in observation_keys}
     expert_traj = {k: dida_agent.expert_buffer_state.experience[k][0, :end_of_firt_traj_idx] for k in observation_keys}
     anchor_traj = {k: dida_agent.anchor_buffer_state.experience[k][0, :end_of_firt_traj_idx] for k in observation_keys}
@@ -101,6 +103,7 @@ def get_discriminators_hists(
 
     # get trajectories
     end_of_firt_traj_idx = np.argmax(learner_trajs["dones"])
+    end_of_firt_traj_idx = max(end_of_firt_traj_idx, MIN_TRAJECTORY_SIZE)
     learner_traj = {k: learner_trajs[k][:end_of_firt_traj_idx] for k in observation_keys}
     expert_traj = {k: dida_agent.expert_buffer_state.experience[k][0, :end_of_firt_traj_idx] for k in observation_keys}
 
