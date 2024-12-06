@@ -1,7 +1,7 @@
 from copy import deepcopy
+from typing import Callable
 
 import gymnasium as gym
-import jax
 import numpy as np
 from flax import struct
 from hydra.utils import instantiate
@@ -17,7 +17,7 @@ from utils import (apply_model_jit, convert_figure_to_array,
 from utils.types import BufferState, DataType
 
 from .das import DomainAdversarialSampling, _prepare_anchor_batch_jit
-from .domain_loss_scale_updaters import IdentityDomainLossScaleUpdater
+from .domain_loss_scale_fns import ConstantDomainLossScale
 from .update_steps import (_update_domain_discriminator_only_jit,
                            _update_encoders_and_domain_discriminator_jit)
 from .utils import (get_discriminators_hists,
@@ -30,8 +30,7 @@ class DIDAAgent(GAILAgent):
     anchor_buffer_state: BufferState = struct.field(pytree_node=False)
     das: float = struct.field(pytree_node=False)
     n_domain_discriminator_updates: int = struct.field(pytree_node=False)
-    domain_loss_scale: float = struct.field(pytree_node=False)
-    domain_loss_scale_updater: int = struct.field(pytree_node=False)
+    domain_loss_scale_fn: Callable = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -61,10 +60,9 @@ class DIDAAgent(GAILAgent):
         n_policy_discriminator_updates: int = 1,
         #
         n_domain_discriminator_updates: int = 1,
-        domain_loss_scale: float = 1.0,
-        domain_loss_scale_updater_config: DictConfig = None,
+        domain_loss_scale_fn_config: DictConfig = None,
         #
-        expert_buffer_state_preprocessing_config: DictConfig = None, # TODO: expert batch preprocessing
+        expert_buffer_state_preprocessing_config: DictConfig = None,
         **kwargs,
     ):
         # encoders init
@@ -102,10 +100,10 @@ class DIDAAgent(GAILAgent):
             )
 
         # domain loss updater init
-        if not use_das or domain_loss_scale_updater_config is None:
-            domain_loss_scale_updater = IdentityDomainLossScaleUpdater()
+        if not use_das or domain_loss_scale_fn_config is None:
+            domain_loss_scale_fn = ConstantDomainLossScale(domain_loss_scale=1.0)
         else:
-            domain_loss_scale_updater = instantiate(domain_loss_scale_updater_config)
+            domain_loss_scale_fn = instantiate(domain_loss_scale_fn_config)
 
         _save_attrs = kwargs.pop(
             "_save_attrs",
@@ -120,7 +118,7 @@ class DIDAAgent(GAILAgent):
 
         dida_agent = super().create(
             seed=seed,
-            observation_dim=observation_dim,
+            observation_dim=encoder_dim,
             action_dim=action_dim,
             low=low,
             high=high,
@@ -135,8 +133,7 @@ class DIDAAgent(GAILAgent):
             das=das,
             domain_discriminator=domain_discriminator,
             n_domain_discriminator_updates=n_domain_discriminator_updates,
-            domain_loss_scale=domain_loss_scale,
-            domain_loss_scale_updater=domain_loss_scale_updater,
+            domain_loss_scale_fn=domain_loss_scale_fn,
             _save_attrs=_save_attrs,
             **kwargs,
         )
@@ -285,7 +282,7 @@ class DIDAAgent(GAILAgent):
 
 def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
     # update encoders and domain discriminator
-    new_domain_loss_scale = dida_agent.domain_loss_scale_updater.update(dida_agent)
+    domain_loss_scale = dida_agent.domain_loss_scale_fn(dida_agent)
     (
         new_dida_agent,
         batch,
@@ -297,6 +294,7 @@ def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
     ) = _update_encoders_and_domain_discriminator_jit(
         dida_agent=dida_agent,
         batch=deepcopy(batch),
+        domain_loss_scale=domain_loss_scale,
     )
 
     # prepare mixed batch for policy discriminator update
