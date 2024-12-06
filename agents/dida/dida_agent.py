@@ -321,6 +321,6 @@ def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
         update_agent=update_agent,
     )
 
-    info.update(gail_info)
+    info.update({**gail_info, "domain_loss_scale": domain_loss_scale})
     stats_info.update(gail_stats_info)
     return new_dida_agent, info, stats_info
