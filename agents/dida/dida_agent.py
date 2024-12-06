@@ -8,16 +8,20 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
+import wandb
 from agents.gail.gail_agent import GAILAgent
 from gan.discriminator import Discriminator
 from gan.generator import Generator
-from utils import apply_model_jit, get_buffer_state_size, sample_batch
+from utils import (apply_model_jit, convert_figure_to_array,
+                   get_buffer_state_size)
 from utils.types import BufferState, DataType
 
 from .das import DomainAdversarialSampling, _prepare_anchor_batch_jit
 from .domain_loss_scale_updaters import IdentityDomainLossScaleUpdater
 from .update_steps import (_update_domain_discriminator_only_jit,
                            _update_encoders_and_domain_discriminator_jit)
+from .utils import (get_discriminators_hists,
+                    get_state_and_policy_tsne_scatterplots)
 
 
 class DIDAAgent(GAILAgent):
@@ -175,6 +179,56 @@ class DIDAAgent(GAILAgent):
             update_agent=update_agent
         )
         return new_dida_agent, info, stats_info
+
+    def evaluate(
+        self,
+        *,
+        seed: int,
+        env: gym.Env,
+        num_episodes: int,
+        #
+        visualize_state_and_policy_scatterplots: bool = False,
+        visualize_state_and_policy_histograms: bool = False,
+        convert_to_wandb_type: bool = True,
+    ):
+        eval_info, trajs = super().evaluate(seed=seed, env=env, num_episodes=num_episodes, return_trajectories=True)
+
+        # state and policy scatterplots
+        if visualize_state_and_policy_scatterplots:
+            tsne_state_figure, tsne_policy_figure = get_state_and_policy_tsne_scatterplots(
+                dida_agent=self,
+                seed=seed,
+                learner_trajs=trajs,
+            )
+            if convert_to_wandb_type:
+                tsne_state_figure = wandb.Image(convert_figure_to_array(tsne_state_figure), caption="TSNE plot of state feautures")
+                tsne_policy_figure = wandb.Image(convert_figure_to_array(tsne_policy_figure), caption="TSNE plot of policy feautures")
+            eval_info["tsne_state_scatter"] = tsne_state_figure
+            eval_info["tsne_policy_scatter"] = tsne_policy_figure
+
+        # domain discriminator historgrams
+        if visualize_state_and_policy_histograms:
+            (
+                state_learner_hist,
+                state_expert_hist,
+                policy_learner_hist,
+                policy_expert_hist
+            ) = get_discriminators_hists(
+                dida_agent=self,
+                seed=seed,
+                learner_trajs=trajs,
+            )
+            if convert_to_wandb_type:
+                state_learner_hist = wandb.Image(convert_figure_to_array(state_learner_hist), caption="Domain Discriminator Learner logits")
+                state_expert_hist = wandb.Image(convert_figure_to_array(state_expert_hist), caption="Domain Discriminator Expert logits")
+                policy_learner_hist = wandb.Image(convert_figure_to_array(policy_learner_hist), caption="Policy Discriminator Learner logits")
+                policy_expert_hist = wandb.Image(convert_figure_to_array(policy_expert_hist), caption="Policy Discriminator Expert logits")
+            eval_info["state_learner_hist"] = state_learner_hist
+            eval_info["state_expert_hist"] = state_expert_hist
+            eval_info["policy_learner_hist"] = policy_learner_hist
+            eval_info["policy_expert_hist"] = policy_expert_hist
+
+        return eval_info
 
     def _update_encoders_and_domain_discrimiantor(
         self, batch: DataType, expert_batch: DataType, domain_loss_scale: float
