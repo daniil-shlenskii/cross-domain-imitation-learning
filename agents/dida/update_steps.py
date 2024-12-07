@@ -37,7 +37,6 @@ def _update_domain_discriminator_only_jit(
 def _update_encoders_and_domain_discriminator_jit(
     dida_agent: "DIDAAgent",
     batch: DataType,
-    domain_loss_scale: float,
 ):
     # sample expert batch
     new_rng, expert_batch = sample_batch(
@@ -45,6 +44,7 @@ def _update_encoders_and_domain_discriminator_jit(
     )
 
     # udpate encoders and domain discriminator
+    domain_loss_scale = dida_agent.domain_loss_scale_fn(dida_agent)
     (
         new_dida_agent,
         batch,
@@ -61,7 +61,7 @@ def _update_encoders_and_domain_discriminator_jit(
 
     # update dida_agent
     new_dida_agent = new_dida_agent.replace(rng=new_rng)
-
+    info.update({"domain_loss_scale": domain_loss_scale})
     return (
         new_dida_agent,
         batch,

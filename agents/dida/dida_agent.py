@@ -282,7 +282,6 @@ class DIDAAgent(GAILAgent):
 
 def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
     # update encoders and domain discriminator
-    domain_loss_scale = dida_agent.domain_loss_scale_fn(dida_agent)
     (
         new_dida_agent,
         batch,
@@ -294,7 +293,6 @@ def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
     ) = _update_encoders_and_domain_discriminator_jit(
         dida_agent=dida_agent,
         batch=deepcopy(batch),
-        domain_loss_scale=domain_loss_scale,
     )
 
     # prepare mixed batch for policy discriminator update
@@ -321,6 +319,6 @@ def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
         update_agent=update_agent,
     )
 
-    info.update({**gail_info, "domain_loss_scale": domain_loss_scale})
+    info.update(gail_info)
     stats_info.update(gail_stats_info)
     return new_dida_agent, info, stats_info
