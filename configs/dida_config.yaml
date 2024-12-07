@@ -43,6 +43,7 @@ agent:
     start_scale: 0.
     end_scale: 0.2
     max_n_iters: 100_000
+    concavity: 10.
   #
   use_das: True
   #
@@ -99,7 +100,7 @@ agent:
 
 evaluation:
   seed: 42
-  num_episodes: 10
+  num_episodes: 25
   environment:
     _target_: gymnasium.wrappers.TimeLimit
     max_episode_steps: 1000
