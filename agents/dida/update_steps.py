@@ -1,60 +1,73 @@
-import functools
+from copy import deepcopy
 
 import jax
-import jax.numpy as jnp
 
-from agents.base_agent import Agent
-from agents.gail.gail_discriminator import GAILDiscriminator
-from gan.discriminator import Discriminator
-from gan.generator import Generator
-from utils.types import Buffer, BufferState, DataType, PRNGKey
+from utils import sample_batch
+from utils.types import DataType
 
 
 @jax.jit
-def update_gail(
-    *,
+def _update_domain_discriminator_only_jit(
+    dida_agent: "DIDAAgent",
     batch: DataType,
-    expert_batch: DataType,
-    mixed_batch: DataType,
-    #
-    agent: Agent,
-    policy_discriminator: GAILDiscriminator
 ):
-    policy_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=1)
-    expert_policy_batch = jnp.concatenate([expert_batch["observations"], expert_batch["observations_next"]], axis=1)
-    mixed_policy_batch = jnp.concatenate([mixed_batch["observations"], mixed_batch["observations_next"]], axis=1)
-
-    # update agent
-    batch["rewards"] = policy_discriminator.get_rewards(policy_batch)
-    new_agent, agent_info, agent_stats_info = agent.update(batch)
-
-    # update discriminator
-    new_disc, disc_info, disc_stats_info = policy_discriminator.update(learner_batch=mixed_policy_batch, expert_batch=expert_policy_batch)
-
-    info = {**agent_info, **disc_info}
-    stats_info = {**agent_stats_info, **disc_stats_info}
-    return new_agent, new_disc, info, stats_info
-
-
-@functools.partial(jax.jit, static_argnames="expert_buffer")
-def update_domain_discriminator_only_jit(
-    *,
-    rng: PRNGKey,
-    batch: DataType,
-    expert_buffer: Buffer,
-    expert_buffer_state: BufferState,
-    learner_encoder: Generator,
-    expert_encoder: Generator,
-    domain_discriminator: Discriminator
-):
-    new_rng, key = jax.random.split(rng, 2)
-    expert_batch = expert_buffer.sample(expert_buffer_state, key).experience
-
-    encoded_learner_domain_batch = learner_encoder(batch["observations"])
-    encoded_expert_domain_batch = expert_encoder(expert_batch["observations"])
-
-    new_domain_disc, domain_disc_info, domain_disc_stats_info = domain_discriminator.update(
-        real_batch=encoded_learner_domain_batch,
-        fake_batch=encoded_expert_domain_batch
+    # sample expert batch
+    new_rng, expert_batch = sample_batch(
+        dida_agent.rng, dida_agent.expert_buffer, dida_agent.expert_buffer_state
     )
-    return new_rng, new_domain_disc, domain_disc_info, domain_disc_stats_info
+
+    # encode observations
+    batch["observations"] = dida_agent.learner_encoder(batch["observations"])
+    expert_batch["observations"] = dida_agent.expert_encoder(expert_batch["observations"])
+
+    # update domain discriminator
+    new_domain_disc, domain_disc_info, domain_disc_stats_info = dida_agent.domain_discriminator.update(
+        real_batch=expert_batch["observations"],
+        fake_batch=batch["observations"],
+    )
+
+    # update dida agent
+    new_dida_agent = dida_agent.replace(
+        rng=new_rng,
+        domain_discriminator=new_domain_disc
+    )
+    return new_dida_agent, domain_disc_info, domain_disc_stats_info
+
+@jax.jit
+def _update_encoders_and_domain_discriminator_jit(
+    dida_agent: "DIDAAgent",
+    batch: DataType,
+):
+    # sample expert batch
+    new_rng, expert_batch = sample_batch(
+        dida_agent.rng, dida_agent.expert_buffer, dida_agent.expert_buffer_state
+    )
+
+    # udpate encoders and domain discriminator
+    domain_loss_scale = dida_agent.domain_loss_scale_fn(dida_agent)
+    (
+        new_dida_agent,
+        batch,
+        expert_batch,
+        learner_domain_logits,
+        expert_domain_logits,
+        info,
+        stats_info,
+    ) = dida_agent._update_encoders_and_domain_discrimiantor(
+        batch=deepcopy(batch),
+        expert_batch=expert_batch,
+        domain_loss_scale=domain_loss_scale,
+    )
+
+    # update dida_agent
+    new_dida_agent = new_dida_agent.replace(rng=new_rng)
+    info.update({"domain_loss_scale": domain_loss_scale})
+    return (
+        new_dida_agent,
+        batch,
+        expert_batch,
+        learner_domain_logits,
+        expert_domain_logits,
+        info,
+        stats_info
+    )

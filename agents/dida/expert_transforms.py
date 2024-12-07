@@ -27,7 +27,7 @@ class ObservationsTransform(abc.ABC):
         new_state_exp = self.update_state_exp(new_state_exp)
         new_state = state.replace(experience=new_state_exp)
         return new_state
-    
+
     @abc.abstractmethod
     def update_state_exp(self, state_exp: Dict[str, jax.Array]) -> Dict[str, jax.Array]:
         pass
@@ -39,7 +39,7 @@ class GaussianTransform(ObservationsTransform):
 
     def update_state_exp(self, state_exp: Dict[str, jax.Array]) -> Dict[str, jax.Array]:
         for k in self._observations_keys:
-            state_exp[k] = add_noise_jit(
+            state_exp[k] = _add_noise_jit(
                 key=self.key,
                 x=state_exp[k],
                 mu=self.mu,
@@ -47,7 +47,7 @@ class GaussianTransform(ObservationsTransform):
             )
         return state_exp
 
-def add_noise_jit(key: PRNGKey, x: jnp.ndarray, mu: float, sigma: float) -> jnp.ndarray:
+@jax.jit
+def _add_noise_jit(key: PRNGKey, x: jnp.ndarray, mu: float, sigma: float) -> jnp.ndarray:
     noise = jax.random.normal(key, shape=x.shape)
     return x + noise * sigma + mu
-

@@ -16,10 +16,10 @@ from utils.types import Buffer, BufferState, DataType
 
 class GAILAgent(Agent):
     agent: Agent
-    discriminator: GAILDiscriminator
+    policy_discriminator: GAILDiscriminator
     expert_buffer: Buffer = struct.field(pytree_node=False)
     expert_buffer_state: BufferState = struct.field(pytree_node=False)
-    n_discriminator_updates: int = struct.field(pytree_node=False)
+    n_policy_discriminator_updates: int = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -35,12 +35,12 @@ class GAILAgent(Agent):
         expert_buffer_state_path: str,
         #
         agent_config: DictConfig,
-        discriminator_config: DictConfig,
+        policy_discriminator_config: DictConfig,
         #
-        n_discriminator_updates: int = 1,
+        n_policy_discriminator_updates: int = 1,
         **kwargs,
     ):
-        # agent and discriminator init
+        # agent and policy_discriminator init
         agent = instantiate(
             agent_config,
             seed=seed,
@@ -51,8 +51,8 @@ class GAILAgent(Agent):
             _recursive_=False,
         )
 
-        discriminator = instantiate(
-            discriminator_config,
+        policy_discriminator = instantiate(
+            policy_discriminator_config,
             seed=seed,
             input_dim=observation_dim * 2,
             _recursive_=False,
@@ -82,7 +82,7 @@ class GAILAgent(Agent):
 
         _save_attrs = kwargs.pop(
             "_save_attrs",
-            ("agent", "discriminator")
+            ("agent", "policy_discriminator")
         )
 
         return cls(
@@ -90,8 +90,8 @@ class GAILAgent(Agent):
             expert_buffer=expert_buffer,
             expert_buffer_state=expert_buffer_state,
             agent=agent,
-            discriminator=discriminator,
-            n_discriminator_updates=n_discriminator_updates,
+            policy_discriminator=policy_discriminator,
+            n_policy_discriminator_updates=n_policy_discriminator_updates,
             _save_attrs = _save_attrs,
             **kwargs,
         )
@@ -101,43 +101,58 @@ class GAILAgent(Agent):
         return self.agent.actor
 
     def update(self, batch: DataType):
-        train_agent = bool(
-                (self.discriminator.state.step + 1) % self.n_discriminator_updates == 0
+        update_agent = bool(
+                (self.policy_discriminator.state.step + 1) % self.n_policy_discriminator_updates == 0
         )
         new_gail_agent, info, stats_info = _update_jit(
-            batch, gail_agent=self, train_agent=train_agent
+            batch, gail_agent=self, update_agent=update_agent
         )
         return new_gail_agent, info, stats_info
 
-@functools.partial(jax.jit, static_argnames="train_agent")
+    @functools.partial(jax.jit, static_argnames="update_agent")
+    def update_gail(
+        self,
+        batch: DataType,
+        expert_batch: DataType,
+        policy_discriminator_learner_batch: DataType,
+        update_agent: bool,
+    ):
+        new_params = {}
+
+        # update policy_discriminator
+        new_disc, info, stats_info = self.policy_discriminator.update(
+            learner_batch=policy_discriminator_learner_batch,
+            expert_batch=expert_batch,
+        )
+        new_params["policy_discriminator"] = new_disc
+
+        # update agent
+        if update_agent:
+            batch["rewards"] = new_disc.get_rewards(batch)
+            new_agent, agent_info, agent_stats_info = self.agent.update(batch)
+            new_params["agent"] = new_agent
+            info.update(agent_info)
+            stats_info.update(agent_stats_info)
+
+        new_gail_agent = self.replace(**new_params)
+        return new_gail_agent, info, stats_info
+
+@functools.partial(jax.jit, static_argnames="update_agent")
 def _update_jit(
     batch: DataType,
     gail_agent: GAILAgent,
-    train_agent: bool,
+    update_agent: bool,
 ):
-    new_params = {}
-
     # sample expert batch
     new_rng, key = jax.random.split(gail_agent.rng)
     expert_batch = gail_agent.expert_buffer.sample(gail_agent.expert_buffer_state, key).experience
-    new_params["rng"] = new_rng
+    new_gail_agent = gail_agent.replace(rng=new_rng)
 
-    # update discriminator
-    new_disc, info, stats_info = gail_agent.discriminator.update(
-        learner_batch=batch,
+    # update agent and policy policy_discriminator
+    new_gail_agent, info, stats_info = new_gail_agent.update_gail(
+        batch=batch,
         expert_batch=expert_batch,
+        policy_discriminator_learner_batch=batch,
+        update_agent=update_agent,
     )
-    new_params["discriminator"] = new_disc
-
-    # update agent
-    if train_agent:
-        batch["rewards"] = new_disc.get_rewards(batch)
-        new_agent, agent_info, agent_stats_info = gail_agent.agent.update(batch)
-
-        new_params["agent"] = new_agent
-        info.update(agent_info)
-        stats_info.update(agent_stats_info)
-
-    new_gail_agent = gail_agent.replace(**new_params)
     return new_gail_agent, info, stats_info
-

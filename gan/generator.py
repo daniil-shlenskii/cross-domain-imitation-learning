@@ -36,11 +36,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         module = instantiate(module_config)
         params = module.init(key, jnp.ones(input_dim, dtype=jnp.float32))["params"]
 
-        loss_fn = instantiate(
-            loss_config,
-            is_generator=True,
-            _recursive_=False,
-        )
+        loss_fn = instantiate(loss_config, _recursive_=False)
 
         state = TrainState.create(
             loss_fn=loss_fn,

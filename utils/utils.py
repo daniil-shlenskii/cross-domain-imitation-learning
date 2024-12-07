@@ -3,10 +3,11 @@ import json
 import pickle
 import warnings
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Callable, Dict
 
 import hydra
 import jax
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 import optax
@@ -14,8 +15,12 @@ from hydra.utils import instantiate
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from omegaconf.dictconfig import DictConfig
 
-from utils.types import Buffer, BufferState
+from utils.types import Buffer, BufferState, PRNGKey
 
+
+@jax.jit
+def apply_model_jit(model: Callable, input: jnp.ndarray):
+    return model(input)
 
 def instantiate_optimizer(config: DictConfig):
     transforms = [
@@ -154,3 +159,9 @@ def get_method_partially(path: str, params: Dict):
     method = hydra.utils.get_method(path)
     method = functools.partial(method, **params)
     return method
+
+@functools.partial(jax.jit, static_argnums=1)
+def sample_batch(rng: PRNGKey, buffer: Buffer, state: BufferState):
+    new_rng, key = jax.random.split(rng)
+    batch = buffer.sample(state, key).experience
+    return new_rng, batch
