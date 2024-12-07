@@ -13,15 +13,27 @@ class DIDAEncoderLossMixin:
     def __init__(self, policy_loss: GANLoss, domain_loss: GANLoss):
         self.learner_policy_loss_fn = policy_loss.generator_loss_fn
         self.learner_domain_loss_fn = domain_loss.generator_loss_fn
-        self.expert_policy_loss_fn = self.learner_policy_loss_fn
+        self.expert_policy_loss_fn = self._get_expert_policy_loss_fn(policy_loss)
         self.expert_domain_loss_fn = self._get_expert_domain_loss_fn(domain_loss)
 
     def _get_expert_domain_loss_fn(self, loss: GANLoss):
+        """For discriminator deceiving."""
         loss_fn = loss.generator_loss_fn
         if isinstance(loss, LogisticLoss):
-            expert_loss_fn = lambda logits: -loss_fn(logits)
+            expert_loss_fn = lambda logits: loss_fn(-logits)
         elif isinstance(loss, SoftplusLoss):
             expert_loss_fn = lambda logits: loss_fn(-logits)
+        else:
+            raise ValueError
+        return expert_loss_fn
+
+    def _get_expert_policy_loss_fn(self, loss: GANLoss):
+        """Helps discriminator to discriminate better."""
+        loss_fn = loss.generator_loss_fn
+        if isinstance(loss, LogisticLoss):
+            expert_loss_fn = lambda logits: -loss_fn(-logits)
+        elif isinstance(loss, SoftplusLoss):
+            expert_loss_fn = lambda logits: -loss_fn(-logits)
         else:
             raise ValueError
         return expert_loss_fn
