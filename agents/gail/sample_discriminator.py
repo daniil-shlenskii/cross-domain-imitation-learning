@@ -68,7 +68,7 @@ class SampleDiscriminator(Discriminator):
         normalized_logits =  shifted_logits / shifted_logits.max()
 
         relevance = 1. - normalized_logits
-        priorities = jax.nn.softmax(relevance)
+        priorities = jax.nn.softmax(relevance / self.temperature)
         return priorities
 
 
