@@ -1,5 +1,5 @@
 seed: &seed 0
-env_name: &env_name HalfCheetah-v5
+env_name: &env_name Hopper-v5
 
 n_iters_training: 1_000_000
 
@@ -30,7 +30,7 @@ agent:
   _target_: agents.gail.GAILAgent.create
   seed: *seed
   expert_batch_size: *batch_size
-  expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
+  expert_buffer_state_path: experts/Hopper-v5/archive/Hopper-v5/collected_rollouts/buffer_state.pickle
   n_policy_discriminator_updates: 1
   agent_config:
     _target_: agents.sac.SACAgent.create
