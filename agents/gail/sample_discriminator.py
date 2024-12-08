@@ -6,7 +6,7 @@ from gan.discriminator import Discriminator
 from utils.types import DataType, PRNGKey
 
 
-class SampleDisciminator(Discriminator):
+class SampleDiscriminator(Discriminator):
     buffer_state_experience: DataType = struct.field(pytree_node=False)
     sample_size: int = struct.field(pytree_node=False)
     priorities: jnp.ndarray
@@ -71,7 +71,7 @@ class SampleDisciminator(Discriminator):
 
 @jax.jit
 def _update(
-    sample_discriminator: SampleDisciminator,
+    sample_discriminator: SampleDiscriminator,
     learner_batch: DataType,
     expert_batch: DataType,
 ):

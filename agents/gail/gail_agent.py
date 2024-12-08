@@ -16,13 +16,13 @@ from utils.types import Buffer, BufferState, DataType
 from utils.utils import sample_batch
 
 from .gail_discriminator import GAILDiscriminator
-from .sample_discriminator import SampleDisciminator
+from .sample_discriminator import SampleDiscriminator
 
 
 class GAILAgent(Agent):
     agent: Agent
     policy_discriminator: GAILDiscriminator
-    sample_discriminator: SampleDisciminator
+    sample_discriminator: SampleDiscriminator
     expert_buffer: Buffer = struct.field(pytree_node=False)
     expert_batch_size: int
     expert_buffer_state: BufferState = struct.field(pytree_node=False)
