@@ -164,4 +164,6 @@ def get_method_partially(path: str, params: Dict):
 def sample_batch(rng: PRNGKey, buffer: Buffer, state: BufferState):
     new_rng, key = jax.random.split(rng)
     batch = buffer.sample(state, key).experience
+    if hasattr(batch, "first"):
+        batch = batch.first
     return new_rng, batch
