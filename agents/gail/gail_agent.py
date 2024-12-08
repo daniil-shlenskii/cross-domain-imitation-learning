@@ -9,14 +9,15 @@ from flax import struct
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
+import wandb
 from agents.base_agent import Agent
-from utils import (get_buffer_state_size, instantiate_jitted_fbx_buffer,
-                   load_pickle)
+from utils import (convert_figure_to_array, get_buffer_state_size,
+                   instantiate_jitted_fbx_buffer, load_pickle, sample_batch)
 from utils.types import Buffer, BufferState, DataType
-from utils.utils import sample_batch
 
 from .gail_discriminator import GAILDiscriminator
 from .sample_discriminator import SampleDiscriminator
+from .utils import get_sample_discriminator_hists
 
 
 class GAILAgent(Agent):
@@ -92,7 +93,7 @@ class GAILAgent(Agent):
             is_full=True,
         )
 
-        # sample_discrimiantor init
+        # sample_discriminator init
         sample_discriminator = None
         if sample_discriminator_config is not None:
             sample_discriminator = instantiate(
@@ -176,6 +177,38 @@ class GAILAgent(Agent):
 
         new_gail_agent = self.replace(**new_params)
         return new_gail_agent, info, stats_info
+
+    def evaluate(
+        self,
+        *,
+        seed: int,
+        env: gym.Env,
+        num_episodes: int,
+        #
+        convert_to_wandb_type: bool = True,
+        #
+        return_trajs: bool = False,
+    ):
+        eval_info, trajs = super().evaluate(seed=seed, env=env, num_episodes=num_episodes, return_trajectories=True)
+
+        # sample discriminator historgrams
+        if self.sample_discriminator is not None:
+            (
+                state_learner_hist,
+                state_expert_hist,
+            ) = get_sample_discriminator_hists(
+                dida_agent=self,
+                learner_trajs=trajs,
+            )
+            if convert_to_wandb_type:
+                state_learner_hist = wandb.Image(convert_figure_to_array(state_learner_hist), caption="Sample Discriminator Learner logits")
+                state_expert_hist = wandb.Image(convert_figure_to_array(state_expert_hist), caption="Sample Discriminator Expert logits")
+            eval_info["sample_learner_hist"] = state_learner_hist
+            eval_info["sample_expert_hist"] = state_expert_hist
+
+            if return_trajs:
+                return eval_info, trajs
+            return eval_info
 
 @functools.partial(jax.jit, static_argnames="update_agent")
 def _update_jit(
