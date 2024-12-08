@@ -64,7 +64,7 @@ class SampleDiscriminator(Discriminator):
         shifted_logits = logits - logits.min()
         normalized_logits =  shifted_logits / shifted_logits.max()
 
-        relevance = 1 - normalized_logits
+        relevance = 1. - normalized_logits
         priorities = relevance / relevance.sum()
         return priorities
 
