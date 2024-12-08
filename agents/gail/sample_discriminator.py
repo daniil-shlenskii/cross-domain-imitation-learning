@@ -19,17 +19,24 @@ class SampleDisciminator(Discriminator):
         *,
         buffer_state: BufferState,
         update_priorities_every: int = 1,
-        **discriminator_kwargs: DictConfig, 
+        **discriminator_kwargs: DictConfig,
     ):
         buffer_state_experience = buffer_state.experience
 
         exp_size = buffer_state_experience["observations"].shape[0]
         priorities = jnp.ones(exp_size) / float(exp_size)
 
+        _save_attrs = (
+            "state",
+            "buffer_state_experience",
+            "priorities",
+        )
+
         return super().create(
             buffer_state_experience=buffer_state_experience,
             priorities=priorities,
             update_priorities_every=update_priorities_every,
+            _save_attrs=_save_attrs,
             **discriminator_kwargs,
         )
 
@@ -41,7 +48,7 @@ class SampleDisciminator(Discriminator):
         )
         return new_sample_discriminator, info, stats_info
 
-    @functools(jax.jit, static_argnames="sample_size")
+    @functools.partial(jax.jit, static_argnames="sample_size")
     def sample(self, rng: PRNGKey, sample_size: int):
         new_rng, key = jax.random_split(rng)
 
@@ -78,7 +85,6 @@ def _update(
     sample_discriminator: SampleDisciminator,
     learner_batch: DataType,
     expert_batch: DataType,
-    update_priorities: bool
 ):
     # update discriminator
     new_sample_discr, info, stats_info = Discriminator.update(
@@ -88,7 +94,7 @@ def _update(
     )
 
     # update priorities
-    if update_priorities:
+    if new_sample_discr.state.step % new_sample_discr.update_priorities_every == 0:
         priorities = sample_discriminator.get_priorities(sample_discriminator.buffer_state_experience)
         new_priorities = (priorities + sample_discriminator.priorities) * 0.5
         new_sample_discr = new_sample_discr.replace(priorities=new_priorities)
