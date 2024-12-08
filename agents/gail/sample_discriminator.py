@@ -1,42 +1,33 @@
-import functools
-
 import jax
 import jax.numpy as jnp
-from omegaconf.dictconfig import DictConfig
+from flax import struct
 
 from gan.discriminator import Discriminator
-from utils.types import BufferState, DataType, PRNGKey
+from utils.types import DataType, PRNGKey
 
 
 class SampleDisciminator(Discriminator):
-    buffer_state_experience: DataType
+    buffer_state_experience: DataType = struct.field(pytree_node=False)
+    sample_size: int = struct.field(pytree_node=False)
     priorities: jnp.ndarray
-    update_priorities_every: int
 
     @classmethod
     def create(
         cls,
         *,
-        buffer_state: BufferState,
-        update_priorities_every: int = 1,
-        **discriminator_kwargs: DictConfig,
+        buffer_state_experience: DataType,
+        sample_size: int,
+        **discriminator_kwargs,
     ):
-        buffer_state_experience = buffer_state.experience
-
         exp_size = buffer_state_experience["observations"].shape[0]
         priorities = jnp.ones(exp_size) / float(exp_size)
 
-        _save_attrs = (
-            "state",
-            "buffer_state_experience",
-            "priorities",
-        )
-
         return super().create(
             buffer_state_experience=buffer_state_experience,
+            sample_size=sample_size,
             priorities=priorities,
-            update_priorities_every=update_priorities_every,
-            _save_attrs=_save_attrs,
+            info_key="sample_discriminator",
+            _save_attrs = ("state", "priorities"),
             **discriminator_kwargs,
         )
 
@@ -48,29 +39,27 @@ class SampleDisciminator(Discriminator):
         )
         return new_sample_discriminator, info, stats_info
 
-    @functools.partial(jax.jit, static_argnames="sample_size")
-    def sample(self, rng: PRNGKey, sample_size: int):
-        new_rng, key = jax.random_split(rng)
+    @jax.jit
+    def sample(self, rng: PRNGKey):
+        new_rng, key = jax.random.split(rng)
 
         batch_idcs = jax.random.choice(
             key=key,
-            a=self.buffer_state_experience["observations"].shape[0],
-            shape=sample_size,
+            a=self.priorities.shape[0],
+            shape=(self.sample_size,),
             p=self.priorities,
             replace=False,
         )
 
-        batch = jax.tree.map(
-            lambda x: x.at[batch_idcs].get(),
-            self.buffer_state_experience,
-            is_leaf=lambda x: isinstance(x, jnp.ndarray)
-        )
+        batch = {}
+        for k, v in self.buffer_state_experience.items():
+            batch[k] = v.at[batch_idcs].get()
 
         return new_rng, batch
 
     @jax.jit
-    def get_priorities(self, expert_batch: DataType):
-        states = expert_batch["observations"]
+    def get_priorities(self):
+        states = self.buffer_state_experience["observations"]
         logits = self(states)
         shifted_logits = logits - logits.min()
         normalized_logits =  shifted_logits / shifted_logits.max()
@@ -80,7 +69,7 @@ class SampleDisciminator(Discriminator):
         return priorities
 
 
-@functools.partial(jax.jit, static_arganames="update_priorities")
+@jax.jit
 def _update(
     sample_discriminator: SampleDisciminator,
     learner_batch: DataType,
@@ -89,14 +78,13 @@ def _update(
     # update discriminator
     new_sample_discr, info, stats_info = Discriminator.update(
         self=sample_discriminator,
-        real_batch=expert_batch,
-        fake_batch=learner_batch,
+        real_batch=expert_batch["observations"],
+        fake_batch=learner_batch["observations"],
     )
 
     # update priorities
-    if new_sample_discr.state.step % new_sample_discr.update_priorities_every == 0:
-        priorities = sample_discriminator.get_priorities(sample_discriminator.buffer_state_experience)
-        new_priorities = (priorities + sample_discriminator.priorities) * 0.5
-        new_sample_discr = new_sample_discr.replace(priorities=new_priorities)
+    priorities = new_sample_discr.get_priorities()
+    new_priorities = (priorities + sample_discriminator.priorities) * 0.5
+    new_sample_discr = new_sample_discr.replace(priorities=new_priorities)
 
     return new_sample_discr, info, stats_info
