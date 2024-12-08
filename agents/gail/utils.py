@@ -1,9 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-import wandb
 from agents.base_agent import Agent
-from utils import apply_model_jit, convert_figure_to_array
+from utils import apply_model_jit
 from utils.types import DataType
 
 MIN_TRAJECTORY_SIZE = 100
