@@ -49,7 +49,7 @@ def get_sample_discriminator_hists(
     )
 
     priorities_hist = plt.figure(figsize=(5, 5))
-    plt.hist(samples, density=True)
+    plt.hist(samples, bins=len(priorities), density=True)
     plt.xlabel("priorities")
     plt.close()
 
