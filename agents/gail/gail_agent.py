@@ -188,7 +188,7 @@ class GAILAgent(Agent):
         #
         convert_to_wandb_type: bool = True,
         #
-        return_trajs: bool = False,
+        return_trajectories: bool = False,
     ):
         eval_info, trajs = super().evaluate(seed=seed, env=env, num_episodes=num_episodes, return_trajectories=True)
 
@@ -210,9 +210,9 @@ class GAILAgent(Agent):
             eval_info["sample_expert_hist"] = state_expert_hist
             eval_info["priorities_hist"] = priorities_hist
 
-            if return_trajs:
-                return eval_info, trajs
-            return eval_info
+        if return_trajectories:
+            return eval_info, trajs
+        return eval_info
 
     @override
     def _preprocess_expert_observations(self, observations):
