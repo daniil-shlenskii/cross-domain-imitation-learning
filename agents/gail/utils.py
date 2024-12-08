@@ -20,8 +20,8 @@ def get_sample_discriminator_hists(
     expert_traj = {k: gail_agent.expert_buffer_state.experience[k][0, :end_of_firt_traj_idx] for k in observation_keys}
 
     # state and policy embeddings
-    learner_state = learner_traj["observations"]
-    expert_state = expert_traj["observations"]
+    learner_state = gail_agent._preprocess_observations(learner_traj["observations"])
+    expert_state = gail_agent._preprocess_expert_observations(expert_traj["observations"])
 
     # state and policy logits
     state_learner_logits = apply_model_jit(gail_agent.sample_discriminator, learner_state)

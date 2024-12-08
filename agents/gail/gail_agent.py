@@ -8,6 +8,7 @@ import numpy as np
 from flax import struct
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
+from typing_extensions import override
 
 import wandb
 from agents.base_agent import Agent
@@ -212,6 +213,10 @@ class GAILAgent(Agent):
             if return_trajs:
                 return eval_info, trajs
             return eval_info
+
+    @override
+    def _preprocess_expert_observations(self, observations):
+        return observations
 
 @functools.partial(jax.jit, static_argnames="update_agent")
 def _update_jit(
