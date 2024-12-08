@@ -6,7 +6,6 @@ import jax.numpy as jnp
 import numpy as np
 from flax import struct
 from hydra.utils import instantiate
-from numpy.core.multiarray import ndarray
 from omegaconf.dictconfig import DictConfig
 
 import wandb
@@ -78,10 +77,21 @@ class GAILAgent(Agent):
             sample_discriminator = None
 
         # expert buffer init
-        expert_buffer_state = load_pickle(expert_buffer_state_path)
+        _expert_buffer_state = load_pickle(expert_buffer_state_path)
+        buffer_state_size = get_buffer_state_size(_expert_buffer_state)
 
-        buffer_state_size = get_buffer_state_size(expert_buffer_state)
-        expert_buffer_state_exp = expert_buffer_state.experience
+        expert_buffer = instantiate_jitted_fbx_buffer({
+            "_target_": "flashbax.make_prioritised_flat_buffer",
+            "sample_batch_size": expert_batch_size,
+            "min_length": 1,
+            "max_length": buffer_state_size,
+        })
+
+        expert_buffer_state_exp = _expert_buffer_state.experience
+        expert_buffer_state = expert_buffer.init({
+            k: v[0] for k, v in expert_buffer_state_exp.items()
+        })
+
         new_expert_buffer_state_exp = {}
         for k, v in expert_buffer_state_exp.items():
             new_expert_buffer_state_exp[k] = jnp.asarray(v[0, :buffer_state_size][None])
@@ -90,14 +100,6 @@ class GAILAgent(Agent):
             current_index=0,
             is_full=True,
         )
-
-        expert_buffer = instantiate_jitted_fbx_buffer({
-            "_target_": "flashbax.make_item_buffer",
-            "sample_batch_size": expert_batch_size,
-            "min_length": buffer_state_size,
-            "max_length": buffer_state_size,
-            "add_batches": False,
-        })
 
         _save_attrs = kwargs.pop(
             "_save_attrs",
@@ -123,34 +125,29 @@ class GAILAgent(Agent):
 
     @jax.jit
     def _sample_expert_batch(self):
-        # get top relevant samples batch
-        expert_experience = self.expert_buffer_state.experience
-        expert_states = expert_experience["observations"][0]
-        expert_states_logits = self.sample_discriminator(expert_states)
-        _, top_relevant_idcs = jax.lax.top_k(-expert_states_logits, k=self.expert_batch_size//2)
-        top_relevant_batch = jax.tree.map(
-            lambda x: x.at[0, top_relevant_idcs].get(),
-            expert_experience,
-            is_leaf=lambda x: isinstance(x, jnp.ndarray)
-        )
+        rng = self.rng
 
         # sample random batch
-        new_rng, random_expert_batch = sample_batch(self.rng, self.expert_buffer, self.expert_buffer_state)
-        random_expert_batch = jax.tree.map(
-            lambda x: x.at[:self.expert_batch_size//2].get(),
-            random_expert_batch,
-            is_leaf=lambda x: isinstance(x, jnp.ndarray)
-        )
+        rng, random_batch = sample_batch(self.rng, self.expert_buffer, self.expert_buffer_state)
 
-        # combine gotten batches
-        expert_batch = jax.tree.map(
-            lambda x, y: jnp.concatenate([x, y]),
-            top_relevant_batch,
-            random_expert_batch,
-            is_leaf=lambda x: isinstance(x, jnp.ndarray)
-        )
+        # sample batch using sample_discriminator
+        if self.sample_discriminator is not None:
+            expert_experience = self.expert_buffer_state.experience
+            expert_states = expert_experience["observations"][0]
+            expert_states_logits = self.sample_discriminator(expert_states)
+            shifted_logits = expert_states_logits - expert_states_logits.min()
+            normalized_logits = shifted_logits / shifted_logits.max()
+            relevance_probs = 1 - normalized_logits
+            relevance_sample_priorities = relevance_probs / relevance_probs.sum()
+            relevant_state = self.expert_buffer.set_priorities(
+                self.expert_buffer_state,
+                jnp.arange(expert_states.shape[0]),
+                relevance_sample_priorities
+            )
+            rng, relevant_batch = sample_batch(rng, self.expert_buffer, relevant_state)
+            return rng, relevant_batch, random_batch
 
-        return new_rng, expert_batch
+        return rng, random_batch, random_batch
 
     def update(self, batch: DataType):
         update_agent = bool(
@@ -198,6 +195,7 @@ class GAILAgent(Agent):
         batch: DataType,
         expert_batch: DataType,
         policy_discriminator_learner_batch: DataType,
+        sample_discriminator_batch: DataType,
         update_agent: bool,
     ):
         new_params = {}
@@ -220,7 +218,7 @@ class GAILAgent(Agent):
         # update sample discriminator if exists
         if self.sample_discriminator is not None:
             new_sample_disc, sample_disc_info, sample_disc_stats_info = self.sample_discriminator.update(
-                real_batch=expert_batch["observations"],
+                real_batch=sample_discriminator_batch["observations"],
                 fake_batch=batch["observations"],
             )
             new_params["sample_discriminator"] = new_sample_disc
@@ -237,8 +235,7 @@ def _update_jit(
     update_agent: bool,
 ):
     # sample expert batch
-    # new_rng, expert_batch = sample_batch(gail_agent.rng, gail_agent.expert_buffer, gail_agent.expert_buffer_state)
-    new_rng, expert_batch = gail_agent._sample_expert_batch()
+    new_rng, expert_batch, sample_discriminator_batch = gail_agent._sample_expert_batch()
     new_gail_agent = gail_agent.replace(rng=new_rng)
 
     # update agent and policy policy_discriminator
@@ -246,6 +243,7 @@ def _update_jit(
         batch=batch,
         expert_batch=expert_batch,
         policy_discriminator_learner_batch=batch,
+        sample_discriminator_batch=sample_discriminator_batch,
         update_agent=update_agent,
     )
     return new_gail_agent, info, stats_info
