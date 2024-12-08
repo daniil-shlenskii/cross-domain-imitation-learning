@@ -2,9 +2,11 @@ import functools
 
 import gymnasium as gym
 import jax
+import jax.numpy as jnp
 import numpy as np
 from flax import struct
 from hydra.utils import instantiate
+from numpy.core.multiarray import ndarray
 from omegaconf.dictconfig import DictConfig
 
 import wandb
@@ -12,7 +14,7 @@ from agents.base_agent import Agent
 from agents.gail.gail_discriminator import GAILDiscriminator
 from gan.discriminator import Discriminator
 from utils import (convert_figure_to_array, get_buffer_state_size,
-                   instantiate_jitted_fbx_buffer, load_pickle)
+                   instantiate_jitted_fbx_buffer, load_pickle, sample_batch)
 from utils.types import Buffer, BufferState, DataType
 
 from .utils import get_sample_discriminator_hists
@@ -22,6 +24,7 @@ class GAILAgent(Agent):
     agent: Agent
     policy_discriminator: GAILDiscriminator
     sample_discriminator: Discriminator
+    expert_batch_size: int = struct.field(pytree_node=False)
     expert_buffer: Buffer = struct.field(pytree_node=False)
     expert_buffer_state: BufferState = struct.field(pytree_node=False)
     n_policy_discriminator_updates: int = struct.field(pytree_node=False)
@@ -81,8 +84,8 @@ class GAILAgent(Agent):
         expert_buffer_state_exp = expert_buffer_state.experience
         new_expert_buffer_state_exp = {}
         for k, v in expert_buffer_state_exp.items():
-            new_expert_buffer_state_exp[k] = v[0, :buffer_state_size]
-        expert_buffer_state.replace(
+            new_expert_buffer_state_exp[k] = jnp.asarray(v[0, :buffer_state_size][None])
+        expert_buffer_state = expert_buffer_state.replace(
             experience=new_expert_buffer_state_exp,
             current_index=0,
             is_full=True,
@@ -103,6 +106,7 @@ class GAILAgent(Agent):
 
         return cls(
             rng=jax.random.key(seed),
+            expert_batch_size=expert_batch_size,
             expert_buffer=expert_buffer,
             expert_buffer_state=expert_buffer_state,
             agent=agent,
@@ -116,6 +120,37 @@ class GAILAgent(Agent):
     @property
     def actor(self):
         return self.agent.actor
+
+    @jax.jit
+    def _sample_expert_batch(self):
+        # get top relevant samples batch
+        expert_experience = self.expert_buffer_state.experience
+        expert_states = expert_experience["observations"][0]
+        expert_states_logits = self.sample_discriminator(expert_states)
+        _, top_relevant_idcs = jax.lax.top_k(-expert_states_logits, k=self.expert_batch_size//2)
+        top_relevant_batch = jax.tree.map(
+            lambda x: x.at[0, top_relevant_idcs].get(),
+            expert_experience,
+            is_leaf=lambda x: isinstance(x, jnp.ndarray)
+        )
+
+        # sample random batch
+        new_rng, random_expert_batch = sample_batch(self.rng, self.expert_buffer, self.expert_buffer_state)
+        random_expert_batch = jax.tree.map(
+            lambda x: x.at[:self.expert_batch_size//2].get(),
+            random_expert_batch,
+            is_leaf=lambda x: isinstance(x, jnp.ndarray)
+        )
+
+        # combine gotten batches
+        expert_batch = jax.tree.map(
+            lambda x, y: jnp.concatenate([x, y]),
+            top_relevant_batch,
+            random_expert_batch,
+            is_leaf=lambda x: isinstance(x, jnp.ndarray)
+        )
+
+        return new_rng, expert_batch
 
     def update(self, batch: DataType):
         update_agent = bool(
@@ -202,8 +237,8 @@ def _update_jit(
     update_agent: bool,
 ):
     # sample expert batch
-    new_rng, key = jax.random.split(gail_agent.rng)
-    expert_batch = gail_agent.expert_buffer.sample(gail_agent.expert_buffer_state, key).experience
+    # new_rng, expert_batch = sample_batch(gail_agent.rng, gail_agent.expert_buffer, gail_agent.expert_buffer_state)
+    new_rng, expert_batch = gail_agent._sample_expert_batch()
     new_gail_agent = gail_agent.replace(rng=new_rng)
 
     # update agent and policy policy_discriminator
