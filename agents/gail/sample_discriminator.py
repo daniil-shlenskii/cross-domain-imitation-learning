@@ -10,6 +10,7 @@ class SampleDiscriminator(Discriminator):
     buffer_state_experience: DataType = struct.field(pytree_node=False)
     sample_size: int = struct.field(pytree_node=False)
     priorities: jnp.ndarray
+    temperature: float
 
     @classmethod
     def create(
@@ -17,6 +18,7 @@ class SampleDiscriminator(Discriminator):
         *,
         buffer_state_experience: DataType,
         sample_size: int,
+        temperature: float = 1.,
         **discriminator_kwargs,
     ):
         exp_size = buffer_state_experience["observations"].shape[0]
@@ -26,6 +28,7 @@ class SampleDiscriminator(Discriminator):
             buffer_state_experience=buffer_state_experience,
             sample_size=sample_size,
             priorities=priorities,
+            temperature=temperature,
             info_key="sample_discriminator",
             _save_attrs = ("state", "priorities"),
             **discriminator_kwargs,
@@ -65,7 +68,7 @@ class SampleDiscriminator(Discriminator):
         normalized_logits =  shifted_logits / shifted_logits.max()
 
         relevance = 1. - normalized_logits
-        priorities = relevance / relevance.sum()
+        priorities = jax.nn.softmax(relevance)
         return priorities
 
 
