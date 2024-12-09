@@ -40,17 +40,18 @@ def get_sample_discriminator_hists(
     state_expert_figure = logits_to_plot(state_expert_logits)
 
     # priorities hist
-    def priorities_to_plot(priorities):
+    def priorities_to_plot(priorities, hline=False):
         figure = plt.figure(figsize=figsize)
         plt.plot(priorities, "go")
-        plt.axhline(y=1/len(priorities), color='r', linestyle='-')
+        if hline:
+            plt.axhline(y=1/len(priorities), color='r', linestyle='-')
         plt.close()
         return figure
 
     priorities = gail_agent.sample_discriminator.get_priorities(expert_states)
     priorities_acc = gail_agent.sample_discriminator.priorities[:end_of_firt_traj_idx]
 
-    priorities_hist = priorities_to_plot(priorities)
+    priorities_hist = priorities_to_plot(priorities, hline=True)
     priorities_acc_hist = priorities_to_plot(priorities_acc)
 
     return state_learner_figure, state_expert_figure, priorities_hist, priorities_acc_hist
