@@ -322,6 +322,7 @@ def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
         policy_discriminator_learner_batch=mixed_batch,
         sample_discriminator_expert_batch=sample_discr_expert_batch,
         update_agent=update_agent,
+        expert_encoder=new_dida_agent.expert_encoder,
     )
 
     info.update(gail_info)
