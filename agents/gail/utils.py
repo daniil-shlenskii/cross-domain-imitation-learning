@@ -20,16 +20,17 @@ def get_sample_discriminator_hists(
     expert_traj = {k: gail_agent.expert_buffer_state.experience[k][0, :end_of_firt_traj_idx] for k in observation_keys}
 
     # state and policy embeddings
-    learner_state = gail_agent._preprocess_observations(learner_traj["observations"])
-    expert_state = gail_agent._preprocess_expert_observations(expert_traj["observations"])
+    learner_states = gail_agent._preprocess_observations(learner_traj["observations"])
+    expert_states = gail_agent._preprocess_expert_observations(expert_traj["observations"])
 
     # state and policy logits
-    state_learner_logits = apply_model_jit(gail_agent.sample_discriminator, learner_state)
-    state_expert_logits = apply_model_jit(gail_agent.sample_discriminator, expert_state)
+    state_learner_logits = apply_model_jit(gail_agent.sample_discriminator, learner_states)
+    state_expert_logits = apply_model_jit(gail_agent.sample_discriminator, expert_states)
 
     # plots
+    figsize = (5, 5)
     def logits_to_plot(logits):
-        figure = plt.figure(figsize=(5, 5))
+        figure = plt.figure(figsize=figsize)
         plt.plot(logits, "bo")
         plt.axhline(y=0., color='r', linestyle='-')
         plt.close()
@@ -39,17 +40,11 @@ def get_sample_discriminator_hists(
     state_expert_figure = logits_to_plot(state_expert_logits)
 
     # priorities hist
-    priorities = np.asarray(gail_agent.sample_discriminator.priorities)
-    samples = np.random.choice(
-        a=len(priorities),
-        size=10_000,
-        p=priorities,
-        replace=True,
-    )
+    priorities = gail_agent.sample_discriminator.get_priorities(expert_states)
 
-    priorities_hist = plt.figure(figsize=(5, 5))
-    plt.hist(samples, bins=len(priorities), density=True)
-    plt.xlabel("priorities")
+    priorities_hist = plt.figure(figsize=figsize)
+    plt.plot(priorities, "go")
+    plt.axhline(y=1/len(priorities), color='r', linestyle='-')
     plt.close()
 
     return state_learner_figure, state_expert_figure, priorities_hist

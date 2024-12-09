@@ -67,8 +67,7 @@ class SampleDiscriminator(Discriminator):
         return new_rng, batch
 
     @jax.jit
-    def _get_priorities(self, expert_encoder=None):
-        observations = self.buffer_state_experience["observations"]
+    def get_priorities(self, observations, expert_encoder=None):
         if expert_encoder is not None:
             observations = expert_encoder(observations)
         logits = self(observations)
@@ -95,7 +94,7 @@ def _update(
     )
 
     # update priorities
-    priorities = new_sample_discr._get_priorities(expert_encoder)
+    priorities = new_sample_discr.get_priorities(sample_discriminator.buffer_state_experience["observations"], expert_encoder)
     new_priorities = sample_discriminator.priorities * sample_discriminator.ema_decay + priorities * (1 - sample_discriminator.ema_decay)
     new_sample_discr = new_sample_discr.replace(priorities=new_priorities)
 
