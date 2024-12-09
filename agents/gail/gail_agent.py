@@ -144,11 +144,13 @@ class GAILAgent(Agent):
     @functools.partial(jax.jit, static_argnames="update_agent")
     def update_gail(
         self,
+        *, 
         batch: DataType,
         expert_batch: DataType,
         policy_discriminator_learner_batch: DataType,
         sample_discriminator_expert_batch: DataType,
         update_agent: bool,
+        expert_encoder=None,
     ):
         new_params = {}
 
@@ -171,7 +173,7 @@ class GAILAgent(Agent):
             new_sample_discr, sample_discr_info, sample_discr_stats_info = self.sample_discriminator.update(
                 expert_batch=sample_discriminator_expert_batch,
                 learner_batch=batch,
-                preprocess_expert_observations=self._preprocess_expert_observations,
+                expert_encoder=expert_encoder,
             )
             info.update(sample_discr_info)
             stats_info.update(sample_discr_stats_info)

@@ -10,7 +10,6 @@ from utils.types import DataType, PRNGKey
 
 class SampleDiscriminator(Discriminator):
     buffer_state_experience: DataType = struct.field(pytree_node=False)
-    preprocess_expert_observations: Callable = struct.field(pytree_node=False)
     sample_size: int = struct.field(pytree_node=False)
     priorities: jnp.ndarray
     ema_decay: float
@@ -22,20 +21,15 @@ class SampleDiscriminator(Discriminator):
         *,
         buffer_state_experience: DataType,
         sample_size: int,
-        preprocess_expert_observations: Callable = None,
         ema_decay: float = 0.99,
         temperature: float = 1.,
         **discriminator_kwargs,
     ):
-        if preprocess_expert_observations is None:
-            preprocess_expert_observations = lambda x: x
-
         exp_size = buffer_state_experience["observations"].shape[0]
         priorities = jnp.ones(exp_size) / float(exp_size)
 
         return super().create(
             buffer_state_experience=buffer_state_experience,
-            preprocess_expert_observations = preprocess_expert_observations,
             sample_size=sample_size,
             priorities=priorities,
             ema_decay=ema_decay,
@@ -45,14 +39,12 @@ class SampleDiscriminator(Discriminator):
             **discriminator_kwargs,
         )
 
-    def update(self, *, expert_batch: DataType, learner_batch: DataType, preprocess_expert_observations: Callable=None):
-        new_sample_discr = self
-        if preprocess_expert_observations is not None:
-            new_sample_discr = self.replace(preprocess_expert_observations=preprocess_expert_observations)
+    def update(self, *, expert_batch: DataType, learner_batch: DataType, expert_encoder=None):
         new_sample_discr, info, stats_info = _update(
-            sample_discriminator=new_sample_discr,
+            sample_discriminator=self,
             learner_batch=learner_batch,
             expert_batch=expert_batch,
+            expert_encoder=expert_encoder,
         )
         return new_sample_discr, info, stats_info
 
@@ -75,9 +67,11 @@ class SampleDiscriminator(Discriminator):
         return new_rng, batch
 
     @jax.jit
-    def _get_priorities(self):
-        states = self.preprocess_expert_observations(self.buffer_state_experience["observations"])
-        logits = self(states)
+    def _get_priorities(self, expert_encoder=None):
+        observations = self.buffer_state_experience["observations"]
+        if expert_encoder is not None:
+            observations = expert_encoder(observations)
+        logits = self(observations)
         shifted_logits = logits - logits.min()
         normalized_logits =  shifted_logits / shifted_logits.max()
 
@@ -91,6 +85,7 @@ def _update(
     sample_discriminator: SampleDiscriminator,
     learner_batch: DataType,
     expert_batch: DataType,
+    expert_encoder,
 ):
     # update discriminator
     new_sample_discr, info, stats_info = Discriminator.update(
@@ -100,7 +95,7 @@ def _update(
     )
 
     # update priorities
-    priorities = new_sample_discr._get_priorities()
+    priorities = new_sample_discr._get_priorities(expert_encoder)
     new_priorities = sample_discriminator.priorities * sample_discriminator.ema_decay + priorities * (1 - sample_discriminator.ema_decay)
     new_sample_discr = new_sample_discr.replace(priorities=new_priorities)
 
