@@ -207,13 +207,13 @@ class GAILAgent(Agent):
         # update sample discriminator
         new_sample_discr, info, stats_info = self.sample_discriminator.update(
             expert_batch=expert_batch,
-            learner_batch=learner_batch,
+            learner_batch=batch,
             expert_encoder=expert_encoder,
         )
 
         # update gail agent
         new_gail_agent = self.replace(
-            rng=new-rng,
+            rng=new_rng,
             sample_discriminator=new_sample_discr,
         )
         return new_gail_agent, info, stats_info
