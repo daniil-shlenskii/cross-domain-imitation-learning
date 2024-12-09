@@ -67,16 +67,24 @@ class SampleDiscriminator(Discriminator):
         return new_rng, batch
 
     @jax.jit
-    def get_priorities(self, observations, expert_encoder=None):
+    def get_priorities(self, observation_pairs, expert_encoder=None):
         if expert_encoder is not None:
+            observations, observations_next = jnp.split(observation_pairs, 2, axis=1)
             observations = expert_encoder(observations)
-        logits = self(observations)
+            observations_next = expert_encoder(observations_next)
+            observation_pairs = self._make_pairs(observations, observations_next)
+        logits = self(observation_pairs)
         shifted_logits = logits - logits.min()
         normalized_logits =  shifted_logits / shifted_logits.max()
 
         relevance = 1. - normalized_logits
         priorities = jax.nn.softmax(relevance / self.temperature)
         return priorities
+
+    def _make_pairs(self, observations: jnp.ndarray, observations_next: jnp.ndarray):
+        return jnp.concatenate([
+            observations, observations_next
+        ], axis=1)
 
 
 @jax.jit
@@ -86,15 +94,27 @@ def _update(
     expert_batch: DataType,
     expert_encoder,
 ):
+    # prepare observation pairs
+    learner_pairs = sample_discriminator._make_pairs(
+        learner_batch["observations"], learner_batch["observations_next"]
+    )
+    expert_pairs = sample_discriminator._make_pairs(
+        expert_batch["observations"], expert_batch["observations_next"]
+    )
+
     # update discriminator
     new_sample_discr, info, stats_info = Discriminator.update(
         self=sample_discriminator,
-        real_batch=expert_batch["observations"],
-        fake_batch=learner_batch["observations"],
+        real_batch=expert_pairs,
+        fake_batch=learner_pairs,
     )
 
     # update priorities
-    priorities = new_sample_discr.get_priorities(sample_discriminator.buffer_state_experience["observations"], expert_encoder)
+    exp_pairs = jnp.concatenate([
+        sample_discriminator.buffer_state_experience["observations"],
+        sample_discriminator.buffer_state_experience["observations_next"],
+    ], axis=1)
+    priorities = new_sample_discr.get_priorities(exp_pairs, expert_encoder)
     new_priorities = sample_discriminator.priorities * sample_discriminator.ema_decay + priorities * (1 - sample_discriminator.ema_decay)
     new_sample_discr = new_sample_discr.replace(priorities=new_priorities)
 

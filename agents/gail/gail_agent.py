@@ -102,7 +102,7 @@ class GAILAgent(Agent):
             sample_discriminator = instantiate(
                 sample_discriminator_config,
                 seed=seed,
-                input_dim=observation_dim,
+                input_dim=observation_dim * 2,
                 buffer_state_experience={
                     k: v[0] for k, v in deepcopy(
                         new_expert_buffer_state_exp
@@ -155,7 +155,7 @@ class GAILAgent(Agent):
     @functools.partial(jax.jit, static_argnames="update_agent")
     def update_gail(
         self,
-        *, 
+        *,
         batch: DataType,
         expert_batch: DataType,
         policy_discriminator_learner_batch: DataType,
