@@ -195,7 +195,7 @@ class DIDAAgent(GAILAgent):
                 info.update(domain_info)
                 stats_info.update(domain_stats_info)
 
-            if update_domain_discriminator_only:
+            if update_sample_discriminator_only:
                 new_dida_agent, sample_info, sample_stats_info = new_dida_agent.update_sample_discriminator(
                     batch=batch,
                     expert_encoder=new_dida_agent.expert_encoder,
