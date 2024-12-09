@@ -1,4 +1,4 @@
-ueed: &seed 0
+seed: &seed 0
 env_name: &env_name HalfCheetah-v5
 
 n_iters_training: 1_000_000
