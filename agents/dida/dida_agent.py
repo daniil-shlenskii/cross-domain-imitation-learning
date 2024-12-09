@@ -100,7 +100,7 @@ class DIDAAgent(GAILAgent):
             )
 
         # domain loss updater init
-        if not use_das or domain_loss_scale_fn_config is None:
+        if domain_loss_scale_fn_config is None:
             domain_loss_scale_fn = ConstantDomainLossScale(domain_loss_scale=1.0)
         else:
             domain_loss_scale_fn = instantiate(domain_loss_scale_fn_config)
