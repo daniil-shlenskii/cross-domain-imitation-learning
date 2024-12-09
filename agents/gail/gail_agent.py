@@ -29,6 +29,7 @@ class GAILAgent(Agent):
     expert_batch_size: int
     expert_buffer_state: BufferState = struct.field(pytree_node=False)
     n_policy_discriminator_updates: int = struct.field(pytree_node=False)
+    n_sample_discriminator_updates: int = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -48,6 +49,7 @@ class GAILAgent(Agent):
         sample_discriminator_config: DictConfig = None,
         #
         n_policy_discriminator_updates: int = 1,
+        n_sample_discriminator_updates: int = 1,
         **kwargs,
     ):
         # agent and policy_discriminator init
@@ -124,6 +126,7 @@ class GAILAgent(Agent):
             policy_discriminator=policy_discriminator,
             sample_discriminator=sample_discriminator,
             n_policy_discriminator_updates=n_policy_discriminator_updates,
+            n_sample_discriminator_updates=n_sample_discriminator_updates,
             _save_attrs = _save_attrs,
             **kwargs,
         )
@@ -133,6 +136,14 @@ class GAILAgent(Agent):
         return self.agent.actor
 
     def update(self, batch: DataType):
+        update_sample_discriminator_only = (
+            self.sample_discriminator is not None and
+            (self.sample_discriminator.state.step + 1) % self.n_sample_discriminator_updates != 0
+        )
+        if update_sample_discriminator_only:
+            new_gail_agent, info, stats_info = self.update_sample_discriminator(batch=batch)
+            return new_gail_agent, info, stats_info
+
         update_agent = bool(
                 (self.policy_discriminator.state.step + 1) % self.n_policy_discriminator_updates == 0
         )
@@ -180,6 +191,31 @@ class GAILAgent(Agent):
             new_params["sample_discriminator"] = new_sample_discr
 
         new_gail_agent = self.replace(**new_params)
+        return new_gail_agent, info, stats_info
+
+    @jax.jit
+    def update_sample_discriminator(self, *, batch: DataType, expert_encoder=None):
+        # sample expert batch
+        new_rng, expert_batch = sample_batch(
+            self.rng, self.expert_buffer, self.expert_buffer_state
+        )
+
+        # encode batches
+        batch["observations"] = self._preprocess_observations(batch["observations"])
+        expert_batch["observations"] = self._preprocess_expert_observations(expert_batch["observations"])
+
+        # update sample discriminator
+        new_sample_discr, info, stats_info = self.sample_discriminator.update(
+            expert_batch=expert_batch,
+            learner_batch=learner_batch,
+            expert_encoder=expert_encoder,
+        )
+
+        # update gail agent
+        new_gail_agent = self.replace(
+            rng=new-rng,
+            sample_discriminator=new_sample_discr,
+        )
         return new_gail_agent, info, stats_info
 
     def evaluate(
