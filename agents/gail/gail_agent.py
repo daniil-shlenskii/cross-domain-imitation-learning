@@ -237,6 +237,7 @@ class GAILAgent(Agent):
                 state_learner_hist,
                 state_expert_hist,
                 priorities_hist,
+                priorities_acc_hist,
             ) = get_sample_discriminator_hists(
                 gail_agent=self,
                 learner_trajs=trajs,
@@ -245,9 +246,11 @@ class GAILAgent(Agent):
                 state_learner_hist = wandb.Image(convert_figure_to_array(state_learner_hist), caption="Sample Discriminator Learner logits")
                 state_expert_hist = wandb.Image(convert_figure_to_array(state_expert_hist), caption="Sample Discriminator Expert logits")
                 priorities_hist = wandb.Image(convert_figure_to_array(priorities_hist), caption="Sample Discriminator priority hist")
+                priorities_acc_hist = wandb.Image(convert_figure_to_array(priorities_acc_hist), caption="Sample Discriminator accumulated priority hist")
             eval_info["sample_learner_hist"] = state_learner_hist
             eval_info["sample_expert_hist"] = state_expert_hist
             eval_info["priorities_hist"] = priorities_hist
+            eval_info["priorities_acc_hist"] = priorities_acc_hist
 
         if return_trajectories:
             return eval_info, trajs
