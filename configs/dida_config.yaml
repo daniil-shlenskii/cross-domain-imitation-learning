@@ -45,7 +45,7 @@ agent:
     max_n_iters: 100_000
     concavity: 10.
   #
-  use_das: True
+  use_das: False
   #
   agent_config:
     _target_: agents.SACAgent.create
@@ -90,6 +90,15 @@ agent:
       _target_: agents.dida.encoder_loss.DIDAEncoderLoss
   domain_discriminator_config:
     _target_: gan.discriminator.Discriminator.create
+    module_config:
+      _target_: networks.discriminator.Discriminator
+      hidden_dims: [128, 128]
+    optimizer_config: *optimizer_config
+    loss_config:
+      _target_: gan.losses.SoftplusLoss
+      is_generator: False
+  sample_discriminator_config:
+    _target_: agents.gail.SampleDiscriminator.create
     module_config:
       _target_: networks.discriminator.Discriminator
       hidden_dims: [128, 128]

@@ -164,6 +164,9 @@ class DIDAAgent(GAILAgent):
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
         return apply_model_jit(self.learner_encoder, observations)
 
+    def _preprocess_expert_observations(self, observations: np.ndarray) -> np.ndarray:
+        return apply_model_jit(self.expert_encoder, observations)
+
     def __getattr__(self, item: str):
         if item == "expert_encoder":
             return self.learner_encoder
@@ -286,6 +289,7 @@ def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
         new_dida_agent,
         batch,
         expert_batch,
+        sample_discr_expert_batch,
         learner_domain_logits,
         expert_domain_logits,
         info,
@@ -316,6 +320,7 @@ def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
         batch=batch,
         expert_batch=expert_batch,
         policy_discriminator_learner_batch=mixed_batch,
+        sample_discriminator_expert_batch=sample_discr_expert_batch,
         update_agent=update_agent,
     )
 
