@@ -171,6 +171,7 @@ class GAILAgent(Agent):
             new_sample_discr, sample_discr_info, sample_discr_stats_info = self.sample_discriminator.update(
                 expert_batch=sample_discriminator_expert_batch,
                 learner_batch=batch,
+                preprocess_expert_observations=self._preprocess_expert_observations,
             )
             info.update(sample_discr_info)
             stats_info.update(sample_discr_stats_info)
