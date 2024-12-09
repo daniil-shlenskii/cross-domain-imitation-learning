@@ -58,7 +58,7 @@ class DIDAAgent(GAILAgent):
         p_acc_ema_decay: float = 0.999,
         #
         n_policy_discriminator_updates: int = 1,
-        #
+        n_sample_discriminator_updates: int = 1,
         n_domain_discriminator_updates: int = 1,
         domain_loss_scale_fn_config: DictConfig = None,
         #
@@ -176,11 +176,32 @@ class DIDAAgent(GAILAgent):
         update_domain_discriminator_only = bool(
             (self.domain_discriminator.state.step + 1) % self.n_domain_discriminator_updates != 0
         )
-        if update_domain_discriminator_only:
-            new_dida_agent, info, stats_info = _update_domain_discriminator_only_jit(
-                dida_agent=self,
-                batch=batch
-            )
+        update_sample_discriminator_only = bool(
+            (self.sample_discriminator.state.step + 1) % self.n_sample_discriminator_updates != 0
+        )
+        update_dida_agent = not (
+            update_domain_discriminator_only or
+            update_sample_discriminator_only
+        )
+        if not update_dida_agent:
+            new_dida_agent = self
+            info, stats_info = {}, {}
+            if update_domain_discriminator_only:
+                new_dida_agent, domain_info, domain_stats_info = _update_domain_discriminator_only_jit(
+                    dida_agent=new_dida_agent,
+                    batch=batch
+                )
+                info.update(domain_info)
+                stats_info.update(domain_stats_info)
+
+            if update_domain_discriminator_only:
+                new_dida_agent, sample_info, sample_stats_info = new_dida_agent.update_sample_discriminator(
+                    batch=batch,
+                    expert_encoder=new_dida_agent.expert_encoder,
+                )
+                info.update(sample_info)
+                stats_info.update(sample_stats_info)
+
             return new_dida_agent, info, stats_info
 
         update_agent = bool(
