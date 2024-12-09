@@ -177,6 +177,7 @@ class DIDAAgent(GAILAgent):
             (self.domain_discriminator.state.step + 1) % self.n_domain_discriminator_updates != 0
         )
         update_sample_discriminator_only = bool(
+            self.sample_discriminator is not None and
             (self.sample_discriminator.state.step + 1) % self.n_sample_discriminator_updates != 0
         )
         update_dida_agent = not (
