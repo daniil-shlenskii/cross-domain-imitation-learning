@@ -5,21 +5,17 @@ import gymnasium as gym
 import numpy as np
 from flax import struct
 from hydra.utils import instantiate
-from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
 import wandb
 from agents.gail.gail_agent import GAILAgent
 from gan.discriminator import Discriminator
 from gan.generator import Generator
-from utils import (apply_model_jit, convert_figure_to_array,
-                   get_buffer_state_size)
+from utils import convert_figure_to_array, get_buffer_state_size
 from utils.types import BufferState, DataType
+from utils.utils import sample_batch
 
-from .das import DomainAdversarialSampling, _prepare_anchor_batch_jit
-from .domain_loss_scale_fns import ConstantDomainLossScale
-from .update_steps import (_update_domain_discriminator_only_jit,
-                           _update_encoders_and_domain_discriminator_jit)
+from .das import _prepare_anchor_batch_jit
 from .utils import (get_discriminators_hists,
                     get_state_and_policy_tsne_scatterplots)
 
@@ -29,8 +25,6 @@ class DIDAAgent(GAILAgent):
     domain_discriminator: Discriminator
     anchor_buffer_state: BufferState = struct.field(pytree_node=False)
     das: float = struct.field(pytree_node=False)
-    n_domain_discriminator_updates: int = struct.field(pytree_node=False)
-    domain_loss_scale_fn: Callable = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -42,83 +36,46 @@ class DIDAAgent(GAILAgent):
         low: np.ndarray[float],
         high: np.ndarray[float],
         #
-        encoder_dim: int,
+        encoding_dim: int,
         #
         expert_batch_size: int,
         expert_buffer_state_path: str,
         #
         agent_config: DictConfig,
-        learner_encoder_config: DictConfig,
         policy_discriminator_config: DictConfig,
-        domain_discriminator_config: DictConfig,
+        domain_encoder_config: DictConfig,
         #
-        use_das: bool = True,
-        sar_p: float = 0.5,
-        p_acc_ema: float = 0.9,
-        p_acc_ema_decay: float = 0.999,
-        #
-        n_policy_discriminator_updates: int = 1,
-        n_sample_discriminator_updates: int = 1,
-        n_domain_discriminator_updates: int = 1,
-        domain_loss_scale_fn_config: DictConfig = None,
+        das_config: DictConfig = None,
         #
         expert_buffer_state_preprocessing_config: DictConfig = None,
         **kwargs,
     ):
-        # encoders init
-        policy_loss = instantiate(policy_discriminator_config["loss_config"])
-        domain_loss = instantiate(domain_discriminator_config["loss_config"])
-        learner_encoder_config = OmegaConf.to_container(learner_encoder_config)
-        learner_encoder_config["loss_config"]["policy_loss"] = policy_loss
-        learner_encoder_config["loss_config"]["domain_loss"] = domain_loss
-
-        learner_encoder = instantiate(
-            learner_encoder_config,
+        # domain encoder init
+        domain_encoder = instantiate(
+            domain_encoder_config,
             seed=seed,
-            input_dim=observation_dim,
-            output_dim=encoder_dim,
-            info_key="encoder",
+            learner_dim=observation_dim,
+            encoding_dim=encoding_dim,
             _recursive_=False,
         )
-
-        # domain discriminators init
-        domain_discriminator = instantiate(
-            domain_discriminator_config,
-            seed=seed,
-            input_dim=encoder_dim ,
-            info_key="domain_discriminator",
-            _recursive_=False,
-        )
-
         # DAS init
         das = None
-        if use_das:
-            das = DomainAdversarialSampling(
-                sar_p=sar_p,
-                p_acc_ema=p_acc_ema,
-                p_acc_ema_decay=p_acc_ema_decay,
-            )
-
-        # domain loss updater init
-        if domain_loss_scale_fn_config is None:
-            domain_loss_scale_fn = ConstantDomainLossScale(domain_loss_scale=1.0)
-        else:
-            domain_loss_scale_fn = instantiate(domain_loss_scale_fn_config)
+        if das_config is not None:
+            das = instantiate(das_config)
 
         _save_attrs = kwargs.pop(
             "_save_attrs",
             (
                 "agent",
-                "learner_encoder",
                 "policy_discriminator",
-                "domain_discriminator",
+                "domain_encoder",
                 "das",
             )
         )
 
         dida_agent = super().create(
             seed=seed,
-            observation_dim=encoder_dim,
+            observation_dim=encoding_dim,
             action_dim=action_dim,
             low=low,
             high=high,
@@ -126,18 +83,15 @@ class DIDAAgent(GAILAgent):
             expert_buffer_state_path=expert_buffer_state_path,
             agent_config=agent_config,
             policy_discriminator_config=policy_discriminator_config,
-            n_policy_discriminator_updates=n_policy_discriminator_updates,
             #
             anchor_buffer_state=None,
-            learner_encoder=learner_encoder,
+            domain_encoder=domain_encoder,
             das=das,
-            domain_discriminator=domain_discriminator,
-            n_domain_discriminator_updates=n_domain_discriminator_updates,
-            domain_loss_scale_fn=domain_loss_scale_fn,
             _save_attrs=_save_attrs,
             **kwargs,
         )
 
+        # preprocess expert buffer if needed
         if expert_buffer_state_preprocessing_config is not None:
             expert_buffer_state_preprocessing = instantiate(expert_buffer_state_preprocessing_config)
             new_expert_buffer_state = expert_buffer_state_preprocessing(dida_agent.expert_buffer_state)
@@ -162,56 +116,15 @@ class DIDAAgent(GAILAgent):
         return dida_agent
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
-        return apply_model_jit(self.learner_encoder, observations)
+        return self.domain_encoder.encode_learner_state(observations)
 
     def _preprocess_expert_observations(self, observations: np.ndarray) -> np.ndarray:
-        return apply_model_jit(self.expert_encoder, observations)
-
-    def __getattr__(self, item: str):
-        if item == "expert_encoder":
-            return self.learner_encoder
-        return super().__getattr__(item)
+        return self.domain_encoder.encode_expert_state(observations)
 
     def update(self, batch: DataType):
-        update_domain_discriminator_only = bool(
-            (self.domain_discriminator.state.step + 1) % self.n_domain_discriminator_updates != 0
-        )
-        update_sample_discriminator_only = bool(
-            self.sample_discriminator is not None and
-            (self.sample_discriminator.state.step + 1) % self.n_sample_discriminator_updates != 0
-        )
-        update_dida_agent = not (
-            update_domain_discriminator_only or
-            update_sample_discriminator_only
-        )
-        if not update_dida_agent:
-            new_dida_agent = self
-            info, stats_info = {}, {}
-            if update_domain_discriminator_only:
-                new_dida_agent, domain_info, domain_stats_info = _update_domain_discriminator_only_jit(
-                    dida_agent=new_dida_agent,
-                    batch=batch
-                )
-                info.update(domain_info)
-                stats_info.update(domain_stats_info)
-
-            if update_sample_discriminator_only:
-                new_dida_agent, sample_info, sample_stats_info = new_dida_agent.update_sample_discriminator(
-                    batch=batch,
-                    expert_encoder=new_dida_agent.expert_encoder,
-                )
-                info.update(sample_info)
-                stats_info.update(sample_stats_info)
-
-            return new_dida_agent, info, stats_info
-
-        update_agent = bool(
-                (self.policy_discriminator.state.step + 1) % self.n_policy_discriminator_updates == 0
-        )
         new_dida_agent, info, stats_info = _update_jit(
             dida_agent=self,
-            batch=batch,
-            update_agent=update_agent
+            learner_batch=batch,
         )
         return new_dida_agent, info, stats_info
 
@@ -232,7 +145,7 @@ class DIDAAgent(GAILAgent):
         if visualize_state_and_policy_scatterplots:
             tsne_state_figure, tsne_policy_figure = get_state_and_policy_tsne_scatterplots(
                 dida_agent=self,
-                seed=seed,
+    seed=seed,
                 learner_trajs=trajs,
             )
             if convert_to_wandb_type:
@@ -251,7 +164,7 @@ class DIDAAgent(GAILAgent):
             ) = get_discriminators_hists(
                 dida_agent=self,
                 learner_trajs=trajs,
-            )
+)
             if convert_to_wandb_type:
                 state_learner_hist = wandb.Image(convert_figure_to_array(state_learner_hist), caption="Domain Discriminator Learner logits")
                 state_expert_hist = wandb.Image(convert_figure_to_array(state_expert_hist), caption="Domain Discriminator Expert logits")
@@ -264,68 +177,25 @@ class DIDAAgent(GAILAgent):
 
         return eval_info
 
-    def _update_encoders_and_domain_discrimiantor(
-        self, batch: DataType, expert_batch: DataType, domain_loss_scale: float
-    ):
-        # update encoders
-        new_encoder, encoder_info, encoder_stats_info = self.learner_encoder.update(
-            batch=batch,
-            expert_batch=expert_batch,
-            policy_discriminator=self.policy_discriminator,
-            domain_discriminator=self.domain_discriminator,
-            domain_loss_scale=domain_loss_scale,
-        )
-        batch = encoder_info.pop("learner_encoded_batch")
-        expert_batch = encoder_info.pop("expert_encoded_batch")
-
-        # update domain discriminator
-        new_domain_disc, domain_disc_info, domain_disc_stats_info = self.domain_discriminator.update(
-            real_batch=expert_batch["observations"],
-            fake_batch=batch["observations"],
-            return_logits=True,
-        )
-        expert_domain_logits = domain_disc_info.pop("real_logits")
-        learner_domain_logits = domain_disc_info.pop("fake_logits")
-
-        # update dida agent
-        new_dida_agent = self.replace(
-            learner_encoder=new_encoder,
-            domain_discriminator=new_domain_disc,
-        )
-        info = {**encoder_info, **domain_disc_info}
-        stats_info = {**encoder_stats_info, **domain_disc_stats_info}
-
-        return (
-            new_dida_agent,
-            batch,
-            expert_batch,
-            learner_domain_logits,
-            expert_domain_logits,
-            info,
-            stats_info,
-        )
-
-def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
-    # update encoders and domain discriminator
+def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType):
+    # sample batches and update domain encoder
     (
         new_dida_agent,
         batch,
         expert_batch,
+        anchor_batch,
         sample_discr_expert_batch,
         learner_domain_logits,
         expert_domain_logits,
         info,
         stats_info,
-    ) = _update_encoders_and_domain_discriminator_jit(
+    ) = _update_domain_encoder(
         dida_agent=dida_agent,
-        batch=deepcopy(batch),
+        learner_batch=learner_batch,
     )
 
     # prepare mixed batch for policy discriminator update
     if new_dida_agent.das is not None:
-        # prepare anchor batch
-        anchor_batch = _prepare_anchor_batch_jit(dida_agent=dida_agent)
-
         # mix learner and anchor batches
         mixed_batch, sar_info = new_dida_agent.das.mix_batches(
             learner_batch=batch,
@@ -343,10 +213,50 @@ def _update_jit(dida_agent: DIDAAgent, batch: DataType, update_agent: bool):
         expert_batch=expert_batch,
         policy_discriminator_learner_batch=mixed_batch,
         sample_discriminator_expert_batch=sample_discr_expert_batch,
-        update_agent=update_agent,
         expert_encoder=new_dida_agent.expert_encoder,
     )
 
     info.update(gail_info)
     stats_info.update(gail_stats_info)
     return new_dida_agent, info, stats_info
+
+def _update_domain_encoder(
+    dida_agent: DIDAAgent,
+    learner_batch: DataType,
+):
+    # sample source batches
+    new_rng, expert_batch = sample_batch(dida_agent.rng, dida_agent.expert_buffer, dida_agent.expert_buffer_state)
+    new_rng, anchor_batch = sample_batch(new_rng, dida_agent.expert_buffer, dida_agent.anchor_buffer_state)
+
+    # update domain encoder
+    (
+        new_domain_encoder,
+        learner_batch,
+        expert_batch,
+        anchor_batch,
+        learner_domain_logits,
+        expert_domain_logits,
+        info,
+        stats_info,
+    ) = dida_agent.domain_encoder.update(
+        learner_batch=learner_batch,
+        expert_batch=expert_batch,
+        anchor_batch=anchor_batch,
+    )
+
+    # update dida agent
+    new_dida_agent = dida_agent.replace(
+        rng=new_rng,
+        domain_encoder=new_domain_encoder
+    )
+
+    return (
+        new_dida_agent,
+        learner_batch,
+        expert_batch,
+        anchor_batch,
+        learner_domain_logits,
+        expert_domain_logits,
+        info,
+        stats_info,
+    )

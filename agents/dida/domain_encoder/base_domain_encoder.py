@@ -82,11 +82,17 @@ class BaseDomainEncoder(PyTreeNode, ABC)
     def encode_expert_state(self, state: jnp.ndarray):
         return self.learner_encoder(state)
 
-    def update(self, learner_batch: DataType, expert_batch: DataType):
+    def update(
+        self,
+        learner_batch: DataType,
+        expert_batch: DataType,
+        anchor_batch: DataType,
+    ):
         (
             new_domain_encoder,
             learner_batch,
             expert_batch,
+            anchor_batch,
             learner_domain_logits,
             expert_domain_logits,
             info,
@@ -100,6 +106,7 @@ class BaseDomainEncoder(PyTreeNode, ABC)
             new_domain_encoder,
             learner_batch,
             expert_batch,
+            anchor_batch,
             learner_domain_logits,
             expert_domain_logits,
             info,
