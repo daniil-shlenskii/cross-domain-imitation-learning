@@ -9,10 +9,11 @@ from omegaconf import DictConfig, OmegaConf
 from agents.gail.utils import get_state_pairs
 from gan.discriminator import Discriminator
 from gan.generator import Generator
+from utils import SaveLoadFrozenDataclassMixin
 from utils.types import DataType
 
 
-class BaseDomainEncoder(PyTreeNode, ABC):
+class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     learner_encoder: Generator
     state_discriminator: Discriminator
     policy_discriminator: Discriminator
@@ -71,6 +72,11 @@ class BaseDomainEncoder(PyTreeNode, ABC):
             state_discriminator=state_discriminator,
             policy_discriminator=policy_discriminator,
             state_loss_scale=state_loss_scale,
+            _save_attrs=(
+                "learner_encoder",
+                "state_discriminator",
+                "policy_discriminator"
+            ),
             **kwargs,
         )
 
@@ -121,7 +127,7 @@ class BaseDomainEncoder(PyTreeNode, ABC):
         expert_batch: DataType,
         anchor_batch: DataType,
    ):
-        pass        
+        pass
 
 @jax.jit
 def _update_jit(
