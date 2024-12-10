@@ -15,14 +15,13 @@ from utils import convert_figure_to_array, get_buffer_state_size
 from utils.types import BufferState, DataType
 from utils.utils import sample_batch
 
-from .das import _prepare_anchor_batch_jit
+from .domain_encoder.base_domain_encoder import BaseDomainEncoder
 from .utils import (get_discriminators_hists,
                     get_state_and_policy_tsne_scatterplots)
 
 
 class DIDAAgent(GAILAgent):
-    learner_encoder: Generator
-    domain_discriminator: Discriminator
+    domain_encoder: BaseDomainEncoder
     anchor_buffer_state: BufferState = struct.field(pytree_node=False)
     das: float = struct.field(pytree_node=False)
 
@@ -145,7 +144,7 @@ class DIDAAgent(GAILAgent):
         if visualize_state_and_policy_scatterplots:
             tsne_state_figure, tsne_policy_figure = get_state_and_policy_tsne_scatterplots(
                 dida_agent=self,
-    seed=seed,
+                seed=seed,
                 learner_trajs=trajs,
             )
             if convert_to_wandb_type:
@@ -184,7 +183,6 @@ def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType):
         batch,
         expert_batch,
         anchor_batch,
-        sample_discr_expert_batch,
         learner_domain_logits,
         expert_domain_logits,
         info,
@@ -212,8 +210,9 @@ def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType):
         batch=batch,
         expert_batch=expert_batch,
         policy_discriminator_learner_batch=mixed_batch,
-        sample_discriminator_expert_batch=sample_discr_expert_batch,
-        expert_encoder=new_dida_agent.expert_encoder,
+        #
+        update_agent=True,
+        sample_discriminator_expert_batch=expert_batch,
     )
 
     info.update(gail_info)

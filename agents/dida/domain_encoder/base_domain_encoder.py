@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
-from collections import abc
 
+import jax
 import jax.numpy as jnp
 from flax.struct import PyTreeNode
-from omegaconf import DictConfig
-from typing_extensions import override
+from hydra.utils import instantiate
+from omegaconf import DictConfig, OmegaConf
 
 from agents.gail.utils import get_state_pairs
 from gan.discriminator import Discriminator
@@ -12,7 +12,7 @@ from gan.generator import Generator
 from utils.types import DataType
 
 
-class BaseDomainEncoder(PyTreeNode, ABC)
+class BaseDomainEncoder(PyTreeNode, ABC):
     learner_encoder: Generator
     state_discriminator: Discriminator
     policy_discriminator: Discriminator
@@ -101,6 +101,7 @@ class BaseDomainEncoder(PyTreeNode, ABC)
             domain_encoder=self,
             learner_batch=learner_batch,
             expert_batch=expert_batch,
+            anchor_batch=anchor_batch,
         )
         return (
             new_domain_encoder,
@@ -133,15 +134,14 @@ def _update_jit(
     new_domain_encoder, info, stats_info = domain_encoder._update_encoder(
         learner_batch=learner_batch,
         expert_batch=expert_batch,
-        anchor_batch=anchor_batch
     )
     learner_batch = info.pop("learner_encoded_batch")
     expert_batch = info.pop("expert_encoded_batch")
 
     # encode anchor batch
-    anchor_batch["observations"] = self.encode_expert_state(anchor_batch["observations"])
-    anchor_batch["observations_next"] = self.encode_expert_state(anchor_batch["observations_next"])
-    
+    anchor_batch["observations"] = new_domain_encoder.encode_expert_state(anchor_batch["observations"])
+    anchor_batch["observations_next"] = new_domain_encoder.encode_expert_state(anchor_batch["observations_next"])
+
     # construct pairs
     learner_pairs = get_state_pairs(learner_batch)
     expert_pairs = get_state_pairs(expert_batch)
@@ -153,8 +153,8 @@ def _update_jit(
         real_batch=jnp.concatenate([expert_pairs, anchor_pairs]),
         return_logits=True,
     )
-    learner_domain_logits = domain_disc_info.pop("fake_logits")
-    expert_domain_logits = domain_disc_info.pop("real_logits")
+    learner_domain_logits = state_disc_info.pop("fake_logits")
+    expert_domain_logits = state_disc_info.pop("real_logits")
 
     # update policy discriminator
     new_policy_disc, policy_disc_info, policy_disc_stats_info = new_domain_encoder.policy_discriminator.update(

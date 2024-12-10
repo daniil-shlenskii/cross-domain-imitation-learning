@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.manifold import TSNE
 
 from agents.base_agent import Agent
+from agents.gail.utils import get_state_pairs
 from utils import apply_model_jit
 from utils.types import DataType
 
@@ -24,41 +25,41 @@ def get_state_and_policy_tsne_scatterplots(
 
     # encode trjectories
     for k in observation_keys:
-        learner_traj[k] = apply_model_jit(dida_agent.learner_encoder, learner_traj[k])
-        expert_traj[k] = apply_model_jit(dida_agent.expert_encoder, expert_traj[k])
-        anchor_traj[k] = apply_model_jit(dida_agent.expert_encoder, anchor_traj[k])
+        learner_traj[k] = dida_agent._preprocess_observations(learner_traj[k])
+        expert_traj[k] = dida_agent._preprocess_expert_observations(expert_traj[k])
+        anchor_traj[k] = dida_agent._preprocess_expert_observations(anchor_traj[k])
 
-    # state and policy embeddings
+    # state and state_pairs embeddings
     learner_state_embeddings = learner_traj["observations"]
     expert_state_embeddings = expert_traj["observations"]
 
-    learner_policy_embeddings = np.concatenate([learner_traj["observations"], learner_traj["observations_next"]], axis=1)
-    expert_policy_embeddings = np.concatenate([expert_traj["observations"], expert_traj["observations_next"]], axis=1)
-    anchor_policy_embeddings = np.concatenate([anchor_traj["observations"], anchor_traj["observations_next"]], axis=1)
+    learner_state_pairs_embeddings = get_state_pairs(learner_traj)
+    expert_state_pairs_embeddings = get_state_pairs(expert_traj)
+    anchor_state_pairs_embeddings = get_state_pairs(anchor_traj)
 
     # combine embeddings for further processing
     state_embeddings_list = [
         learner_state_embeddings,
         expert_state_embeddings
     ]
-    policy_embeddings_list = [
-        learner_policy_embeddings,
-        expert_policy_embeddings,
-        anchor_policy_embeddings,
+    state_pairs_embeddings_list = [
+        learner_state_pairs_embeddings,
+        expert_state_pairs_embeddings,
+        anchor_state_pairs_embeddings,
     ]
 
     state_size_list = [0] + list(np.cumsum(list(map(
         lambda embs: embs.shape[0],
         state_embeddings_list,
     ))))
-    policy_size_list = [0] + list(np.cumsum(list(map(
+    state_pairs_size_list = [0] + list(np.cumsum(list(map(
         lambda embs: embs.shape[0],
-        policy_embeddings_list,
+        state_pairs_embeddings_list,
     ))))
 
     # tsne embeddings
     tsne_state_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(state_embeddings_list))
-    tsne_policy_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(policy_embeddings_list))
+    tsne_state_pairs_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(state_pairs_embeddings_list))
 
     tsne_state_embeddings_list = [
         tsne_state_embeddings[
@@ -66,11 +67,11 @@ def get_state_and_policy_tsne_scatterplots(
         ]
         for i in range(len(state_embeddings_list))
     ]
-    tsne_policy_embeddings_list = [
-        tsne_policy_embeddings[
-            policy_size_list[i]: policy_size_list[i + 1]
+    tsne_state_pairs_embeddings_list = [
+        tsne_state_pairs_embeddings[
+            state_pairs_size_list[i]: state_pairs_size_list[i + 1]
         ]
-        for i in range(len(policy_embeddings_list))
+        for i in range(len(state_pairs_embeddings_list))
     ]
 
     # scatterplots
@@ -87,13 +88,13 @@ def get_state_and_policy_tsne_scatterplots(
     plt.legend()
     plt.close()
 
-    policy_figure = plt.figure(figsize=figsize)
-    for tsne_policy_embeddings, scatter_params in zip(tsne_policy_embeddings_list, scatter_params_list):
-        plt.scatter(tsne_policy_embeddings[:, 0], tsne_policy_embeddings[:, 1], **scatter_params)
+    state_pairs_figure = plt.figure(figsize=figsize)
+    for tsne_state_pairs_embeddings, scatter_params in zip(tsne_state_pairs_embeddings_list, scatter_params_list):
+        plt.scatter(tsne_state_pairs_embeddings[:, 0], tsne_state_pairs_embeddings[:, 1], **scatter_params)
     plt.legend()
     plt.close()
 
-    return state_figure, policy_figure
+    return state_figure, state_pairs_figure
 
 def get_discriminators_hists(
     dida_agent: Agent,
@@ -109,22 +110,21 @@ def get_discriminators_hists(
 
     # encode trjectories
     for k in observation_keys:
-        learner_traj[k] = apply_model_jit(dida_agent.learner_encoder, learner_traj[k])
-        expert_traj[k] = apply_model_jit(dida_agent.expert_encoder, expert_traj[k])
+        learner_traj[k] = dida_agent._preprocess_observations(learner_traj[k])
+        expert_traj[k] = dida_agent._preprocess_expert_observations(expert_traj[k])
 
-    # state and policy embeddings
-    learner_state_embeddings = learner_traj["observations"]
-    expert_state_embeddings = expert_traj["observations"]
+    # state_pairs embeddings
+    learner_state_pairs_embeddings = get_state_pairs(learner_traj)
+    expert_state_pairs_embeddings = get_state_pairs(expert_traj)
 
-    learner_policy_embeddings = np.concatenate([learner_traj["observations"], learner_traj["observations_next"]], axis=1)
-    expert_policy_embeddings = np.concatenate([expert_traj["observations"], expert_traj["observations_next"]], axis=1)
+    # state and state_pairs logits
+    state_discriminator = dida_agent.domain_encoder.state_discriminator
+    state_learner_logits = apply_model_jit(state_discriminator, learner_state_pairs_embeddings)
+    state_expert_logits = apply_model_jit(state_discriminator, expert_state_pairs_embeddings)
 
-    # state and policy logits
-    state_learner_logits = apply_model_jit(dida_agent.domain_discriminator, learner_state_embeddings)
-    state_expert_logits = apply_model_jit(dida_agent.domain_discriminator, expert_state_embeddings)
-
-    policy_learner_logits = apply_model_jit(dida_agent.policy_discriminator, learner_policy_embeddings)
-    policy_expert_logits = apply_model_jit(dida_agent.policy_discriminator, expert_policy_embeddings)
+    policy_discriminator = dida_agent.domain_encoder.policy_discriminator
+    policy_learner_logits = apply_model_jit(policy_discriminator, learner_state_pairs_embeddings)
+    policy_expert_logits = apply_model_jit(policy_discriminator, expert_state_pairs_embeddings)
 
     # plots
     def logits_to_plot(logits):

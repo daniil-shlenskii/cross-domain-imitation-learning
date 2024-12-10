@@ -1,3 +1,5 @@
+from utils.types import DataType
+
 from .base_domain_encoder import BaseDomainEncoder
 
 
@@ -5,7 +7,7 @@ class InDomainEncoder(BaseDomainEncoder):
     def _update_encoder(
         self,
         learner_batch: DataType,
-        expert_batch: DataType
+        expert_batch: DataType,
     ):
         new_learner_encoder, info, stats_info = self.learner_encoder.update(
             batch=learner_batch,
