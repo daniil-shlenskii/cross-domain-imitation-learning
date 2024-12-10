@@ -43,7 +43,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             state_discriminator_config,
             seed=seed,
             input_dim=encoding_dim * 2,
-            info_key="state_discriminator",
+            info_key="domain_encoder/state_discriminator",
             _recursive_=False,
         )
 
@@ -52,7 +52,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             policy_discriminator_config,
             seed=seed,
             input_dim=encoding_dim * 2,
-            info_key="policy_discriminator",
+            info_key="domain_encoder/policy_discriminator",
             _recursive_=False,
         )
 
