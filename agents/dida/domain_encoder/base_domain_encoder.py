@@ -144,8 +144,8 @@ def _update_jit(
         learner_batch=learner_batch,
         expert_batch=expert_batch,
     )
-    learner_batch = info.pop("learner_encoded_batch")
-    expert_batch = info.pop("expert_encoded_batch")
+    learner_batch = info.pop("learner_encoder_encoded_batch")
+    expert_batch = info.pop("expert_encoder_encoded_batch")
 
     # encode anchor batch
     anchor_batch["observations"] = new_domain_encoder.encode_expert_state(anchor_batch["observations"])
