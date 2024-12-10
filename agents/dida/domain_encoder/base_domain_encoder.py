@@ -33,16 +33,6 @@ class BaseDomainEncoder(PyTreeNode, ABC)
         #
         **kwargs,
     ):
-        # learner encoder init
-        learner_encoder = instantiate(
-            learner_encoder_config,
-            seed=seed,
-            input_dim=learner_dim,
-            output_dim=encoding_dim,
-            info_key="learner_encoder",
-            _recursive_=False,
-        )
-
         # state discriminator init
         state_discriminator = instantiate(
             state_discriminator_config,
@@ -58,6 +48,20 @@ class BaseDomainEncoder(PyTreeNode, ABC)
             seed=seed,
             input_dim=encoding_dim * 2,
             info_key="policy_discriminator",
+            _recursive_=False,
+        )
+
+        # learner encoder init
+        learner_encoder_config = OmegaConf.to_container(learner_encoder_config)
+        learner_encoder_config["loss_config"]["state_loss"] = state_discriminator.state.loss_fn
+        learner_encoder_config["loss_config"]["policy_loss"] = policy_discriminator.state.loss_fn
+
+        learner_encoder = instantiate(
+            learner_encoder_config,
+            seed=seed,
+            input_dim=learner_dim,
+            output_dim=encoding_dim,
+            info_key="learner_encoder",
             _recursive_=False,
         )
 
