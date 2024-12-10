@@ -1,3 +1,4 @@
+import re
 from copy import deepcopy
 from typing import Callable
 
@@ -108,7 +109,7 @@ class InDomainEncoderLoss(DomainEncoderLossMixin):
         )
         loss = (learner_loss + expert_loss) * 0.5
         info = {
-            **{"learner_" + k: v for k, v in learner_info.items()},
-            **{"expert_" + k: v for k, v in expert_info.items()},
+            **learner_info,
+            **{re.sub("learner", "expert", k): v for k, v in expert_info.items()},
         }
         return loss, info
