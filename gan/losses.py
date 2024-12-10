@@ -41,7 +41,7 @@ class GANLoss:
     ):
         fake_batch = state.apply_fn({"params": params}, batch, train=train)
         fake_logits = discriminator(fake_batch)
-        loss = self.generator_loss_fn(fake_logits).mean()
+        loss = self.generator_loss_fn(fake_logits)
 
         info = {
             f"{state.info_key}_loss": loss,
@@ -59,7 +59,7 @@ class GANLoss:
     ):
         real_logits = state.apply_fn({"params": params}, real_batch, train=train)
         fake_logits = state.apply_fn({"params": params}, fake_batch, train=train)
-        loss = self.discriminator_loss_fn(real_logits=real_logits, fake_logits=fake_logits).mean()
+        loss = self.discriminator_loss_fn(real_logits=real_logits, fake_logits=fake_logits)
 
         info = {
             f"{state.info_key}_loss": loss,
@@ -67,7 +67,7 @@ class GANLoss:
             "fake_logits": fake_logits,
         }
         return loss, info
-    
+
     def __call__(
         self,
         params: Params,
@@ -106,12 +106,6 @@ class GradientPenaltyDecorator:
     ):
         self.d_loss_fn = d_loss_fn
         self.penalty_coef = gradient_penalty_coef
-        
-    def key(self):
-        if not hasattr(self, "rng"):
-            self.rng = jax.random.key(0)
-        self.rng, key = jax.random.split(self.rng) 
-        return key
 
     def __call__(
         self,
@@ -130,14 +124,14 @@ class GradientPenaltyDecorator:
         )
 
         disc_grad_fn = jax.grad(lambda x: state.apply_fn({"params": params}, x, train=True))
-        penalty = gradient_penalty(key=jax.random.key(state.step), real_batch=real_batch, fake_batch=fake_batch, discriminator_grad_fn=disc_grad_fn).mean() # TODO:: hardcoded random.key
+        penalty = gradient_penalty(key=jax.random.key(state.step), real_batch=real_batch, fake_batch=fake_batch, discriminator_grad_fn=disc_grad_fn)
 
         loss_with_gp = d_loss + self.penalty_coef * penalty
 
         info.update({
             f"{state.info_key}_loss_with_gradient_penalty": loss_with_gp,
             f"{state.info_key}_gradient_penalty": penalty
-        }) 
+        })
 
         return loss_with_gp, info
 
