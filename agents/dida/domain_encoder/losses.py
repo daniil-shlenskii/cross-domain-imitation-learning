@@ -60,7 +60,7 @@ class DomainEncoderLossMixin:
             f"{state.info_key}_loss": loss,
             f"{state.info_key}_policy_loss": policy_loss,
             f"{state.info_key}_state_loss": state_loss,
-            "encoded_batch": batch,
+            f"{state.info_key}_encoded_batch": batch,
         }
         return loss, info
 
