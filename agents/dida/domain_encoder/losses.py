@@ -3,6 +3,7 @@ from typing import Callable
 
 import jax.numpy as jnp
 
+from agents.gail.utils import get_state_pairs
 from gan.discriminator import Discriminator
 from gan.losses import GANLoss
 from nn.train_state import TrainState
@@ -25,8 +26,8 @@ class DomainEncoderLossMixin:
     def _set_policy_loss_fns(self, policy_loss: GANLoss):
         """Helps discriminator to discriminate better."""
         loss_fn = policy_loss.generator_loss_fn
-        learner_loss_fn = lambda logits: loss_fn(-logits)
-        expert_loss_fn = lambda logits: loss_fn(logits)
+        learner_loss_fn = lambda logits: -loss_fn(logits)
+        expert_loss_fn = lambda logits: -loss_fn(-logits)
         self.learner_policy_loss_fn = learner_loss_fn
         self.expert_policy_loss_fn = expert_loss_fn
 
@@ -45,14 +46,13 @@ class DomainEncoderLossMixin:
         batch = deepcopy(batch)
         batch["observations"] = state.apply_fn({"params": params}, batch["observations"], train=True)
         batch["observations_next"] = state.apply_fn({"params": params}, batch["observations_next"], train=True)
+        state_pairs = get_state_pairs(batch)
 
-        policy_batch = jnp.concatenate([batch["observations"], batch["observations_next"]], axis=1)
-        policy_logits = policy_discriminator(policy_batch)
-        policy_loss = policy_loss_fn(policy_logits).mean()
-
-        state_batch = batch["observations"]
-        state_logits = state_discriminator(state_batch)
+        state_logits = state_discriminator(state_pairs)
         state_loss = state_loss_fn(state_logits).mean()
+
+        policy_logits = policy_discriminator(state_pairs)
+        policy_loss = policy_loss_fn(policy_logits).mean()
 
         loss = policy_loss + state_loss_scale * state_loss
         info = {

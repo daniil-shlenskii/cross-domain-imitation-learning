@@ -112,7 +112,7 @@ class BaseDomainEncoder(PyTreeNode, ABC)
         learner_batch: DataType,
         expert_batch: DataType,
         anchor_batch: DataType,
-    ):
+   ):
         pass        
 
 @jax.jit
@@ -130,8 +130,12 @@ def _update_jit(
     )
     learner_batch = info.pop("learner_encoded_batch")
     expert_batch = info.pop("expert_encoded_batch")
-    anchor_batch = info.pop("anchor_encoded_batch")
+
+    # encode anchor batch
+    anchor_batch["observations"] = self.encode_expert_state(anchor_batch["observations"])
+    anchor_batch["observations_next"] = self.encode_expert_state(anchor_batch["observations_next"])
     
+    # construct pairs
     learner_pairs = get_state_pairs(learner_batch)
     expert_pairs = get_state_pairs(expert_batch)
     anchor_pairs = get_state_pairs(anchor_batch)
