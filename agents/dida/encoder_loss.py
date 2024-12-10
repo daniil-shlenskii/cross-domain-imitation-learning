@@ -4,7 +4,7 @@ from typing import Callable
 import jax.numpy as jnp
 
 from gan.discriminator import Discriminator
-from gan.losses import GANLoss, LogisticLoss, SoftplusLoss
+from gan.losses import GANLoss
 from nn.train_state import TrainState
 from utils.types import DataType, Params
 
@@ -25,8 +25,8 @@ class DIDAEncoderLossMixin:
     def _set_policy_loss_fns(self, policy_loss: GANLoss):
         """Helps discriminator to discriminate better."""
         loss_fn = policy_loss.generator_loss_fn
-        learner_loss_fn = lambda logits: -loss_fn(logits)
-        expert_loss_fn = lambda logits: -loss_fn(-logits)
+        learner_loss_fn = lambda logits: loss_fn(-logits)
+        expert_loss_fn = lambda logits: loss_fn(logits)
         self.learner_policy_loss_fn = learner_loss_fn
         self.expert_policy_loss_fn = expert_loss_fn
 

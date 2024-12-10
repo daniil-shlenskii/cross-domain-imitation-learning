@@ -102,7 +102,7 @@ class GAILAgent(Agent):
             sample_discriminator = instantiate(
                 sample_discriminator_config,
                 seed=seed,
-                input_dim=observation_dim,
+                input_dim=observation_dim * 2,
                 buffer_state_experience={
                     k: v[0] for k, v in deepcopy(
                         new_expert_buffer_state_exp
@@ -155,7 +155,7 @@ class GAILAgent(Agent):
     @functools.partial(jax.jit, static_argnames="update_agent")
     def update_gail(
         self,
-        *, 
+        *,
         batch: DataType,
         expert_batch: DataType,
         policy_discriminator_learner_batch: DataType,
@@ -260,6 +260,17 @@ class GAILAgent(Agent):
     def _preprocess_expert_observations(self, observations):
         return observations
 
+    def _sample_expert_batch(self):
+        new_rng, sample_discr_expert_batch = sample_batch(
+            self.rng, self.expert_buffer, self.expert_buffer_state
+        )
+        if self.sample_discriminator is not None:
+            new_rng, expert_batch = self.sample_discriminator.sample(new_rng)
+        else:
+            expert_batch = sample_discr_expert_batch
+        return new_rng, expert_batch, sample_discr_expert_batch
+
+
 @functools.partial(jax.jit, static_argnames="update_agent")
 def _update_jit(
     gail_agent: GAILAgent,
@@ -267,13 +278,7 @@ def _update_jit(
     update_agent: bool,
 ):
     # sample expert batch
-    new_rng, sample_discr_expert_batch = sample_batch(
-        gail_agent.rng, gail_agent.expert_buffer, gail_agent.expert_buffer_state
-    )
-    if gail_agent.sample_discriminator is not None:
-        new_rng, expert_batch = gail_agent.sample_discriminator.sample(new_rng)
-    else:
-        expert_batch = sample_discr_expert_batch
+    new_rng, expert_batch, sample_discr_expert_batch = gail_agent._sample_expert_batch()
     new_gail_agent = gail_agent.replace(rng=new_rng)
 
     # update agent and policy policy_discriminator
