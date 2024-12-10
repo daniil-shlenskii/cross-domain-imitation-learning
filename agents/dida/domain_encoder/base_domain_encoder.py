@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections import abc
 
+import jax.numpy as jnp
 from flax.struct import PyTreeNode
 from omegaconf import DictConfig
 from typing_extensions import override
@@ -37,7 +38,7 @@ class BaseDomainEncoder(PyTreeNode, ABC)
         state_discriminator = instantiate(
             state_discriminator_config,
             seed=seed,
-            input_dim=encoding_dim,
+            input_dim=encoding_dim * 2,
             info_key="state_discriminator",
             _recursive_=False,
         )
@@ -70,6 +71,7 @@ class BaseDomainEncoder(PyTreeNode, ABC)
             state_discriminator=state_discriminator,
             policy_discriminator=policy_discriminator,
             state_loss_scale=state_loss_scale,
+            **kwargs,
         )
 
     @jax.jit 
@@ -105,7 +107,12 @@ class BaseDomainEncoder(PyTreeNode, ABC)
         )
 
     @abstractmethod
-    def _update_encoder(self, learner_batch: DataType, expert_batch: DataType):
+    def _update_encoder(
+        self,
+        learner_batch: DataType,
+        expert_batch: DataType,
+        anchor_batch: DataType,
+    ):
         pass        
 
 @jax.jit
@@ -113,19 +120,26 @@ def _update_jit(
     domain_encoder: BaseDomainEncoder,
     learner_batch: DataType,
     expert_batch: DataType,
+    anchor_batch: DataType,
 ):
     # update encoder 
     new_domain_encoder, info, stats_info = domain_encoder._update_encoder(
         learner_batch=learner_batch,
         expert_batch=expert_batch,
+        anchor_batch=anchor_batch
     )
     learner_batch = info.pop("learner_encoded_batch")
     expert_batch = info.pop("expert_encoded_batch")
+    anchor_batch = info.pop("anchor_encoded_batch")
+    
+    learner_pairs = get_state_pairs(learner_batch)
+    expert_pairs = get_state_pairs(expert_batch)
+    anchor_pairs = get_state_pairs(anchor_batch)
 
     # update state discriminator
     new_state_disc, state_disc_info, state_disc_stats_info = new_domain_encoder.state_discriminator.update(
-        fake_batch=learner_batch["observations"],
-        real_batch=expert_batch["observations"],
+        fake_batch=learner_pairs,
+        real_batch=jnp.concatenate([expert_pairs, anchor_pairs]),
         return_logits=True,
     )
     learner_domain_logits = domain_disc_info.pop("fake_logits")
@@ -133,8 +147,8 @@ def _update_jit(
 
     # update policy discriminator
     new_policy_disc, policy_disc_info, policy_disc_stats_info = new_domain_encoder.policy_discriminator.update(
-        fake_batch=learner_pairs=get_state_pairs(learner_batch),
-        real_batch=get_state_pairs(expert_batch),
+        fake_batch=jnp.concatenate([learner_pairs, anchor_pairs]),
+        real_batch=expert_pairs,
     )
 
     # update domain encoder
@@ -149,6 +163,7 @@ def _update_jit(
         new_domain_encoder,
         learner_batch,
         expert_batch,
+        anchor_batch,
         learner_domain_logits,
         expert_domain_logits,
         info,
