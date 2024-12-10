@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 import jax
 import jax.numpy as jnp
+from flax import struct
 from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
@@ -18,6 +19,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     state_discriminator: Discriminator
     policy_discriminator: Discriminator
     state_loss_scale: float
+    _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     @classmethod
     def create(
