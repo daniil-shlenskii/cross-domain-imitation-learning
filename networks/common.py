@@ -64,7 +64,7 @@ class UNet(nn.Module):
         inter_feats = [res]
         for i, (n_resblocks, hidden_dim) in enumerate(zip(self.n_resblocks_per_dim, self.hidden_dims)):
             for _ in range(n_resblocks):
-                res = ResBlock(in_dim=hidden_dim, activation=self.activation, train=train)(res)
+                res = ResBlock(in_dim=hidden_dim, activation=self.activation)(res, train=train)
                 inter_feats.append(res)
             if i < len(self.hidden_dims) - 1:
                 hidden_dim_next = self.hidden_dims[i + 1]
@@ -78,7 +78,7 @@ class UNet(nn.Module):
             for _ in range(n_resblocks):
                 skip_connection = inter_feats.pop()
                 res = res + skip_connection
-                res = ResBlock(in_dim=hidden_dim, activation=self.activation, train=train)(res)
+                res = ResBlock(in_dim=hidden_dim, activation=self.activation)(res, train=train)
                 inter_feats.append(res)
             if i < len(hidden_dims_inv) - 1:
                 hidden_dim_next = hidden_dims_inv[i + 1]
