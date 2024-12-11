@@ -69,22 +69,24 @@ class UNet(nn.Module):
             if i < len(self.hidden_dims) - 1:
                 hidden_dim_next = self.hidden_dims[i + 1]
                 res = nn.Dense(hidden_dim_next, kernel_init=default_init())(res)
+                inter_feats.append(res)
 
         res = nn.Dense(self.hidden_dims[-1], kernel_init=default_init())(res)
+
 
         n_resblocks_per_dim_inv = self.n_resblocks_per_dim[::-1]
         hidden_dims_inv = self.hidden_dims[::-1]
         for i, (n_resblocks, hidden_dim) in enumerate(zip(n_resblocks_per_dim_inv, hidden_dims_inv)):
             for _ in range(n_resblocks):
                 skip_connection = inter_feats.pop()
-                res = res + skip_connection
-                res = ResBlock(in_dim=hidden_dim, activation=self.activation)(res, train=train)
-                inter_feats.append(res)
+                res = ResBlock(in_dim=hidden_dim, activation=self.activation)(res + skip_connection, train=train)
             if i < len(hidden_dims_inv) - 1:
                 hidden_dim_next = hidden_dims_inv[i + 1]
-                res = nn.Dense(hidden_dim_next, kernel_init=default_init())(res)
+                skip_connection = inter_feats.pop()
+                res = nn.Dense(hidden_dim_next, kernel_init=default_init())(res + skip_connection)
 
-        res = nn.Dense(x.shape[-1], kernel_init=constant(0.))(res)
+        skip_connection = inter_feats.pop()
+        res = nn.Dense(x.shape[-1], kernel_init=constant(0.))(res + skip_connection)
 
         x = x + res
 
