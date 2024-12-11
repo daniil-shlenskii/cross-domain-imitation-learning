@@ -187,7 +187,7 @@ def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType):
         expert_domain_logits,
         info,
         stats_info,
-    ) = _update_domain_encoder(
+    ) = _update_domain_encoder_jit(
         dida_agent=dida_agent,
         learner_batch=learner_batch,
     )
@@ -219,7 +219,8 @@ def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType):
     stats_info.update(gail_stats_info)
     return new_dida_agent, info, stats_info
 
-def _update_domain_encoder(
+@jax.jit
+def _update_domain_encoder_jit(
     dida_agent: DIDAAgent,
     learner_batch: DataType,
 ):
