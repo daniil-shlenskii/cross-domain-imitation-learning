@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import gymnasium as gym
 import jax
+import jax.numpy as jnp
 import numpy as np
 from flax import struct
 from hydra.utils import instantiate
@@ -23,7 +24,7 @@ class DIDAAgent(GAILAgent):
     domain_encoder: BaseDomainEncoder
     anchor_buffer_state: BufferState = struct.field(pytree_node=False)
     das: float = struct.field(pytree_node=False)
-    n_iters_pretrain_domain_encoder: float = struct.field(pytree_node=False)
+    n_iters_pretrain_domain_encoder_and_policy_discriminator: float = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -48,7 +49,7 @@ class DIDAAgent(GAILAgent):
         #
         expert_buffer_state_preprocessing_config: DictConfig = None,
         #
-        n_iters_pretrain_domain_encoder: int = 0,
+        n_iters_pretrain_domain_encoder_and_policy_discriminator: int = 0,
         **kwargs,
     ):
         # domain encoder init
@@ -88,7 +89,7 @@ class DIDAAgent(GAILAgent):
             anchor_buffer_state=None,
             domain_encoder=domain_encoder,
             das=das,
-            n_iters_pretrain_domain_encoder=n_iters_pretrain_domain_encoder,
+            n_iters_pretrain_domain_encoder_and_policy_discriminator=n_iters_pretrain_domain_encoder_and_policy_discriminator,
             _save_attrs=_save_attrs,
             **kwargs,
         )
@@ -124,15 +125,14 @@ class DIDAAgent(GAILAgent):
         return self.domain_encoder.encode_expert_state(observations)
 
     def update(self, batch: DataType):
-        train_domain_encoder_only = (
+        pretrain_domain_encoder_and_policy_discriminator = (
             self.domain_encoder.learner_encoder.state.step <=
-            self.n_iters_pretrain_domain_encoder
+            self.n_iters_pretrain_domain_encoder_and_policy_discriminator
         )
-        if train_domain_encoder_only:
-            new_dida_agent, info, stats_info = _update_domain_encoder_jit(
+        if pretrain_domain_encoder_and_policy_discriminator:
+            new_dida_agent, info, stats_info = _update_domain_encoder_and_policy_discriminator_jit(
                 dida_agent=self,
                 learner_batch=batch,
-                return_intermediates=False,
             )
         else:
             new_dida_agent, info, stats_info = _update_jit(
@@ -204,7 +204,6 @@ def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType):
     ) = _update_domain_encoder_jit(
         dida_agent=dida_agent,
         learner_batch=learner_batch,
-        return_intermediates=True,
     )
 
     # prepare mixed batch for policy discriminator update
@@ -234,11 +233,10 @@ def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType):
     stats_info.update(gail_stats_info)
     return new_dida_agent, info, stats_info
 
-@functools.partial(jax.jit, static_argnames="return_intermediates")
+@jax.jit
 def _update_domain_encoder_jit(
     dida_agent: DIDAAgent,
     learner_batch: DataType,
-    return_intermediates: bool = False,
 ):
     # sample source batches
     new_rng, expert_batch = sample_batch(dida_agent.rng, dida_agent.expert_buffer, dida_agent.expert_buffer_state)
@@ -266,9 +264,6 @@ def _update_domain_encoder_jit(
         domain_encoder=new_domain_encoder
     )
 
-    if not return_intermediates:
-        return new_dida_agent, info, stats_info
-
     return (
         new_dida_agent,
         learner_batch,
@@ -279,3 +274,42 @@ def _update_domain_encoder_jit(
         info,
         stats_info,
     )
+
+@jax.jit
+def _update_domain_encoder_and_policy_discriminator_jit(
+    dida_agent: DIDAAgent,
+    learner_batch: DataType,
+):
+    # update domain encoder
+    (
+        new_dida_agent,
+        learner_batch,
+        expert_batch,
+        anchor_batch,
+        _,
+        _,
+        info,
+        stats_info,
+    ) = _update_domain_encoder_jit(
+        dida_agent=dida_agent,
+        learner_batch=learner_batch,
+    )
+
+    # update policy dicriminator
+    new_learner_batch = {
+        k: jnp.concatenate([
+            learner_batch[k], anchor_batch[k]
+        ])
+        for k in ["observations", "observations_next"]
+    }
+    new_policy_discr, discr_info, discr_stats_info = new_dida_agent.policy_discriminator.update(
+        learner_batch=new_learner_batch,
+        expert_batch=expert_batch,
+    )
+
+    # update dida agent
+    new_dida_agent = new_dida_agent.replace(policy_discriminator=new_policy_discr)
+    info.update(discr_info)
+    stats_info.update(discr_stats_info)
+
+    return new_dida_agent, info, stats_info

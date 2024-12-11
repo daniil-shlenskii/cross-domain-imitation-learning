@@ -33,7 +33,7 @@ agent:
   encoding_dim: 17
   expert_batch_size: *batch_size
   expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
-  n_iters_pretrain_domain_encoder: *n_iters_pretrain_domain_encoder
+  n_iters_pretrain_domain_encoder_and_policy_discriminator: *n_iters_pretrain_domain_encoder
   #
   # expert_buffer_state_preprocessing_config:
   #   _target_: agents.dida.expert_transforms.GaussianTransform
