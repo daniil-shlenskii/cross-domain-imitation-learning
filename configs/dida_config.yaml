@@ -5,6 +5,7 @@ n_iters_training: 1_000_000
 batch_size: &batch_size 2048
 
 precollect_buffer_size: &precollect_buffer_size 5_000
+agent_starts_sampling_after: &n_iters_pretrain_domain_encoder 10_000
 
 log_every: 1000
 eval_every: 5_000
@@ -32,6 +33,7 @@ agent:
   encoding_dim: 12
   expert_batch_size: *batch_size
   expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
+  n_iters_pretrain_domain_encoder: *n_iters_pretrain_domain_encoder
   #
   # expert_buffer_state_preprocessing_config:
   #   _target_: agents.dida.expert_transforms.GaussianTransform

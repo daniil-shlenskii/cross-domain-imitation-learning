@@ -183,7 +183,10 @@ def main(args: argparse.Namespace):
                 wandb.log({f"evaluation/{k}": v}, step=i)
 
         # sample actions
-        action = agent.sample_actions(agent_sample_key, observation[None])
+        if i < config.get("agent_starts_sampling_after", 0):
+            action = env.action_space.sample()
+        else:
+            action = agent.sample_actions(agent_sample_key, observation[None])
 
         # do step in the environment
         do_environment_step(action[0], i)

@@ -1,7 +1,8 @@
+import functools
 from copy import deepcopy
-from typing import Callable
 
 import gymnasium as gym
+import jax
 import numpy as np
 from flax import struct
 from hydra.utils import instantiate
@@ -9,8 +10,6 @@ from omegaconf.dictconfig import DictConfig
 
 import wandb
 from agents.gail.gail_agent import GAILAgent
-from gan.discriminator import Discriminator
-from gan.generator import Generator
 from utils import convert_figure_to_array, get_buffer_state_size
 from utils.types import BufferState, DataType
 from utils.utils import sample_batch
@@ -24,6 +23,7 @@ class DIDAAgent(GAILAgent):
     domain_encoder: BaseDomainEncoder
     anchor_buffer_state: BufferState = struct.field(pytree_node=False)
     das: float = struct.field(pytree_node=False)
+    n_iters_pretrain_domain_encoder: float = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -47,6 +47,8 @@ class DIDAAgent(GAILAgent):
         das_config: DictConfig = None,
         #
         expert_buffer_state_preprocessing_config: DictConfig = None,
+        #
+        n_iters_pretrain_domain_encoder: int = 0,
         **kwargs,
     ):
         # domain encoder init
@@ -86,6 +88,7 @@ class DIDAAgent(GAILAgent):
             anchor_buffer_state=None,
             domain_encoder=domain_encoder,
             das=das,
+            n_iters_pretrain_domain_encoder=n_iters_pretrain_domain_encoder,
             _save_attrs=_save_attrs,
             **kwargs,
         )
@@ -121,10 +124,21 @@ class DIDAAgent(GAILAgent):
         return self.domain_encoder.encode_expert_state(observations)
 
     def update(self, batch: DataType):
-        new_dida_agent, info, stats_info = _update_jit(
-            dida_agent=self,
-            learner_batch=batch,
+        train_domain_encoder_only = (
+            self.domain_encoder.learner_encoder.state.step <=
+            self.n_iters_pretrain_domain_encoder
         )
+        if train_domain_encoder_only:
+            new_dida_agent, info, stats_info = _update_domain_encoder_jit(
+                dida_agent=self,
+                learner_batch=batch,
+                return_intermediates=False,
+            )
+        else:
+            new_dida_agent, info, stats_info = _update_jit(
+                dida_agent=self,
+                learner_batch=batch,
+            )
         return new_dida_agent, info, stats_info
 
     def evaluate(
@@ -190,6 +204,7 @@ def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType):
     ) = _update_domain_encoder_jit(
         dida_agent=dida_agent,
         learner_batch=learner_batch,
+        return_intermediates=True,
     )
 
     # prepare mixed batch for policy discriminator update
@@ -219,10 +234,11 @@ def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType):
     stats_info.update(gail_stats_info)
     return new_dida_agent, info, stats_info
 
-@jax.jit
+@functools.partial(jax.jit, static_argnames="return_intermediates")
 def _update_domain_encoder_jit(
     dida_agent: DIDAAgent,
     learner_batch: DataType,
+    return_intermediates: bool = False,
 ):
     # sample source batches
     new_rng, expert_batch = sample_batch(dida_agent.rng, dida_agent.expert_buffer, dida_agent.expert_buffer_state)
@@ -249,6 +265,9 @@ def _update_domain_encoder_jit(
         rng=new_rng,
         domain_encoder=new_domain_encoder
     )
+
+    if not return_intermediates:
+        return new_dida_agent, info, stats_info
 
     return (
         new_dida_agent,
