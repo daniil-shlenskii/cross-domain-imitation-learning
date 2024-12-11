@@ -81,9 +81,8 @@ agent:
     learner_encoder_config:
       _target_: gan.generator.Generator.create
       module_config:
-        _target_: networks.common.UNet
-        hidden_dims: [128]
-        n_resblocks_per_dim: [1]
+        _target_: networks.common.MLP
+        hidden_dims: [128, 128]
       optimizer_config: *optimizer_config
       loss_config:
         _target_: agents.dida.domain_encoder.losses.InDomainEncoderLoss
