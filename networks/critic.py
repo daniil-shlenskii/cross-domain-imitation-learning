@@ -12,10 +12,15 @@ class ValueCritic(nn.Module):
     dropout_rate: Optional[float] = None
 
     @nn.compact
-    def __call__(self, observations: jnp.ndarray) -> jnp.ndarray:
+    def __call__(
+        self, observations: jnp.ndarray, train: bool = False
+    ) -> jnp.ndarray:
         values = MLP(
-            (*self.hidden_dims, 1), self.activation, self.dropout_rate
-        )(observations)
+            hidden_dims=self.hidden_dims,
+            out_dim=1,
+            activation=self.activation,
+            dropout_rate=self.dropout_rate
+        )(observations, train=train)
         return values.squeeze(-1)
 
 class Critic(nn.Module):
@@ -29,29 +34,9 @@ class Critic(nn.Module):
     ) -> jnp.ndarray:
         input_array = jnp.concatenate([observations, actions], axis=-1)
         values = MLP(
-            (*self.hidden_dims, 1), self.activation, self.dropout_rate
+            hidden_dims=self.hidden_dims,
+            out_dim=1,
+            activation=self.activation,
+            dropout_rate=self.dropout_rate
         )(input_array, train=train)
         return values.squeeze(-1)
-
-class CriticEnsemble(nn.Module):
-    hidden_dims: Sequence[int]
-    activation: Callable[[jnp.ndarray], jnp.ndarray] = nn.relu
-    dropout_rate: Optional[float] = None
-    n_modules: int = 2
-
-    @nn.compact
-    def __call__(
-        self, observations: jnp.ndarray, actions: jnp.ndarray, train: bool = False
-    ) -> jnp.ndarray:
-        critic_ensemble = nn.vmap(
-            Critic,
-            variable_axes={"params": 0},
-            split_rngs={"params": True},
-            in_axes=None,
-            out_axes=0,
-            axis_size=self.n_modules,
-        )
-        q_values = critic_ensemble(
-            self.hidden_dims, self.activation, self.dropout_rate
-        )(observations, actions, train)
-        return q_values

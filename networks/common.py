@@ -11,8 +11,8 @@ def default_init(scale: Optional[float] = jnp.sqrt(2)):
 
 class MLP(nn.Module):
     hidden_dims: Sequence[int]
+    out_dim: int = None
     activation: Callable[[jnp.ndarray], jnp.ndarray] = nn.relu
-    activate_final: Optional[bool] = False
     dropout_rate: Optional[float] = None
 
     @nn.compact
@@ -21,13 +21,14 @@ class MLP(nn.Module):
     ) -> jnp.ndarray:
         for i, hid_dim in enumerate(self.hidden_dims):
             x = nn.Dense(hid_dim, kernel_init=default_init())(x)
+            x = self.activation(x)
+            if self.dropout_rate is not None:
+                x = nn.Dropout(reate=self.dropout_rate)(
+                    x, deterministic=not train
+                )
+        if self.out_dim is not None:
+            x = nn.Dense(self.out_dim, kernel_init=default_init())(x)
 
-            if i < len(self.hidden_dims) - 1 or self.activate_final:
-                x = self.activation(x)
-                if self.dropout_rate is not None:
-                    x = nn.Dropout(reate=self.dropout_rate)(
-                        x, deterministic=not train
-                    )
         return x
 
 class ResBlock(nn.Module):
@@ -51,6 +52,7 @@ class ResBlock(nn.Module):
 class UNet(nn.Module):
     hidden_dims: Sequence[int]
     n_resblocks_per_dim: Sequence[int]
+    out_dim: int = None
     activation: Callable[[jnp.ndarray], jnp.ndarray] = nn.relu
 
     @nn.compact
@@ -59,10 +61,10 @@ class UNet(nn.Module):
     ):
         res = nn.Dense(self.hidden_dims[0], kernel_init=default_init())(x)
 
-        inter_feats = [res] 
+        inter_feats = [res]
         for i, (n_resblocks, hidden_dim) in enumerate(zip(self.n_resblocks_per_dim, self.hidden_dims)):
             for _ in range(n_resblocks):
-                res = ResBlock(in_dim=hidden_dim, activation=self.activation)(res)
+                res = ResBlock(in_dim=hidden_dim, activation=self.activation, train=train)(res)
                 inter_feats.append(res)
             if i < len(self.hidden_dims) - 1:
                 hidden_dim_next = self.hidden_dims[i + 1]
@@ -76,7 +78,7 @@ class UNet(nn.Module):
             for _ in range(n_resblocks):
                 skip_connection = inter_feats.pop()
                 res = res + skip_connection
-                res = ResBlock(in_dim=hidden_dim, activation=self.activation)(res)
+                res = ResBlock(in_dim=hidden_dim, activation=self.activation, train=train)(res)
                 inter_feats.append(res)
             if i < len(hidden_dims_inv) - 1:
                 hidden_dim_next = hidden_dims_inv[i + 1]
@@ -84,4 +86,9 @@ class UNet(nn.Module):
 
         res = nn.Dense(x.shape[-1], kernel_init=constant(0.))(res)
 
-        return x + res
+        x = x + res
+
+        if self.out_dim is not None:
+            x = nn.Dense(self.out_dim, kernel_init=default_init())(x)
+
+        return x

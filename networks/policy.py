@@ -27,7 +27,7 @@ class DeterministicPolicy(nn.Module):
         self, observations: jnp.ndarray, train: bool=False
     ) -> jnp.ndarray:
         features = MLP(
-            self.hidden_dims, dropout_rate=self.dropout_rate, activate_final=True,
+            self.hidden_dims, dropout_rate=self.dropout_rate
         )(observations, train=train)
         features = nn.Dense(
             self.action_dim, kernel_init=default_init(),
@@ -51,7 +51,7 @@ class NormalTanhPolicy(nn.Module):
         train: bool = False,
     ) -> distrax.Distribution:
         features = MLP(
-            self.hidden_dims, dropout_rate=self.dropout_rate, activate_final=True,
+            self.hidden_dims, dropout_rate=self.dropout_rate
         )(observations, train=train)
 
         means = nn.Dense(self.action_dim, kernel_init=default_init())(features)

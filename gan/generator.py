@@ -30,7 +30,7 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         info_key: str = "generator",
         **kwargs,
     ):
-        module_config.hidden_dims.append(output_dim)
+        module_config["out_dim"] = output_dim
 
         key = jax.random.key(seed)
         module = instantiate(module_config)
