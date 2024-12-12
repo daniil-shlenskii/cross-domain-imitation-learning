@@ -75,7 +75,7 @@ def get_state_and_policy_tsne_scatterplots(
     ]
 
     # scatterplots
-    opaque = np.linspace(0, 1, num=end_of_firt_traj_idx)
+    opaque = np.linspace(.2, 1., num=end_of_firt_traj_idx)
     scatter_params_list = (
         {"label": "TE", "c": "tab:blue",   "marker": "x", "alpha": opaque},
         {"label": "SE", "c": "tab:red",    "marker": "o", "alpha": opaque},
