@@ -91,6 +91,9 @@ class UNet(nn.Module):
         x = x + res
 
         if self.out_dim is not None:
-            x = nn.Dense(self.out_dim, kernel_init=default_init())(x)
+            if x.shape[-1] == self.out_dim:
+                x = x + nn.Dense(self.out_dim, kernel_init=constant(0.))(x)
+            else:
+                x = nn.Dense(self.out_dim, kernel_init=default_init())(x)
 
         return x
