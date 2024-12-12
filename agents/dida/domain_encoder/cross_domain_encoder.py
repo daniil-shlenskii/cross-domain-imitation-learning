@@ -1,3 +1,5 @@
+import jax
+import jax.numpy as jnp
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 from omegaconf.omegaconf import OmegaConf
@@ -63,6 +65,10 @@ class CrossDomainEncoder(BaseDomainEncoder):
             expert_encoder=expert_encoder,
             _save_attrs=_save_attrs,
         )
+
+    @jax.jit
+    def encode_expert_state(self, state: jnp.ndarray):
+        return self.expert_encoder(state)
 
     def _update_encoder(
         self,

@@ -1,9 +1,16 @@
+import jax
+import jax.numpy as jnp
+
 from utils.types import DataType
 
 from .base_domain_encoder import BaseDomainEncoder
 
 
 class InDomainEncoder(BaseDomainEncoder):
+    @jax.jit
+    def encode_expert_state(self, state: jnp.ndarray):
+        return self.learner_encoder(state)
+
     def _update_encoder(
         self,
         learner_batch: DataType,

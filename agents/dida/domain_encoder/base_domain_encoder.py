@@ -83,12 +83,8 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             **kwargs,
         )
 
-    @jax.jit 
-    def encode_learner_state(self, state: jnp.ndarray):
-        return self.learner_encoder(state)
-
     @jax.jit
-    def encode_expert_state(self, state: jnp.ndarray):
+    def encode_learner_state(self, state: jnp.ndarray):
         return self.learner_encoder(state)
 
     def update(
