@@ -113,3 +113,43 @@ class InDomainEncoderLoss(DomainEncoderLossMixin):
             **{re.sub("learner", "expert", k): v for k, v in expert_info.items()},
         }
         return loss, info
+
+class CrossDomainLearnerEncoderLoss(DomainEncoderLossMixin):
+    def __call__(
+        self,
+        params: Params,
+        state: TrainState,
+        batch: DataType,
+        policy_discriminator: Discriminator,
+        state_discriminator: Discriminator,
+        state_loss_scale: float,
+    ):
+        loss, info = self.learner_loss(
+            params=params,
+            state=state,
+            batch=batch,
+            policy_discriminator=policy_discriminator,
+            state_discriminator=state_discriminator,
+            state_loss_scale=state_loss_scale,
+        )
+        return loss, info
+
+class CrossDomainExpertEncoderLoss(DomainEncoderLossMixin):
+    def __call__(
+        self,
+        params: Params,
+        state: TrainState,
+        batch: DataType,
+        policy_discriminator: Discriminator,
+        state_discriminator: Discriminator,
+        state_loss_scale: float,
+    ):
+        loss, info = self.expert_loss(
+            params=params,
+            state=state,
+            batch=batch,
+            policy_discriminator=policy_discriminator,
+            state_discriminator=state_discriminator,
+            state_loss_scale=state_loss_scale,
+        )
+        return loss, info
