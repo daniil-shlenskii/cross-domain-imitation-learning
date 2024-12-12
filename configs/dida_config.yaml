@@ -1,5 +1,5 @@
 seed: &seed 0
-env_name: &env_name InvertedPendulum-v5
+env_name: &env_name HalfCheetah-v5
 
 n_iters_training: 1_000_000
 batch_size: &batch_size 2048
@@ -32,7 +32,7 @@ agent:
   seed: *seed
   encoding_dim: 4
   expert_batch_size: *batch_size
-  expert_buffer_state_path: experts/InvertedPendulum-v5/archive/InvertedPendulum-v5/collected_rollouts/buffer_state.pickle
+  expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
   n_iters_pretrain_domain_encoder_and_policy_discriminator: *n_iters_pretrain_domain_encoder
   #
   # expert_buffer_state_preprocessing_config:
@@ -50,7 +50,7 @@ agent:
       hidden_dims: [256, 256]
     temperature_module_config:
       _target_: agents.sac.Temperature
-      initial_temperature: 1.
+      initial_temperature: 0.2
     actor_optimizer_config:
       transforms:
         - _target_: optax.clip
@@ -66,7 +66,7 @@ agent:
     temperature_optimizer_config:
       transforms:
         - _target_: optax.sgd
-          learning_rate: 1e-5
+          learning_rate: 0.
   #
   policy_discriminator_config:
     _target_: agents.gail.GAILDiscriminator.create
