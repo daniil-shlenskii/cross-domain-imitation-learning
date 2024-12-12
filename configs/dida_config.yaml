@@ -30,7 +30,7 @@ replay_buffer:
 agent:
   _target_: agents.DIDAAgent.create
   seed: *seed
-  encoding_dim: 4
+  encoding_dim: 17
   expert_batch_size: *batch_size
   expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
   n_iters_pretrain_domain_encoder_and_policy_discriminator: *n_iters_pretrain_domain_encoder
@@ -142,7 +142,6 @@ evaluation:
     env:
         _target_: gymnasium.make
         id: *env_name
-        render_mode: human
   extra_args:
     visualize_state_and_policy_scatterplots: True
     visualize_state_and_policy_histograms: True
