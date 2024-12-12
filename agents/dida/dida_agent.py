@@ -52,30 +52,13 @@ class DIDAAgent(GAILAgent):
         n_iters_pretrain_domain_encoder_and_policy_discriminator: int = 0,
         **kwargs,
     ):
-        # domain encoder init
-        domain_encoder = instantiate(
-            domain_encoder_config,
-            seed=seed,
-            learner_dim=observation_dim,
-            encoding_dim=encoding_dim,
-            _recursive_=False,
-        )
         # DAS init
         das = None
         if das_config is not None:
             das = instantiate(das_config)
 
-        _save_attrs = kwargs.pop(
-            "_save_attrs",
-            (
-                "agent",
-                "policy_discriminator",
-                "domain_encoder",
-                "das",
-            )
-        )
-
-        dida_agent = super().create(
+        # gail agent init
+        gail_agent = super().create(
             seed=seed,
             observation_dim=encoding_dim,
             action_dim=action_dim,
@@ -87,11 +70,27 @@ class DIDAAgent(GAILAgent):
             policy_discriminator_config=policy_discriminator_config,
             #
             anchor_buffer_state=None,
-            domain_encoder=domain_encoder,
+            domain_encoder=None,
             das=das,
             n_iters_pretrain_domain_encoder_and_policy_discriminator=n_iters_pretrain_domain_encoder_and_policy_discriminator,
-            _save_attrs=_save_attrs,
             **kwargs,
+        )
+
+        # domain encoder init
+        domain_encoder = instantiate(
+            domain_encoder_config,
+            seed=seed,
+            learner_dim=observation_dim,
+            encoding_dim=encoding_dim,
+            _recursive_=False,
+        )
+
+        # _save_attrs update
+        _save_attrs = gail_agent._save_attrs + ("domain_encoder",)
+
+        dida_agent = gail_agent.replace(
+            domain_encoder=domain_encoder,
+            _save_attrs=_save_attrs,
         )
 
         # preprocess expert buffer if needed
