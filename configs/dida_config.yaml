@@ -1,13 +1,13 @@
 seed: &seed 0
-env_name: &env_name HalfCheetah-v5
+env_name: &env_name InvertedPendulum-v5
 
 n_iters_training: 1_000_000
 batch_size: &batch_size 2048
 
 precollect_buffer_size: &precollect_buffer_size 5_000
-agent_starts_sampling_after: &n_iters_pretrain_domain_encoder 10_000
+agent_starts_sampling_after: &n_iters_pretrain_domain_encoder 5_000
 
-log_every: 1000
+log_every: 1_000
 eval_every: 5_000
 save_every: 5_000
 
@@ -30,9 +30,9 @@ replay_buffer:
 agent:
   _target_: agents.DIDAAgent.create
   seed: *seed
-  encoding_dim: 12
+  encoding_dim: 4
   expert_batch_size: *batch_size
-  expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
+  expert_buffer_state_path: experts/InvertedPendulum-v5/archive/InvertedPendulum-v5/collected_rollouts/buffer_state.pickle
   n_iters_pretrain_domain_encoder_and_policy_discriminator: *n_iters_pretrain_domain_encoder
   #
   # expert_buffer_state_preprocessing_config:
@@ -50,7 +50,7 @@ agent:
       hidden_dims: [256, 256]
     temperature_module_config:
       _target_: agents.sac.Temperature
-      initial_temperature: 0.2
+      initial_temperature: 1.
     actor_optimizer_config:
       transforms:
         - _target_: optax.clip
@@ -66,13 +66,13 @@ agent:
     temperature_optimizer_config:
       transforms:
         - _target_: optax.sgd
-          learning_rate: 0.
+          learning_rate: 1e-5
   #
   policy_discriminator_config:
     _target_: agents.gail.GAILDiscriminator.create
     module_config:
       _target_: networks.discriminator.Discriminator
-      hidden_dims: [128, 128]
+      hidden_dims: [256, 256, 256]
     optimizer_config:
       transforms:
         - _target_: optax.clip
@@ -86,7 +86,7 @@ agent:
       _target_: agents.gail.reward_transforms.RewardStandartization.create
   #
   domain_encoder_config:
-    state_loss_scale: 0.2
+    state_loss_scale: 0.3
     _target_: agents.dida.InDomainEncoder.create
     learner_encoder_config:
       _target_: gan.generator.Generator.create
@@ -105,7 +105,7 @@ agent:
       _target_: gan.discriminator.Discriminator.create
       module_config:
         _target_: networks.discriminator.Discriminator
-        hidden_dims: [128, 128]
+        hidden_dims: [256, 256, 256]
       optimizer_config:
         transforms:
           - _target_: optax.clip
@@ -119,7 +119,7 @@ agent:
       _target_: gan.discriminator.Discriminator.create
       module_config:
         _target_: networks.discriminator.Discriminator
-        hidden_dims: [128, 128]
+        hidden_dims: [256, 256, 256]
       optimizer_config:
         transforms:
           - _target_: optax.clip
@@ -142,6 +142,7 @@ evaluation:
     env:
         _target_: gymnasium.make
         id: *env_name
+        render_mode: human
   extra_args:
     visualize_state_and_policy_scatterplots: True
     visualize_state_and_policy_histograms: True
