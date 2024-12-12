@@ -77,10 +77,12 @@ class DIDAAgent(GAILAgent):
         )
 
         # domain encoder init
+        expert_observation_dim = gail_agent.expert_buffer_state.experience["observations"].shape[-1]
         domain_encoder = instantiate(
             domain_encoder_config,
             seed=seed,
             learner_dim=observation_dim,
+            expert_dim=expert_observation_dim,
             encoding_dim=encoding_dim,
             _recursive_=False,
         )

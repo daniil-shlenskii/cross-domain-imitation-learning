@@ -1,5 +1,6 @@
 from hydra.utils import instantiate
-from omegaconf import DictConfig
+from omegaconf.dictconfig import DictConfig
+from omegaconf.omegaconf import OmegaConf
 
 from gan.generator import Generator
 from utils.types import DataType
