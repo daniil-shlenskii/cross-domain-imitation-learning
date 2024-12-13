@@ -135,36 +135,16 @@ class GradientPenaltyDecorator:
 
         return loss_with_gp, info
 
-class GANLossGP(GANLoss):
-    def __init__(
-        self,
-        *,
-        discriminator_loss_fn: Callable,
-        gradient_penalty_coef: float = 10.,
-        **kwargs,
-    ):
-        self.discriminator_loss_fn = discriminator_loss_fn
-        self.discriminator_loss = GradientPenaltyDecorator(
-            d_loss_fn=self.discriminator_loss,
-            gradient_penalty_coef=gradient_penalty_coef
-        )
-        super().__init__(
-            discriminator_loss_fn=discriminator_loss_fn,
-            **kwargs,
-        )
+def _gan_loss_with_gradient_penalty_decorator(cls: GANLoss):
+    class GANLossGP(cls):
+        def __init__(self, *, gradient_penalty_coef: float, **kwargs):
+            self.discriminator_loss = GradientPenaltyDecorator(
+                d_loss_fn=self.discriminator_loss,
+                gradient_penalty_coef=gradient_penalty_coef
+            )
+            super().__init__(**kwargs)
+    return GANLossGP
 
-class LogisticLossGP(GANLossGP):
-    def __init__(self, is_generator):
-        super().__init__(
-            generator_loss_fn=g_nonsaturating_logistic_loss,
-            discriminator_loss_fn=d_logistic_loss,
-            is_generator=is_generator,
-        )
+LogisticLossGP = _gan_loss_with_gradient_penalty_decorator(LogisticLoss)
 
-class SoftplusLossGP(GANLossGP):
-    def __init__(self, is_generator):
-        super().__init__(
-            generator_loss_fn=g_nonsaturating_softplus_loss,
-            discriminator_loss_fn=d_softplus_loss,
-            is_generator=is_generator,
-        )
+SoftplusLossGP = _gan_loss_with_gradient_penalty_decorator(SoftplusLoss)

@@ -15,6 +15,7 @@ gan:
   seed: *seed
   loss_config:
     _target_: gan.losses.LogisticLossGP
+    gradient_penalty_coef: 2.
   generator_config:
     module_config:
       _target_: networks.common.MLP
