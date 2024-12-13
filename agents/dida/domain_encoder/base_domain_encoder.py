@@ -70,6 +70,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             _recursive_=False,
         )
 
+        kwargs.pop("expert_dim")
         return cls(
             learner_encoder=learner_encoder,
             state_discriminator=state_discriminator,
