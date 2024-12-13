@@ -155,7 +155,7 @@ def _update_jit(
 
     # update state discriminator
     new_state_disc, state_disc_info, state_disc_stats_info = new_domain_encoder.state_discriminator.update(
-        fake_batch=learner_pairs,
+        fake_batch=jnp.concatenate((learner_pairs, learner_pairs)), # TODO: jax-based crutch for gradient penalty usage
         real_batch=jnp.concatenate([expert_pairs, anchor_pairs]),
         return_logits=True,
     )
@@ -165,7 +165,7 @@ def _update_jit(
     # update policy discriminator
     new_policy_disc, policy_disc_info, policy_disc_stats_info = new_domain_encoder.policy_discriminator.update(
         fake_batch=jnp.concatenate([learner_pairs, anchor_pairs]),
-        real_batch=expert_pairs,
+        real_batch=jnp.concatenate([expert_pairs, expert_pairs]) # TODO: jax-based crutch for gradient penalty usage
     )
 
     # update domain encoder

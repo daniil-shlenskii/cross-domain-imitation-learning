@@ -303,9 +303,15 @@ def _update_domain_encoder_and_policy_discriminator_jit(
         ])
         for k in ["observations", "observations_next"]
     }
+    new_expert_batch = {
+        k: jnp.concatenate([
+            expert_batch[k], expert_batch[k]
+        ])
+        for k in ["observations", "observations_next"]
+    } # TODO: jax-based crutch for gradient penalty usage
     new_policy_discr, discr_info, discr_stats_info = new_dida_agent.policy_discriminator.update(
         learner_batch=new_learner_batch,
-        expert_batch=expert_batch,
+        expert_batch=new_expert_batch,
     )
 
     # update dida agent
