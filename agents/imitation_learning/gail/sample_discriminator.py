@@ -1,9 +1,6 @@
-from typing import Callable
-
 import jax
 import jax.numpy as jnp
 from flax import struct
-
 from gan.discriminator import Discriminator
 from utils.types import DataType, PRNGKey
 

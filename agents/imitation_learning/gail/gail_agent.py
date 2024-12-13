@@ -5,13 +5,12 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
+import wandb
+from agents.base_agent import Agent
 from flax import struct
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 from typing_extensions import override
-
-import wandb
-from agents.base_agent import Agent
 from utils import (convert_figure_to_array, get_buffer_state_size,
                    instantiate_jitted_fbx_buffer, load_pickle, sample_batch)
 from utils.types import Buffer, BufferState, DataType

@@ -1,11 +1,11 @@
 import jax
 import jax.numpy as jnp
+from gan.discriminator import Discriminator
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
-
-from agents.gail.reward_transforms import BaseRewardTransform
-from gan.discriminator import Discriminator
 from utils.types import DataType
+
+from .reward_transforms import BaseRewardTransform
 
 
 class GAILDiscriminator(Discriminator):
