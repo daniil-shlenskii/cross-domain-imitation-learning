@@ -24,6 +24,7 @@ class DIDAAgent(GAILAgent):
     domain_encoder: BaseDomainEncoder
     anchor_buffer_state: BufferState = struct.field(pytree_node=False)
     das: float = struct.field(pytree_node=False)
+    update_domain_encoder_every: int = struct.field(pytree_node=False)
     n_iters_pretrain_domain_encoder_and_policy_discriminator: float = struct.field(pytree_node=False)
 
     @classmethod
@@ -49,6 +50,7 @@ class DIDAAgent(GAILAgent):
         #
         expert_buffer_state_preprocessing_config: DictConfig = None,
         #
+        update_domain_encoder_every: int = 100,
         n_iters_pretrain_domain_encoder_and_policy_discriminator: int = 0,
         **kwargs,
     ):
@@ -72,6 +74,7 @@ class DIDAAgent(GAILAgent):
             anchor_buffer_state=None,
             domain_encoder=None,
             das=das,
+            update_domain_encoder_every=update_domain_encoder_every,
             n_iters_pretrain_domain_encoder_and_policy_discriminator=n_iters_pretrain_domain_encoder_and_policy_discriminator,
             **kwargs,
         )
@@ -136,9 +139,11 @@ class DIDAAgent(GAILAgent):
                 learner_batch=batch,
             )
         else:
+            update_domain_encoder = (self.policy_discriminator.state.step + 1) % self.update_domain_encoder_every == 0
             new_dida_agent, info, stats_info = _update_jit(
                 dida_agent=self,
                 learner_batch=batch,
+                update_domain_encoder=update_domain_encoder,
             )
         return new_dida_agent, info, stats_info
 
@@ -191,21 +196,28 @@ class DIDAAgent(GAILAgent):
 
         return eval_info
 
-def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType):
+def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType, update_domain_encoder: bool):
     # sample batches and update domain encoder
-    (
-        new_dida_agent,
-        batch,
-        expert_batch,
-        anchor_batch,
-        learner_domain_logits,
-        expert_domain_logits,
-        info,
-        stats_info,
-    ) = _update_domain_encoder_jit(
-        dida_agent=dida_agent,
-        learner_batch=learner_batch,
-    )
+    if update_domain_encoder:
+        (
+            new_dida_agent,
+            batch,
+            expert_batch,
+            anchor_batch,
+            learner_domain_logits,
+            expert_domain_logits,
+            info,
+            stats_info,
+        ) = _update_domain_encoder_jit(
+            dida_agent=dida_agent,
+            learner_batch=learner_batch,
+        )
+    else:
+        batch, expert_batch, anchor_batch = _prepare_batches_jit(
+            dida_agent=dida_agent,
+            learner_batch=learner_batch,
+        )
+        new_dida_agent, info, stats_info = dida_agent, {}, {}
 
     # prepare mixed batch for policy discriminator update
     if new_dida_agent.das is not None:
@@ -321,3 +333,17 @@ def _update_domain_encoder_and_policy_discriminator_jit(
     stats_info.update(discr_stats_info)
 
     return new_dida_agent, info, stats_info
+
+@jax.jit
+def _prepare_batches_jit(dida_agent, learner_batch):
+    # sample source batches
+    new_rng, expert_batch = sample_batch(dida_agent.rng, dida_agent.expert_buffer, dida_agent.expert_buffer_state)
+    new_rng, anchor_batch = sample_batch(new_rng, dida_agent.expert_buffer, dida_agent.anchor_buffer_state)
+
+    # encoder batches
+    for k in ["observations", "observations_next"]:
+        learner_batch[k] = dida_agent._preprocess_observations(learner_batch[k])
+        expert_batch[k] = dida_agent._preprocess_expert_observations(expert_batch[k])
+        anchor_batch[k] = dida_agent._preprocess_expert_observations(anchor_batch[k])
+
+    return learner_batch, expert_batch, anchor_batch
