@@ -1,3 +1,4 @@
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -62,3 +63,9 @@ def get_sample_discriminator_hists(
     priorities_acc_hist = priorities_to_plot(priorities_acc)
 
     return state_learner_figure, state_expert_figure, priorities_hist, priorities_acc_hist
+
+def get_state_pairs(batch: DataType):
+    return jnp.concatenate([
+        batch["observations"],
+        batch["observations_next"],
+    ], axis=1)

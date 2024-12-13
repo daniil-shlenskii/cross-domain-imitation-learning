@@ -183,10 +183,13 @@ def main(args: argparse.Namespace):
                 wandb.log({f"evaluation/{k}": v}, step=i)
 
         # sample actions
-        action = agent.sample_actions(agent_sample_key, observation[None])
+        if i < config.get("agent_starts_sampling_after", 0):
+            action = env.action_space.sample()
+        else:
+            action = agent.sample_actions(agent_sample_key, observation[None])[0]
 
         # do step in the environment
-        do_environment_step(action[0], i)
+        do_environment_step(action, i)
 
         # do RL optimization step
         batch = buffer.sample(state, buffer_sample_key).experience

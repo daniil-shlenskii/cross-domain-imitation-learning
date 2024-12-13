@@ -1,5 +1,5 @@
 seed: &seed 0
-env_name: &env_name Hopper-v5
+env_name: &env_name HalfCheetah-v5
 
 n_iters_training: 1_000_000
 batch_size: &batch_size 256
@@ -42,8 +42,8 @@ agent:
     transforms:
       - _target_: optax.clip
         max_delta: 1.0
-      - _target_: optax.adamw
-        learning_rate: 3e-4
+      - _target_: optax.sgd
+        learning_rate: 0.
   critic_optimizer_config: *optimizer_config
   temperature_optimizer_config:
     transforms:
@@ -52,7 +52,7 @@ agent:
 
 evaluation:
   seed: 42
-  num_episodes: 50
+  num_episodes: 25
   environment:
     _target_: gymnasium.wrappers.TimeLimit
     max_episode_steps: 1000

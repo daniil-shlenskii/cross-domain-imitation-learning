@@ -22,9 +22,9 @@ def _prepare_anchor_batch_jit(dida_agent: "DIDAAgent"):
 class DomainAdversarialSampling:
     def __init__(
         self,
-        sar_p: float,
-        p_acc_ema: float,
-        p_acc_ema_decay: float,
+        sar_p: float = 0.5,
+        p_acc_ema: float = 0.9,
+        p_acc_ema_decay: float = 0.99,
     ):
         self.sar_p = sar_p
         self.p_acc_ema = p_acc_ema
