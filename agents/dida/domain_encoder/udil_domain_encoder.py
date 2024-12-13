@@ -85,7 +85,7 @@ def _update_jit(
     policy_discriminator: Discriminator,
 ):
     new_learner_encoder, info, stats_info = domain_encoder.learner_encoder.update(
-        learner_batch=learner_batch,
+        batch=learner_batch,
         discriminator=policy_discriminator,
     )
     new_domain_encoder = domain_encoder.replace(
@@ -93,18 +93,20 @@ def _update_jit(
     )
     return new_domain_encoder, info, stats_info
 
-def learner_encoder_loss(
-    params,
-    state,
-    batch,
-    discriminator,
-):
-    fake_state_pairs = jnp.concatenate([
-        state.apply_fn({"params": params}, batch["observations"], train=True),
-        state.apply_fn({"params": params}, batch["observations_next"], train=True),
-    ], axis=1)
-    fake_logits = discriminator(fake_state_pairs)
-    loss = discriminator.state.loss_fn.generator_loss_fn(fake_logits)
+class LearnerEncoderLoss:
+    def __call__(
+        self,
+        params,
+        state,
+        batch,
+        discriminator,
+    ):
+        fake_state_pairs = jnp.concatenate([
+            state.apply_fn({"params": params}, batch["observations"], train=True),
+            state.apply_fn({"params": params}, batch["observations_next"], train=True),
+        ], axis=1)
+        fake_logits = discriminator(fake_state_pairs)
+        loss = discriminator.state.loss_fn.generator_loss_fn(fake_logits)
 
-    info = {f"{state.info_key}_loss": loss}
-    return loss, info
+        info = {f"{state.info_key}_loss": loss}
+        return loss, info
