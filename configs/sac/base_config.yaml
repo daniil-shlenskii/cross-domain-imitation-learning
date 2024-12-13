@@ -59,7 +59,6 @@ evaluation:
     env:
         _target_: gymnasium.make
         id: *env_name
-        render_mode: human
 
 archive:
   agent_load_dir: &agent_dir archive/agents/sac
