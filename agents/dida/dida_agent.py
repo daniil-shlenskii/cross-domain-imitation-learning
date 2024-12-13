@@ -257,6 +257,7 @@ def _update_domain_encoder_jit(
         learner_batch=learner_batch,
         expert_batch=expert_batch,
         anchor_batch=anchor_batch,
+        policy_discriminator=dida_agent.policy_discriminator,
     )
 
     # update dida agent
