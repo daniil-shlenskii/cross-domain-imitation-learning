@@ -17,7 +17,7 @@ from utils.types import DataType
 
 class UDILDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin):
     learner_encoder: Generator
-    update_every: int
+    update_every: int = struct.field(pytree_node=False)
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     @classmethod
