@@ -17,7 +17,6 @@ from utils.types import DataType
 
 class UDILDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin):
     learner_encoder: Generator
-    update_every: int = struct.field(pytree_node=False)
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     @classmethod
@@ -30,7 +29,6 @@ class UDILDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin):
         #
         learner_encoder_config: DictConfig,
         #
-        update_every: int = 100,
         **kwargs,
     ):
         learner_encoder = instantiate(
@@ -43,7 +41,6 @@ class UDILDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin):
         )
         return cls(
             learner_encoder=learner_encoder,
-            update_every=update_every,
             _save_attrs=("learner_encoder",),
         )
 
@@ -61,18 +58,15 @@ class UDILDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin):
         anchor_batch: DataType,
         policy_discriminator: Discriminator,
     ):
-        if (policy_discriminator.state.step + 1) % self.update_every == 0:
-            (
-                new_domain_encoder,
-                info,
-                stats_info,
-            ) = _update_jit(
-                domain_encoder=self,
-                learner_batch=learner_batch,
-                policy_discriminator=policy_discriminator,
-            )
-        else:
-            new_domain_encoder, info, stats_info = self, {}, {}
+        (
+            new_domain_encoder,
+            info,
+            stats_info,
+        ) = _update_jit(
+            domain_encoder=self,
+            learner_batch=learner_batch,
+            policy_discriminator=policy_discriminator,
+        )
 
         return (
             new_domain_encoder,
