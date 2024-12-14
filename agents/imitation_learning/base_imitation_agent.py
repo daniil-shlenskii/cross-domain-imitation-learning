@@ -5,21 +5,28 @@ import gymnasium as gym
 import jax.numpy as jnp
 import numpy as np
 import wandb
+from flax import struct
 from typing_extensions import override
 
 from agents.base_agent import Agent
 from utils import (convert_figure_to_array, get_buffer_state_size,
                    instantiate_jitted_fbx_buffer, load_pickle)
-from utils.types import BufferState
+from utils.types import Buffer, BufferState
+
+from .utils import get_state_and_policy_tsne_scatterplots
 
 
 class ImitationAgent(Agent):
+    expert_buffer: Buffer = struct.field(pytree_node=False)
+    expert_buffer_state: BufferState = struct.field(pytree_node=False)
+
     @override
     def _preprocess_expert_observations(self, observations: np.ndarray) -> np.ndarray:
         return observations
 
+    @classmethod
     def _prepare_expert_buffer(
-        self,
+        cls, 
         expert_buffer_state_path: str,
         expert_batch_size: int,
         expert_buffer_state_processor: Callable = None,
@@ -58,7 +65,8 @@ class ImitationAgent(Agent):
 
         return expert_buffer, expert_buffer_state
 
-    def _get_source_random_buffer_state(self, expert_buffer_state: BufferState, seed: int):
+    @classmethod
+    def _get_source_random_buffer_state(cls, expert_buffer_state: BufferState, seed: int):
         buffer_state_size = get_buffer_state_size(expert_buffer_state)
         anchor_buffer_state = deepcopy(expert_buffer_state)
 
