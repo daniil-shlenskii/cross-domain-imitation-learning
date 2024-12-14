@@ -1,10 +1,9 @@
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.manifold import TSNE
 
 from utils.types import DataType
-
-from .base_imitation_agent import ImitationAgent
 
 
 def get_state_pairs(batch: DataType):
@@ -15,7 +14,7 @@ def get_state_pairs(batch: DataType):
 
 
 def get_state_and_policy_tsne_scatterplots(
-    imitation_agent: ImitationAgent,
+    imitation_agent: "ImitationAgent",
     seed: int,
     learner_trajs: DataType,
 ):

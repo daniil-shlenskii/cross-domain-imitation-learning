@@ -26,7 +26,7 @@ class ImitationAgent(Agent):
 
     @classmethod
     def _prepare_expert_buffer(
-        cls, 
+        cls,
         expert_buffer_state_path: str,
         expert_batch_size: int,
         expert_buffer_state_processor: Callable = None,
