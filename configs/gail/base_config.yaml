@@ -31,7 +31,6 @@ agent:
   seed: *seed
   expert_batch_size: *batch_size
   expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
-  n_policy_discriminator_updates: 1
   agent_config:
     _target_: agents.sac.SACAgent.create
     actor_module_config:
