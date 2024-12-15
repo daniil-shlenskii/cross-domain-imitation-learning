@@ -35,7 +35,7 @@ class SkipMLPAffineTransform(nn.Module):
             out_dim=None,
             activation=self.activation,
             dropout_rate=self.dropout_rate,
-        )
+        )(x)
         res = nn.Dense(x.shape[-1], kernel_init=constant(0.))(res)
 
         x = x + res
