@@ -33,7 +33,7 @@ agent:
   expert_batch_size: *batch_size
   expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
   expert_buffer_state_processor_config:
-  _target_: GaussianTransform
+    _target_: agents.imitation_learning.dida.expert_trasnforms.GaussianTransform
     mu: 0.
     sigma: 0.01
   #
