@@ -57,7 +57,7 @@ class GAILAgent(ImitationAgent):
         # expert buffer init
         expert_buffer_state_processor = None
         if expert_buffer_state_processor_config is not None:
-            expert_buffer_state_processor = instantiate(expert_buffer_state_processor)
+            expert_buffer_state_processor = instantiate(expert_buffer_state_processor_config)
 
         expert_buffer, expert_buffer_state = cls._prepare_expert_buffer(
             expert_buffer_state_path=expert_buffer_state_path,
