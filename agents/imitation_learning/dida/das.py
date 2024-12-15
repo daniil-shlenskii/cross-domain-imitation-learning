@@ -38,7 +38,7 @@ class DomainAdversarialSampling:
         # create mixed batch
         b_size = learner_batch["observations"].shape[0]
         num_to_mix = int(alpha * b_size)
-        idcs = jax.random.choice(self.key, a=b_size, shape=(num_to_mix,), p=das_probs)
+        idcs = jax.random.choice(self.key, a=len(das_probs), shape=(num_to_mix,), p=das_probs)
 
         mixed_batch = anchor_batch
         mixed_batch["observations"] = \
