@@ -33,11 +33,6 @@ agent:
   expert_batch_size: *batch_size
   expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
   #
-  # expert_buffer_state_preprocessing_config:
-  #   _target_: agents.dida.expert_transforms.GaussianTransform
-  #   mu: 0. 
-  #   sigma: 0.01
-  #
   agent_config:
     _target_: agents.SACAgent.create
     actor_module_config:
@@ -98,7 +93,7 @@ agent:
           - _target_: optax.adamw
             learning_rate: 3e-4
       loss_config:
-        _target_: agents.dida.domain_encoder.losses.CrossDomainLearnerEncoderLoss
+        _target_: agents.imitation_learning.dida.domain_encoder.losses.CrossDomainLearnerEncoderLoss
     expert_encoder_config:
       _target_: gan.generator.Generator.create
       module_config:
@@ -111,7 +106,7 @@ agent:
           - _target_: optax.adamw
             learning_rate: 3e-4
       loss_config:
-        _target_: agents.dida.domain_encoder.losses.CrossDomainExpertEncoderLoss
+        _target_: agents.imitation_learning.dida.domain_encoder.losses.CrossDomainLearnerEncoderLoss
     state_discriminator_config:
       _target_: gan.discriminator.Discriminator.create
       module_config:
@@ -150,9 +145,6 @@ evaluation:
     env:
         _target_: gymnasium.make
         id: *env_name
-  extra_args:
-    visualize_state_and_policy_scatterplots: True
-    visualize_state_and_policy_histograms: True
 
 archive:
   agent_load_dir: &agent_dir archive/agents/dida

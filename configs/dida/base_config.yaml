@@ -132,9 +132,6 @@ evaluation:
     env:
         _target_: gymnasium.make
         id: *env_name
-  extra_args:
-    visualize_state_and_policy_scatterplots: True
-    visualize_state_and_policy_histograms: True
 
 archive:
   agent_load_dir: &agent_dir archive/agents/dida
