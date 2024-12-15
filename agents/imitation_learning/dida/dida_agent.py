@@ -6,7 +6,7 @@ from flax import struct
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
-from agents import GAILAgent
+from agents.imitation_learning.gail import GAILAgent
 from utils import sample_batch
 from utils.types import BufferState, DataType
 
@@ -17,7 +17,6 @@ class DIDAAgent(GAILAgent):
     domain_encoder: BaseDomainEncoder
     anchor_buffer_state: BufferState = struct.field(pytree_node=False)
     das: float = struct.field(pytree_node=False)
-    n_iters_pretrain_domain_encoder_and_policy_discriminator: float = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -58,6 +57,7 @@ class DIDAAgent(GAILAgent):
             expert_batch_size=expert_batch_size,
             expert_buffer_state_path=expert_buffer_state_path,
             agent_config=agent_config,
+            policy_discriminator_config=policy_discriminator_config,
             expert_buffer_state_processor_config=expert_buffer_state_processor_config,
             #
             anchor_buffer_state=None,
@@ -142,7 +142,7 @@ def _update_with_das_jit(dida_agent: DIDAAgent, learner_batch: DataType):
 
     # update agent and policy discriminator
     new_dida_agent, gail_info, gail_stats_info = new_dida_agent.update_gail(
-        expert_batch=learner_batch,
+        learner_batch=learner_batch,
         expert_batch=expert_batch,
         policy_discriminator_learner_batch=mixed_batch,
     )
@@ -158,7 +158,7 @@ def _update_no_das_jit(dida_agent: DIDAAgent, learner_batch: DataType):
         new_dida_agent,
         learner_batch,
         expert_batch,
-        intermediates,
+        _,
         info,
         stats_info,
     ) = _update_domain_encoder_jit(

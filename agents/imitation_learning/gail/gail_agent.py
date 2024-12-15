@@ -91,7 +91,6 @@ class GAILAgent(ImitationAgent):
         )
         return new_gail_agent, info, stats_info
 
-    @jax.jit
     def update_gail(
         self,
         *,
