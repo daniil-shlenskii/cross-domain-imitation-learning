@@ -4,12 +4,14 @@ import numpy as np
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
+import wandb
 from agents.base_agent import Agent
 from agents.imitation_learning.base_imitation_agent import ImitationAgent
-from utils import sample_batch
+from utils import convert_figure_to_array, sample_batch
 from utils.types import DataType
 
 from .gail_discriminator import GAILDiscriminator
+from .utils import get_policy_discriminator_logits_plots
 
 
 class GAILAgent(ImitationAgent):
@@ -104,6 +106,34 @@ class GAILAgent(ImitationAgent):
             expert_batch=expert_batch,
             policy_discriminator_learner_batch=policy_discriminator_learner_batch,
         )
+
+    def evaluate(
+        self,
+        *,
+        seed: int,
+        env: gym.Env,
+        num_episodes: int,
+        #
+        convert_to_wandb_type: bool = True,
+        #
+        return_trajectories: bool = False,
+    ):
+        eval_info, trajs = super().evaluate(seed=seed, env=env, num_episodes=num_episodes, return_trajectories=True)
+
+        # policy discriminator logits plots
+        learner_logits_plot, expert_logits_plot = get_policy_discriminator_logits_plots(
+            gail_agent=self,
+            learner_trajs=trajs,
+        )
+        if convert_to_wandb_type:
+            learner_logits_plot = wandb.Image(convert_figure_to_array(learner_logits_plot), caption="Policy Discriminator Learner logits")
+            expert_logits_plot = wandb.Image(convert_figure_to_array(expert_logits_plot), caption="Policy Discriminator Expert logits")
+        eval_info["policy_learner_logits_plot"] = learner_logits_plot
+        eval_info["policy_expert_logits_plot"] = expert_logits_plot
+
+        if return_trajectories:
+            return eval_info, trajs
+        return eval_info
 
 @jax.jit
 def _update_jit(gail_agent: GAILAgent, learner_batch: DataType):
