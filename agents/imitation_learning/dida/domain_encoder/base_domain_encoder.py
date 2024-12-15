@@ -5,12 +5,12 @@ import jax
 import jax.numpy as jnp
 from flax import struct
 from flax.struct import PyTreeNode
+from gan.discriminator import Discriminator
+from gan.generator import Generator
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
-from agents.gail.utils import get_state_pairs
-from gan.discriminator import Discriminator
-from gan.generator import Generator
+from agents.imitation_learning.utils import get_state_pairs
 from utils import SaveLoadFrozenDataclassMixin
 from utils.types import DataType
 
@@ -19,7 +19,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     learner_encoder: Generator
     state_discriminator: Discriminator
     policy_discriminator: Discriminator
-    state_loss_scale: float
+    state_loss_scale: float = struct.field(pytree_node=False)
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     @classmethod
@@ -109,13 +109,16 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             expert_batch=expert_batch,
             anchor_batch=anchor_batch,
         )
+        intermediates = {
+            "anchor_batch": anchor_batch,
+            "learner_domain_logits": learner_domain_logits,
+            "expert_domain_logits": expert_domain_logits,
+        }
         return (
             new_domain_encoder,
             learner_batch,
             expert_batch,
-            anchor_batch,
-            learner_domain_logits,
-            expert_domain_logits,
+            intermediates,
             info,
             stats_info,
         )
@@ -136,7 +139,7 @@ def _update_jit(
     expert_batch: DataType,
     anchor_batch: DataType,
 ):
-    # update encoder 
+    # update encoder
     new_domain_encoder, info, stats_info = domain_encoder._update_encoder(
         learner_batch=learner_batch,
         expert_batch=expert_batch,

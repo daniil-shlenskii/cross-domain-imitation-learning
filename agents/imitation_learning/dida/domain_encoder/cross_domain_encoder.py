@@ -1,10 +1,10 @@
 import jax
 import jax.numpy as jnp
+from gan.generator import Generator
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 from omegaconf.omegaconf import OmegaConf
 
-from gan.generator import Generator
 from utils.types import DataType
 
 from .base_domain_encoder import BaseDomainEncoder
