@@ -27,15 +27,15 @@ class SkipMLPAffineTransform(nn.Module):
     dropout_rate: Optional[float] = None
 
     @nn.compact
-    def __cal__(
-        self, x: jnp.ndarray, train: bool=False,           
+    def __call__(
+        self, x: jnp.ndarray, train: bool=False,
     ):
         res = MLP(
             hidden_dims=self.hidden_dims,
             out_dim=None,
             activation=self.activation,
             dropout_rate=self.dropout_rate,
-        )(x)
+        )(x, train=train)
         res = nn.Dense(x.shape[-1], kernel_init=constant(0.))(res)
 
         x = x + res
