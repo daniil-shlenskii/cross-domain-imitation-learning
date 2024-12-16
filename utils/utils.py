@@ -47,13 +47,15 @@ def load_pickle(path: str) -> Any:
         data = pickle.load(file)
     return data
 
-def load_buffer(state: Buffer, path: str):
+def load_buffer(state: Buffer, path: str, size: int = None):
     stored_state = load_pickle(path)
     if state.experience.keys() == stored_state.experience.keys():
         # define states sized
         stored_state_size = get_buffer_state_size(stored_state)
         state_max_size = state.experience["observations"][0].shape[0]
         data_size = min(stored_state_size, state_max_size)
+        if size is not None:
+            data_size = min(data_size, size)
 
         # create epxerience for new state
         stored_state_exp = stored_state.experience

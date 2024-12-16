@@ -152,7 +152,7 @@ def main(args: argparse.Namespace):
         n_iters_collect_buffer = config.precollect_buffer_size
 
         if config_archive["random_buffer_load_path"].exists():
-            state = load_buffer(state, config_archive["random_buffer_load_path"])
+            state = load_buffer(state, config_archive["random_buffer_load_path"], size=config.precollect_buffer_size)
             n_iters_collect_buffer -= state.current_index
             n_iters_collect_buffer = max(0, n_iters_collect_buffer)
 
