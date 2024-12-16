@@ -54,8 +54,8 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             **kwargs
         )
 
-    def update(self, *, batch: Any, **kwargs):
-        new_state, info, stats_info = self.state.update(batch=batch, **kwargs)
+    def update(self, **kwargs):
+        new_state, info, stats_info = self.state.update(**kwargs)
         return self.replace(state=new_state), info, stats_info
 
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
