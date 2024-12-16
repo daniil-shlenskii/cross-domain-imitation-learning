@@ -37,14 +37,13 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         *,
         seed: int,
         #
+        encoding_dim: int,
+        #
         target_batch_size: int,
         target_random_buffer_state_path,
         #
         source_batch_size: int,
         source_expert_buffer_state_path,
-        #
-        target_dim: int,
-        encoding_dim: int,
         #
         target_encoder_config: DictConfig,
         state_discriminator_config: DictConfig,
@@ -52,6 +51,8 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         #
         state_loss_scale: float,
         update_encoder_every: int = 1,
+        #
+        source_buffer_state_processor_config: DictConfig = None,
         #
         **kwargs,
     ):
@@ -65,6 +66,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         source_buffer, source_expert_buffer_state = prepare_buffer(
             buffer_state_path=source_expert_buffer_state_path,
             batch_size=source_batch_size,
+            buffer_state_processor_config=source_buffer_state_processor_config,
         )
 
         # source random buffer state init
@@ -95,6 +97,8 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         target_encoder_config["loss_config"]["state_loss"] = state_discriminator.state.loss_fn
         target_encoder_config["loss_config"]["policy_loss"] = policy_discriminator.state.loss_fn
 
+        target_dim = target_random_buffer_state.experience["observations"].shape[-1]
+
         target_encoder = instantiate(
             target_encoder_config,
             seed=seed,
@@ -104,7 +108,6 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             _recursive_=False,
         )
 
-        kwargs.pop("source_dim", None)
         return cls(
             rng=jax.random.key(seed),
             target_buffer=target_buffer,
