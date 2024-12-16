@@ -128,27 +128,22 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     def update(self, target_expert_batch: DataType):
         (
             new_domain_encoder,
-            learner_batch,
-            expert_batch,
-            anchor_batch,
-            learner_domain_logits,
-            expert_domain_logits,
+            target_random_batch,
+            target_expert_batch,
+            source_random_batch,
+            source_expert_batch,
             info,
             stats_info,
         ) = _update_jit(
             domain_encoder=self,
             target_expert_batch=target_expert_batch
         )
-        intermediates = {
-            "anchor_batch": anchor_batch,
-            "learner_domain_logits": learner_domain_logits,
-            "expert_domain_logits": expert_domain_logits,
-        }
         return (
             new_domain_encoder,
-            learner_batch,
-            expert_batch,
-            intermediates,
+            target_random_batch,
+            target_expert_batch,
+            source_random_batch,
+            source_expert_batch,
             info,
             stats_info,
         )
@@ -158,12 +153,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         new_rng, source_random_batch = sample_batch(new_rng, self.source_buffer, self.source_random_buffer_state)
         new_rng, source_expert_batch = sample_batch(new_rng, self.source_buffer, self.source_expert_buffer_state)
 
-        return (
-            new_rng,
-            target_random_batch,
-            source_random_batch,
-            source_expert_batch,
-        )
+        return new_rng, target_random_batch, source_random_batch, source_expert_batch,
 
     @abstractmethod
     def _update_encoder(
