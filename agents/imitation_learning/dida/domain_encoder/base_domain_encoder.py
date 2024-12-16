@@ -19,7 +19,7 @@ from utils.utils import sample_batch
 
 class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     rng: PRNGKey
-    learner_encoder: Generator
+    target_encoder: Generator
     state_discriminator: Discriminator
     policy_discriminator: Discriminator
     target_buffer: Buffer = struct.field(pytree_node=False)
@@ -43,10 +43,10 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         source_buffer: Buffer,
         source_expert_buffer_state: BufferState,
         #
-        learner_dim: int,
+        target_dim: int,
         encoding_dim: int ,
         #
-        learner_encoder_config: DictConfig,
+        target_encoder_config: DictConfig,
         state_discriminator_config: DictConfig,
         policy_discriminator_config: DictConfig,
         #
@@ -82,17 +82,17 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             _recursive_=False,
         )
 
-        # learner encoder init
-        learner_encoder_config = OmegaConf.to_container(learner_encoder_config)
-        learner_encoder_config["loss_config"]["state_loss"] = state_discriminator.state.loss_fn
-        learner_encoder_config["loss_config"]["policy_loss"] = policy_discriminator.state.loss_fn
+        # target encoder init
+        target_encoder_config = OmegaConf.to_container(target_encoder_config)
+        target_encoder_config["loss_config"]["state_loss"] = state_discriminator.state.loss_fn
+        target_encoder_config["loss_config"]["policy_loss"] = policy_discriminator.state.loss_fn
 
-        learner_encoder = instantiate(
-            learner_encoder_config,
+        target_encoder = instantiate(
+            target_encoder_config,
             seed=seed,
-            input_dim=learner_dim,
+            input_dim=target_dim,
             output_dim=encoding_dim,
-            info_key="learner_encoder",
+            info_key="target_encoder",
             _recursive_=False,
         )
 
@@ -104,13 +104,13 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             target_random_buffer_state=target_random_buffer_state,
             source_random_buffer_state=source_random_buffer_state,
             source_expert_buffer_state=source_expert_buffer_state,
-            learner_encoder=learner_encoder,
+            target_encoder=target_encoder,
             state_discriminator=state_discriminator,
             policy_discriminator=policy_discriminator,
             state_loss_scale=state_loss_scale,
             update_encoder_every=update_encoder_every,
             _save_attrs=(
-                "learner_encoder",
+                "target_encoder",
                 "state_discriminator",
                 "policy_discriminator"
             ),
@@ -119,7 +119,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
 
     @jax.jit
     def encode_target_state(self, state: jnp.ndarray):
-        return self.learner_encoder(state)
+        return self.target_encoder(state)
 
     @abstractmethod
     def encode_source_state(self, state: jnp.ndarray):
