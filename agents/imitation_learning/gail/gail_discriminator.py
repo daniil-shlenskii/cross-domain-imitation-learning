@@ -10,12 +10,14 @@ from .reward_transforms import BaseRewardTransform
 
 
 class GAILDiscriminator(Discriminator):
+    neg_reward_factor: float
     reward_transform: BaseRewardTransform
 
     @classmethod
     def create(
         cls,
         *,
+        neg_reward_factor: float = 1.,
         reward_transform_config: DictConfig = None,
         **discriminator_kwargs,
     ):
@@ -24,6 +26,7 @@ class GAILDiscriminator(Discriminator):
         else:
             reward_transform = BaseRewardTransform.create()
         return super().create(
+            neg_reward_factor=neg_reward_factor,
             reward_transform=reward_transform,
             info_key="policy_discriminator",
             _save_attrs=("state", "reward_transform"),
@@ -44,7 +47,7 @@ class GAILDiscriminator(Discriminator):
             learner_batch["observations_next"]
         ], axis=1)
         return _get_rewards_jit(
-            discriminator=self,
+            gail_discriminator=self,
             learner_state_pairs=learner_state_pairs,
             reward_transform=self.reward_transform,
         )
@@ -83,17 +86,17 @@ def _update_jit(
 
 @jax.jit
 def _get_rewards_jit(
-    discriminator: Discriminator,
+    gail_discriminator: Discriminator,
     learner_state_pairs: jnp.ndarray,
     reward_transform: BaseRewardTransform,
 ):
-    base_rewards = _get_base_rewards(discriminator, learner_state_pairs)
+    base_rewards = _get_base_rewards(gail_discriminator, learner_state_pairs)
     return reward_transform.transform(base_rewards)
 
 def _get_base_rewards(
-    discriminator: Discriminator,
+    gail_discriminator: Discriminator,
     learner_state_pairs: jnp.ndarray,
 ):
-    learner_logits = discriminator(learner_state_pairs)
-    base_rewards = -discriminator.state.loss_fn.generator_loss_fn(learner_logits)
+    learner_logits = gail_discriminator(learner_state_pairs)
+    base_rewards = learner_logits + jnp.clip(learner_logits, max=0.) * gail_discriminator.neg_reward_factor
     return base_rewards
