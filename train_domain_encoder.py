@@ -33,8 +33,8 @@ def get_config_archive(config: Dict, config_path: str):
     default_agent_storage_dir = config_path[:-len(".yaml")]
     default_random_buffer_storate_dir = "._tmp_archive_dir/random_buffers"
 
-    config_archive["agent_load_dir"] = config_archive.get("agent_load_dir", default_agent_storage_dir)
-    config_archive["agent_save_dir"] = config_archive.get("agent_save_dir", default_agent_storage_dir)
+    config_archive["agent_load_dir"] = config_archive.get("agent_load_dir", default_agent_storage_dir) + "/domain_encoder"
+    config_archive["agent_save_dir"] = config_archive.get("agent_save_dir", default_agent_storage_dir) + "/domain_encoder"
     config_archive["agent_buffer_load_dir"] = config_archive.get("agent_buffer_load_dir", default_agent_storage_dir)
     config_archive["agent_buffer_save_dir"] = config_archive.get("agent_buffer_save_dir", default_agent_storage_dir)
     config_archive["random_buffer_load_dir"] = config_archive.get("random_buffer_load_dir", default_random_buffer_storate_dir)
@@ -43,10 +43,8 @@ def get_config_archive(config: Dict, config_path: str):
     for k, v in config_archive.items():
         dir_path = Path(v)
         dir_path.mkdir(exist_ok=True, parents=True)
-        config_archive[k] = dir_path 
+        config_archive[k] = dir_path
 
-    config_archive["agent_load_dir"] = config_archive.get("agent_load_dir", default_agent_storage_dir) / "domain_encoder"
-    config_archive["agent_save_dir"] = config_archive.get("agent_save_dir", default_agent_storage_dir) / "domain_encoder"
     config_archive["agent_buffer_load_path"] = config_archive["agent_buffer_load_dir"] / "buffer.pickle"
     config_archive["agent_buffer_save_path"] = config_archive["agent_buffer_save_dir"] / "buffer.pickle"
     config_archive["random_buffer_load_path"] = config_archive["random_buffer_load_dir"] / f"{config.env_name}.pickle"
@@ -74,25 +72,10 @@ def main(args: argparse.Namespace):
 
     # environment init
     env = instantiate(config.environment)
-    eval_env = instantiate(config.evaluation.environment)
-
     env = RescaleAction(env, -1, 1)
-    eval_env = RescaleAction(eval_env, -1, 1)
 
     # agent init
-    observation_space = env.observation_space
-    action_space = env.action_space
-
-    observation_dim = observation_space.sample().shape[-1]
-    action_dim = action_space.sample().shape[-1]
-    agent = instantiate(
-        config.agent,
-        observation_dim=observation_dim,
-        action_dim=action_dim,
-        low=None,
-        high=None,
-        _recursive_=False,
-    )
+    agent = instantiate(config.agent, _recursive_=False)
 
     ## load agent params if exist
     if not args.from_scratch and config_archive["agent_load_dir"].exists():
@@ -194,7 +177,7 @@ def main(args: argparse.Namespace):
 
         # do RL optimization step
         batch = buffer.sample(state, buffer_sample_key).experience
-        agent, update_info, stats_info = agent.update(batch)
+        agent, _, _, _, _, update_info, stats_info = agent.update(batch)
 
         # logging
         if (i + 1) % config.log_every == 0:
