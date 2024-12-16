@@ -17,6 +17,7 @@ class DIDAAgent(GAILAgent):
     domain_encoder: BaseDomainEncoder
     anchor_buffer_state: BufferState = struct.field(pytree_node=False)
     das: float = struct.field(pytree_node=False)
+    n_iters_encoder_pretrain: int = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -36,6 +37,8 @@ class DIDAAgent(GAILAgent):
         agent_config: DictConfig,
         policy_discriminator_config: DictConfig,
         domain_encoder_config: DictConfig,
+        #
+        n_iters_encoder_pretrain: int = 0,
         #
         das_config: DictConfig = None,
         #
@@ -60,9 +63,10 @@ class DIDAAgent(GAILAgent):
             policy_discriminator_config=policy_discriminator_config,
             expert_buffer_state_processor_config=expert_buffer_state_processor_config,
             #
-            anchor_buffer_state=None,
             domain_encoder=None,
+            anchor_buffer_state=None,
             das=das,
+            n_iters_encoder_pretrain=n_iters_encoder_pretrain,
             **kwargs,
         )
 
@@ -101,10 +105,18 @@ class DIDAAgent(GAILAgent):
         return self.domain_encoder.encode_expert_state(observations)
 
     def update(self, batch: DataType):
-        new_dida_agent, info, stats_info = _update_jit(
-            dida_agent=self,
-            learner_batch=batch,
-        )
+        if self.domain_encoder.learner_encoder.state.step < self.n_iters_encoder_pretrain:
+            # pretrain domain encoder
+            new_dida_agent, _, _, _, info, stats_info = _update_domain_encoder_jit(
+                dida_agent=self,
+                learner_batch=batch,
+            )
+        else:
+            # main agent update
+            new_dida_agent, info, stats_info = _update_jit(
+                dida_agent=self,
+                learner_batch=batch,
+            )
         return new_dida_agent, info, stats_info
 
 def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType):
