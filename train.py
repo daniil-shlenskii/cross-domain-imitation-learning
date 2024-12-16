@@ -54,7 +54,6 @@ def get_config_archive(config: Dict, config_path: str):
 def main(args: argparse.Namespace):
     # config init
     config = OmegaConf.load(args.config)
-    logger.info(f"\nCONFIG:\n-------\n{OmegaConf.to_yaml(config)}")
 
     ## process config part for saving/loading model
     config_archive = get_config_archive(config=config, config_path=args.config)
@@ -172,10 +171,12 @@ def main(args: argparse.Namespace):
     logger.info(f"There are {get_buffer_state_size(state)} items in the Buffer.")
 
     # training
-    logger.info("Training..")
 
     ## wandb logging init
     wandb.init(project=args.wandb_project, dir=config_archive["agent_save_dir"])
+    logger.info(f"\nCONFIG:\n-------\n{OmegaConf.to_yaml(config)}")
+
+    logger.info("Training..")
 
     observation, _  = env.reset(seed=config.seed)
     for i in tqdm(range(config.n_iters_training)):
