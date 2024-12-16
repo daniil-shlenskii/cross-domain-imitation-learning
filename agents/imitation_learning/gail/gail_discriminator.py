@@ -1,8 +1,9 @@
 import jax
 import jax.numpy as jnp
-from gan.discriminator import Discriminator
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
+
+from gan.discriminator import Discriminator
 from utils.types import DataType
 
 from .reward_transforms import BaseRewardTransform
@@ -94,5 +95,5 @@ def _get_base_rewards(
     learner_state_pairs: jnp.ndarray,
 ):
     learner_logits = discriminator(learner_state_pairs)
-    base_rewards = learner_logits
+    base_rewards = -discriminator.state.loss_fn.generator_loss_fn(learner_logits)
     return base_rewards
