@@ -61,7 +61,7 @@ class GAILAgent(ImitationAgent):
         expert_buffer, expert_buffer_state = prepare_buffer(
             buffer_state_path=expert_buffer_state_path,
             batch_size=expert_batch_size,
-            buffer_state_processor=expert_buffer_state_processor_config,
+            buffer_state_processor_config=expert_buffer_state_processor_config,
         )
 
         # set attrs to save
