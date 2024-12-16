@@ -30,7 +30,7 @@ def get_config_archive(config: Dict, config_path: str):
     config_archive = config.get("archive", {})
 
     default_agent_storage_dir = config_path[:-len(".yaml")]
-    default_random_buffer_storate_dir = "_tmp_random_buffers_dir"
+    default_random_buffer_storate_dir = "._tmp_archive_dir/random_buffers"
 
     config_archive["agent_load_dir"] = config_archive.get("agent_load_dir", default_agent_storage_dir)
     config_archive["agent_save_dir"] = config_archive.get("agent_save_dir", default_agent_storage_dir)
