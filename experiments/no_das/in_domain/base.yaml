@@ -29,10 +29,9 @@ replay_buffer:
 agent:
   _target_: agents.DIDAAgent.create
   seed: *seed
-  encoding_dim: 17
+  encoding_dim: 15
   expert_batch_size: *batch_size
   expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
-  n_iters_encoder_pretrain: 100
   #
   agent_config:
     _target_: agents.SACAgent.create
@@ -82,7 +81,7 @@ agent:
   domain_encoder_config:
     _target_: agents.dida.InDomainEncoder.create
     update_encoder_every: 100
-    state_loss_scale: 0.5
+    state_loss_scale: 0.2
     learner_encoder_config:
       _target_: gan.generator.Generator.create
       module_config:
@@ -105,7 +104,7 @@ agent:
           - _target_: optax.clip
             max_delta: 1.0
           - _target_: optax.adamw
-            learning_rate: 3e-6 
+            learning_rate: 3e-6
       loss_config:
         _target_: gan.losses.SoftplusLoss
         is_generator: False
