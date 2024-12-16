@@ -3,6 +3,43 @@ from typing import Dict
 import gymnasium as gym
 import numpy as np
 
+from utils.types import BufferState
+
+
+def sample_random_trajectory(
+    seed: int,
+    env: gym.Env,
+    n_samples: int,
+):
+    traj_keys = [
+        "observations",
+        "actions",
+        "rewards",
+        "dones",
+        "observations_next",
+    ]
+    trajs = {traj_key: [] for traj_key in traj_keys}
+
+    while True:
+        observation, _, done, truncated = *env.reset(seed=seed), False, False
+        while not (done or truncated):
+            action = env.action_space.sample()
+            next_observation, reward, done, truncated, _ = env.step(action)
+
+            trajs["observations"].append(observation)
+            trajs["actions"].append(action)
+            trajs["rewards"].append(reward)
+            trajs["dones"].append(done or truncated)
+            trajs["observations_next"].append(next_observation)
+
+            observation = next_observation
+
+            if len(trajs["observations"]) == n_samples:
+                for k, v in trajs.items():
+                    trajs[k] = np.stack(v)
+                return trajs
+
+        seed += 1
 
 def evaluate(
     agent: "Agent",
