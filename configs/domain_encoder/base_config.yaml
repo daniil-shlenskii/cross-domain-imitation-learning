@@ -62,7 +62,7 @@ agent:
           learning_rate: 5e-4
     loss_config:
       _target_: gan.losses.SoftplusLossGP
-      gradient_penalaty_coef: 10.
+      gradient_penalty_coef: 10.
       is_generator: False
   policy_discriminator_config:
     _target_: gan.discriminator.Discriminator.create
@@ -77,5 +77,5 @@ agent:
           learning_rate: 1e-4
     loss_config:
       _target_: gan.losses.SoftplusLossGP
-      gradient_penalaty_coef: 10.
+      gradient_penalty_coef: 10.
       is_generator: False
