@@ -1,8 +1,11 @@
+from copy import deepcopy
+
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.manifold import TSNE
 
+from utils import get_buffer_state_size
 from utils.types import DataType
 
 
@@ -11,6 +14,27 @@ def get_state_pairs(batch: DataType):
         batch["observations"],
         batch["observations_next"],
     ], axis=1)
+
+def get_random_from_expert_buffer_state(*, seed: int, expert_buffer_state: BufferState):
+    buffer_state_size = get_buffer_state_size(expert_buffer_state)
+    random_buffer_state = deepcopy(expert_buffer_state)
+
+    np.random.seed(seed)
+    obs_perm_idcs = np.random.choice(buffer_state_size)
+    obs_next_perm_idcs = np.random.choice(buffer_state_size)
+
+    random_buffer_state.experience["observations"] = \
+        random_buffer_state.experience["observations"].at[0].set(
+            random_buffer_state.experience["observations"][0, obs_perm_idcs]
+        )
+
+    random_buffer_state.experience["observations_next"] = \
+        random_buffer_state.experience["observations_next"].at[0].set(
+            random_buffer_state.experience["observations_next"][0, obs_next_perm_idcs]
+        )
+
+    return random_buffer_state
+
 
 
 def get_state_and_policy_tsne_scatterplots(
