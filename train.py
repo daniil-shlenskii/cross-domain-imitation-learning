@@ -55,13 +55,17 @@ def get_config_archive(config: Dict, config_path: str):
 def main(args: argparse.Namespace):
     # config init
     config = OmegaConf.load(args.config)
-    logger.info(f"\nCONFIG:\n-------\n{OmegaConf.to_yaml(config)}")
 
     ## process config part for saving/loading model
     config_archive = get_config_archive(config=config, config_path=args.config)
 
     ## save config into agent dir
     OmegaConf.save(config, config_archive["agent_save_dir"] / "config.yaml")
+
+    # wandb logging init
+    wandb.init(project=args.wandb_project, dir=config_archive["agent_save_dir"])
+
+    logger.info(f"\nCONFIG:\n-------\n{OmegaConf.to_yaml(config)}")
 
     # reprodicibility
     rng = jax.random.PRNGKey(config.seed)
@@ -174,9 +178,6 @@ def main(args: argparse.Namespace):
 
     # training
     logger.info("Training..")
-
-    ## wandb logging init
-    wandb.init(project=args.wandb_project, dir=config_archive["agent_save_dir"])
 
     observation, _  = env.reset(seed=config.seed)
     for i in tqdm(range(config.n_iters_training)):
