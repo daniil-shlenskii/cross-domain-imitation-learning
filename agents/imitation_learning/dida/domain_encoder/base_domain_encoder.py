@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import Any, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -9,11 +9,11 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
 from agents.imitation_learning.utils import (
-    get_random_from_expert_buffer_state, get_state_pairs)
+    get_random_from_expert_buffer_state, get_state_pairs, prepare_buffer)
 from gan.discriminator import Discriminator
 from gan.generator import Generator
 from utils import SaveLoadFrozenDataclassMixin
-from utils.types import Buffer, BufferState, DataType, PRNGKey
+from utils.types import BufferState, DataType, PRNGKey
 from utils.utils import sample_batch
 
 
@@ -22,8 +22,8 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     target_encoder: Generator
     state_discriminator: Discriminator
     policy_discriminator: Discriminator
-    target_buffer: Buffer = struct.field(pytree_node=False)
-    source_buffer: Buffer = struct.field(pytree_node=False)
+    target_buffer: Any = struct.field(pytree_node=False)
+    source_buffer: Any = struct.field(pytree_node=False)
     target_random_buffer_state: BufferState = struct.field(pytree_node=False)
     source_random_buffer_state: BufferState = struct.field(pytree_node=False)
     source_expert_buffer_state: BufferState = struct.field(pytree_node=False)
@@ -37,14 +37,14 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         *,
         seed: int,
         #
-        target_buffer_config: DictConfig,
-        target_random_buffer_state_config: DictConfig,
+        target_batch_size: int,
+        target_random_buffer_state_path,
         #
-        source_buffer: Buffer,
-        source_expert_buffer_state: BufferState,
+        source_batch_size: int,
+        source_expert_buffer_state_path,
         #
         target_dim: int,
-        encoding_dim: int ,
+        encoding_dim: int,
         #
         target_encoder_config: DictConfig,
         state_discriminator_config: DictConfig,
@@ -56,8 +56,16 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         **kwargs,
     ):
         # target random buffer state init
-        target_buffer = instantiate(target_buffer_config)
-        target_random_buffer_state = instantiate(target_random_buffer_state_config)
+        target_buffer, target_random_buffer_state = prepare_buffer(
+            buffer_state_path=target_random_buffer_state_path,
+            batch_size=target_batch_size,
+        )
+
+        # source expert buffer state init
+        source_buffer, source_expert_buffer_state = prepare_buffer(
+            buffer_state_path=source_expert_buffer_state_path,
+            batch_size=source_batch_size,
+        )
 
         # source random buffer state init
         source_random_buffer_state = get_random_from_expert_buffer_state(
