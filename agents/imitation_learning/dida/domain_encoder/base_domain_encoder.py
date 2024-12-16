@@ -8,17 +8,25 @@ from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
-from agents.imitation_learning.utils import get_state_pairs
+from agents.imitation_learning.utils import (
+    get_random_from_expert_buffer_state, get_state_pairs)
 from gan.discriminator import Discriminator
 from gan.generator import Generator
 from utils import SaveLoadFrozenDataclassMixin
-from utils.types import DataType
+from utils.types import Buffer, BufferState, DataType, PRNGKey
+from utils.utils import sample_batch
 
 
 class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
+    rng: PRNGKey
     learner_encoder: Generator
     state_discriminator: Discriminator
     policy_discriminator: Discriminator
+    target_buffer: Buffer = struct.field(pytree_node=False)
+    source_buffer: Buffer = struct.field(pytree_node=False)
+    target_random_buffer_state: BufferState = struct.field(pytree_node=False)
+    source_random_buffer_state: BufferState = struct.field(pytree_node=False)
+    source_expert_buffer_state: BufferState = struct.field(pytree_node=False)
     state_loss_scale: float = struct.field(pytree_node=False)
     update_encoder_every: int = struct.field(pytree_node=False)
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
@@ -28,6 +36,13 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         cls,
         *,
         seed: int,
+        #
+        target_buffer_config: DictConfig,
+        target_random_buffer_state_config: DictConfig,
+        #
+        source_buffer: Buffer,
+        source_expert_buffer_state: BufferState,
+        #
         learner_dim: int,
         encoding_dim: int ,
         #
@@ -40,6 +55,15 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         #
         **kwargs,
     ):
+        # target random buffer state init
+        target_buffer = instantiate(target_buffer_config)
+        target_random_buffer_state = instantiate(target_random_buffer_state_config)
+
+        # source random buffer state init
+        source_random_buffer_state = get_random_from_expert_buffer_state(
+            seed=seed, expert_buffer_state=source_expert_buffer_state
+        )
+
         # state discriminator init
         state_discriminator = instantiate(
             state_discriminator_config,
@@ -74,6 +98,12 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
 
         kwargs.pop("expert_dim", None)
         return cls(
+            rng=jax.random.key(seed),
+            target_buffer=target_buffer,
+            source_buffer=source_buffer,
+            target_random_buffer_state=target_random_buffer_state,
+            source_random_buffer_state=source_random_buffer_state,
+            source_expert_buffer_state=source_expert_buffer_state,
             learner_encoder=learner_encoder,
             state_discriminator=state_discriminator,
             policy_discriminator=policy_discriminator,
@@ -88,15 +118,14 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         )
 
     @jax.jit
-    def encode_learner_state(self, state: jnp.ndarray):
+    def encode_target_state(self, state: jnp.ndarray):
         return self.learner_encoder(state)
 
-    def update(
-        self,
-        learner_batch: DataType,
-        expert_batch: DataType,
-        anchor_batch: DataType,
-    ):
+    @abstractmethod
+    def encode_source_state(self, state: jnp.ndarray):
+        pass
+
+    def update(self, target_expert_batch: DataType):
         (
             new_domain_encoder,
             learner_batch,
@@ -108,9 +137,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             stats_info,
         ) = _update_jit(
             domain_encoder=self,
-            learner_batch=learner_batch,
-            expert_batch=expert_batch,
-            anchor_batch=anchor_batch,
+            target_expert_batch=target_expert_batch
         )
         intermediates = {
             "anchor_batch": anchor_batch,
@@ -126,28 +153,52 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             stats_info,
         )
 
+    def sample_batches(self):
+        new_rng, target_random_batch = sample_batch(self.rng, self.target_buffer, self.target_random_buffer_state)
+        new_rng, source_random_batch = sample_batch(new_rng, self.source_buffer, self.source_random_buffer_state)
+        new_rng, source_expert_batch = sample_batch(new_rng, self.source_buffer, self.source_expert_buffer_state)
+
+        return (
+            new_rng,
+            target_random_batch,
+            source_random_batch,
+            source_expert_batch,
+        )
+
     @abstractmethod
     def _update_encoder(
         self,
-        learner_batch: DataType,
-        expert_batch: DataType,
+        *,
+        target_random_batch: DataType,
+        target_expert_batch: DataType,
+        source_random_batch: DataType,
+        source_expert_batch: DataType,
    ):
         pass
 
 @jax.jit
 def _update_jit(
     domain_encoder: BaseDomainEncoder,
-    learner_batch: DataType,
-    expert_batch: DataType,
-    anchor_batch: DataType,
+    target_expert_batch: DataType,
 ):
+    (
+        new_rng,
+        target_random_batch,
+        source_random_batch,
+        source_expert_batch,
+    ) = domain_encoder.sample_batches()
+
     # update encoder
     new_domain_encoder, info, stats_info = domain_encoder._update_encoder(
-        learner_batch=learner_batch,
-        expert_batch=expert_batch,
+        target_random_batch=target_random_batch,
+        target_expert_batch=target_expert_batch,
+        source_random_batch=source_random_batch,
+        source_expert_batch=source_expert_batch,
     )
-    learner_batch = info.pop("learner_encoder_encoded_batch")
-    expert_batch = info.pop("expert_encoder_encoded_batch")
+    target_random_batch = info.pop("target_random_batch")
+    target_expert_batch = info.pop("target_expert_batch")
+    source_random_batch = info.pop("source_random_batch")
+    source_expert_batch = info.pop("source_expert_batch")
 
     new_domain_encoder = jax.lax.cond(
         (domain_encoder.state_discriminator.state.step + 1) % domain_encoder.update_encoder_every == 0,
@@ -155,32 +206,27 @@ def _update_jit(
         lambda: domain_encoder,
     )
 
-    # encode anchor batch
-    anchor_batch["observations"] = new_domain_encoder.encode_expert_state(anchor_batch["observations"])
-    anchor_batch["observations_next"] = new_domain_encoder.encode_expert_state(anchor_batch["observations_next"])
-
     # construct pairs
-    learner_pairs = get_state_pairs(learner_batch)
-    expert_pairs = get_state_pairs(expert_batch)
-    anchor_pairs = get_state_pairs(anchor_batch)
+    target_random_pairs = get_state_pairs(target_random_batch)
+    target_expert_pairs = get_state_pairs(target_expert_batch)
+    source_random_pairs = get_state_pairs(source_random_batch)
+    source_expert_pairs = get_state_pairs(source_expert_batch)
 
     # update state discriminator
     new_state_disc, state_disc_info, state_disc_stats_info = new_domain_encoder.state_discriminator.update(
-        fake_batch=jnp.concatenate((learner_pairs, learner_pairs)), # TODO: jax-based crutch for gradient penalty usage
-        real_batch=jnp.concatenate([expert_pairs, anchor_pairs]),
-        return_logits=True,
+        fake_batch=jnp.concatenate([target_random_pairs, target_expert_pairs]),
+        real_batch=jnp.concatenate([source_random_pairs, source_expert_pairs]),
     )
-    learner_domain_logits = state_disc_info.pop("fake_logits")
-    expert_domain_logits = state_disc_info.pop("real_logits")
 
     # update policy discriminator
     new_policy_disc, policy_disc_info, policy_disc_stats_info = new_domain_encoder.policy_discriminator.update(
-        fake_batch=jnp.concatenate([learner_pairs, anchor_pairs]),
-        real_batch=jnp.concatenate([expert_pairs, expert_pairs]) # TODO: jax-based crutch for gradient penalty usage
+        fake_batch=jnp.concatenate([target_random_pairs, source_random_pairs]),
+        real_batch=jnp.concatenate([source_expert_pairs, source_expert_pairs]), # TODO: jax-based crutch for Gradient Penalty usage
     )
 
     # update domain encoder
     new_domain_encoder = new_domain_encoder.replace(
+        rng=new_rng,
         state_discriminator=new_state_disc,
         policy_discriminator=new_policy_disc,
     )
@@ -189,11 +235,10 @@ def _update_jit(
 
     return (
         new_domain_encoder,
-        learner_batch,
-        expert_batch,
-        anchor_batch,
-        learner_domain_logits,
-        expert_domain_logits,
+        target_random_batch,
+        target_expert_batch,
+        source_random_batch,
+        source_expert_batch,
         info,
         stats_info,
     )
