@@ -1,10 +1,30 @@
 from typing import Dict
 
+import flashbax as fbx
 import gymnasium as gym
 import numpy as np
 
-from utils.types import BufferState
 
+def get_buffer_state_from_trajectories(trajs):
+    # buffer state init
+    buffer = fbx.make_item_buffer(
+        max_length=len(trajs["observations"]),
+        min_length=1,
+        sample_batch_size=1,
+        add_batches=False,
+    )
+    init_sample = {k: v[0] for k, v in trajs.items()}
+    buffer_state = buffer.init(init_sample)
+
+    # buffer state exp init
+    buffer_state_exp = {k: v[None] for k, v in trajs.items()}
+
+    buffer_state = buffer_state.replace(
+        experience=buffer_state_exp,
+        is_full=True,
+        current_index=0,
+    )
+    return buffer_state
 
 def sample_random_trajectory(
     seed: int,
