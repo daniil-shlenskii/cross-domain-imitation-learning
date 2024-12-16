@@ -5,16 +5,15 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
+from agents.base_agent import Agent
 from flax import struct
 from hydra.utils import instantiate
-from omegaconf.dictconfig import DictConfig
-
-from agents.base_agent import Agent
-from agents.sac.losses import (actor_loss_fn, critic_loss_fn,
-                               temperature_loss_fn)
 from nn.train_state import TrainState
+from omegaconf.dictconfig import DictConfig
 from utils import instantiate_optimizer
 from utils.types import DataType, Params
+
+from .losses import actor_loss_fn, critic_loss_fn, temperature_loss_fn
 
 
 class SACAgent(Agent): 

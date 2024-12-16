@@ -42,7 +42,7 @@ agent:
     transforms:
       - _target_: optax.clip
         max_delta: 1.0
-      - _target_: optax.sgd
+      - _target_: optax.adam
         learning_rate: 3e-4
   critic_optimizer_config: *optimizer_config
   temperature_optimizer_config:

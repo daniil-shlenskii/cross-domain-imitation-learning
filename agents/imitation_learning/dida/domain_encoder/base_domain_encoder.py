@@ -8,7 +8,7 @@ from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
-from agents.gail.utils import get_state_pairs
+from agents.imitation_learning.utils import get_state_pairs
 from gan.discriminator import Discriminator
 from gan.generator import Generator
 from utils import SaveLoadFrozenDataclassMixin
@@ -19,7 +19,8 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     learner_encoder: Generator
     state_discriminator: Discriminator
     policy_discriminator: Discriminator
-    state_loss_scale: float
+    state_loss_scale: float = struct.field(pytree_node=False)
+    update_encoder_every: int = struct.field(pytree_node=False)
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     @classmethod
@@ -35,6 +36,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         policy_discriminator_config: DictConfig,
         #
         state_loss_scale: float,
+        update_encoder_every: int = 1,
         #
         **kwargs,
     ):
@@ -76,6 +78,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             state_discriminator=state_discriminator,
             policy_discriminator=policy_discriminator,
             state_loss_scale=state_loss_scale,
+            update_encoder_every=update_encoder_every,
             _save_attrs=(
                 "learner_encoder",
                 "state_discriminator",
@@ -109,13 +112,16 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             expert_batch=expert_batch,
             anchor_batch=anchor_batch,
         )
+        intermediates = {
+            "anchor_batch": anchor_batch,
+            "learner_domain_logits": learner_domain_logits,
+            "expert_domain_logits": expert_domain_logits,
+        }
         return (
             new_domain_encoder,
             learner_batch,
             expert_batch,
-            anchor_batch,
-            learner_domain_logits,
-            expert_domain_logits,
+            intermediates,
             info,
             stats_info,
         )
@@ -125,7 +131,6 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         self,
         learner_batch: DataType,
         expert_batch: DataType,
-        anchor_batch: DataType,
    ):
         pass
 
@@ -136,13 +141,19 @@ def _update_jit(
     expert_batch: DataType,
     anchor_batch: DataType,
 ):
-    # update encoder 
+    # update encoder
     new_domain_encoder, info, stats_info = domain_encoder._update_encoder(
         learner_batch=learner_batch,
         expert_batch=expert_batch,
     )
     learner_batch = info.pop("learner_encoder_encoded_batch")
     expert_batch = info.pop("expert_encoder_encoded_batch")
+
+    new_domain_encoder = jax.lax.cond(
+        (domain_encoder.state_discriminator.state.step + 1) % domain_encoder.update_encoder_every == 0,
+        lambda: new_domain_encoder,
+        lambda: domain_encoder,
+    )
 
     # encode anchor batch
     anchor_batch["observations"] = new_domain_encoder.encode_expert_state(anchor_batch["observations"])

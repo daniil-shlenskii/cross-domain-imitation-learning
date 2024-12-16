@@ -4,7 +4,7 @@ from typing import Callable
 
 import jax.numpy as jnp
 
-from agents.gail.utils import get_state_pairs
+from agents.imitation_learning.utils import get_state_pairs
 from gan.discriminator import Discriminator
 from gan.losses import GANLoss
 from nn.train_state import TrainState
