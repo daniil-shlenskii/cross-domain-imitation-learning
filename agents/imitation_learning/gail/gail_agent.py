@@ -7,6 +7,7 @@ from omegaconf.dictconfig import DictConfig
 import wandb
 from agents.base_agent import Agent
 from agents.imitation_learning.base_imitation_agent import ImitationAgent
+from agents.imitation_learning.utils import prepare_buffer
 from utils import convert_figure_to_array, sample_batch
 from utils.types import DataType
 
@@ -57,14 +58,10 @@ class GAILAgent(ImitationAgent):
         )
 
         # expert buffer init
-        expert_buffer_state_processor = None
-        if expert_buffer_state_processor_config is not None:
-            expert_buffer_state_processor = instantiate(expert_buffer_state_processor_config)
-
-        expert_buffer, expert_buffer_state = cls._prepare_expert_buffer(
-            expert_buffer_state_path=expert_buffer_state_path,
-            expert_batch_size=expert_batch_size,
-            expert_buffer_state_processor=expert_buffer_state_processor,
+        expert_buffer, expert_buffer_state = prepare_buffer(
+            buffer_state_path=expert_buffer_state_path,
+            batch_size=expert_batch_size,
+            buffer_state_processor=expert_buffer_state_processor_config,
         )
 
         # set attrs to save

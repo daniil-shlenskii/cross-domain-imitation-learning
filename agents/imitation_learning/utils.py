@@ -3,10 +3,13 @@ from copy import deepcopy
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
+from hydra.utils import instantiate
+from omegaconf import DictConfig
 from sklearn.manifold import TSNE
 
-from utils import get_buffer_state_size
-from utils.types import DataType
+from utils import (get_buffer_state_size, instantiate_jitted_fbx_buffer,
+                   load_pickle)
+from utils.types import BufferState, DataType
 
 
 def get_state_pairs(batch: DataType):
@@ -35,7 +38,45 @@ def get_random_from_expert_buffer_state(*, seed: int, expert_buffer_state: Buffe
 
     return random_buffer_state
 
+def prepare_buffer(
+    buffer_state_path: str,
+    batch_size: int,
+    buffer_state_processor_config: DictConfig = None,
+):
+    # load buffer state
+    _buffer_state = load_pickle(buffer_state_path)
 
+    # buffer init
+    buffer_state_size = get_buffer_state_size(_buffer_state)
+    buffer = instantiate_jitted_fbx_buffer({
+        "_target_": "flashbax.make_item_buffer",
+        "sample_batch_size": batch_size,
+        "min_length": 1,
+        "max_length": buffer_state_size,
+        "add_batches": False,
+    })
+
+    # remove dummy experience samples (flashbax specific stuff)
+    buffer_state_exp = _buffer_state.experience
+    buffer_state_init_sample = {k: v[0, 0] for k, v in buffer_state_exp.items()}
+    buffer_state = buffer.init(buffer_state_init_sample)
+
+    new_buffer_state_exp = {}
+    for k, v in buffer_state_exp.items():
+        new_buffer_state_exp[k] = jnp.asarray(v[0, :buffer_state_size][None])
+
+    buffer_state = buffer_state.replace(
+        experience=new_buffer_state_exp,
+        current_index=0,
+        is_full=True,
+    )
+
+    # process buffer state
+    if buffer_state_processor_config is not None:
+        buffer_state_processor = instantiate(buffer_state_processor_config)
+        buffer_state = buffer_state_processor(buffer_state)
+
+    return buffer, buffer_state
 
 def get_state_and_policy_tsne_scatterplots(
     imitation_agent: "ImitationAgent",
