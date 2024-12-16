@@ -96,7 +96,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             _recursive_=False,
         )
 
-        kwargs.pop("expert_dim", None)
+        kwargs.pop("source_dim", None)
         return cls(
             rng=jax.random.key(seed),
             target_buffer=target_buffer,
