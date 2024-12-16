@@ -59,11 +59,3 @@ evaluation:
     env:
         _target_: gymnasium.make
         id: *env_name
-
-archive:
-  agent_load_dir: &agent_dir archive/agents/sac
-  agent_save_dir: *agent_dir
-  agent_buffer_load_dir: *agent_dir
-  agent_buffer_save_dir: *agent_dir
-  random_buffer_load_dir: &random_buffer_dir archive/random_buffers
-  random_buffer_save_dir: *random_buffer_dir
