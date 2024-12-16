@@ -1,7 +1,7 @@
 seed: &seed 0
 env_name: &env_name HalfCheetah-v5
 
-n_iters_training: 200_000
+n_iters_training: 5_000_000
 batch_size: &batch_size 2048
 
 precollect_buffer_size: &precollect_buffer_size 5_000
