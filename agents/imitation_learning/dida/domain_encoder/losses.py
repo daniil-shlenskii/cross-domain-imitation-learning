@@ -19,24 +19,25 @@ class DomainEncoderLossMixin:
     def _set_state_loss_fns(self, state_loss: GANLoss):
         """For discriminator deceiving."""
         loss_fn = state_loss.generator_loss_fn
-        learner_loss_fn = lambda logits: loss_fn(logits)
-        expert_loss_fn = lambda logits: loss_fn(-logits)
-        self.learner_state_loss_fn = learner_loss_fn
-        self.expert_state_loss_fn = expert_loss_fn
+        target_loss_fn = lambda logits: loss_fn(logits)
+        source_loss_fn = lambda logits: loss_fn(-logits)
+        self.target_state_loss_fn = target_loss_fn
+        self.source_state_loss_fn = source_loss_fn
 
     def _set_policy_loss_fns(self, policy_loss: GANLoss):
         """Helps discriminator to discriminate better."""
         loss_fn = policy_loss.generator_loss_fn
-        learner_loss_fn = lambda logits: loss_fn(-logits)
-        expert_loss_fn = lambda logits: loss_fn(logits)
-        self.learner_policy_loss_fn = learner_loss_fn
-        self.expert_policy_loss_fn = expert_loss_fn
+        target_loss_fn = lambda logits: loss_fn(-logits)
+        source_loss_fn = lambda logits: loss_fn(logits)
+        self.target_policy_loss_fn = target_loss_fn
+        self.source_policy_loss_fn = source_loss_fn
 
     def _loss(
         self,
         params: Params,
         state: TrainState,
-        batch: DataType,
+        random_batch: DataType,
+        expert_batch: DataType,
         policy_discriminator: Discriminator,
         state_discriminator: Discriminator,
         state_loss_scale: float,
@@ -44,10 +45,14 @@ class DomainEncoderLossMixin:
         policy_loss_fn: Callable,
         state_loss_fn: Callable,
     ):
-        batch = deepcopy(batch)
-        batch["observations"] = state.apply_fn({"params": params}, batch["observations"], train=True)
-        batch["observations_next"] = state.apply_fn({"params": params}, batch["observations_next"], train=True)
-        state_pairs = get_state_pairs(batch)
+        random_batch = deepcopy(random_batch)
+        expert_batch = deepcopy(expert_batch)
+        for k in ["observations", "observations_next"]:
+            random_batch[k] = state.apply_fn({"params": params}, random_batch[k], train=True)
+            expert_batch[k] = state.apply_fn({"params": params}, expert_batch[k], train=True)
+        random_state_pairs = get_state_pairs(random_batch)
+        expert_state_pairs = get_state_pairs(expert_batch)
+        state_pairs = jnp.concatenate([random_state_pairs, expert_state_pairs])
 
         state_logits = state_discriminator(state_pairs)
         state_loss = state_loss_fn(state_logits).mean()
@@ -56,28 +61,22 @@ class DomainEncoderLossMixin:
         policy_loss = policy_loss_fn(policy_logits).mean()
 
         loss = policy_loss + state_loss_scale * state_loss
-        info = {
-            f"{state.info_key}_loss": loss,
-            f"{state.info_key}_policy_loss": policy_loss,
-            f"{state.info_key}_state_loss": state_loss,
-            f"{state.info_key}_encoded_batch": batch,
-        }
-        return loss, info
+        return loss, policy_loss, state_loss, random_batch, expert_batch
 
-    def learner_loss(self, *args, **kwargs):
+    def target_loss(self, *args, **kwargs):
         return self._loss(
             *args,
             **kwargs,
-            policy_loss_fn=self.learner_policy_loss_fn,
-            state_loss_fn=self.learner_state_loss_fn,
+            policy_loss_fn=self.target_policy_loss_fn,
+            state_loss_fn=self.target_state_loss_fn,
         )
 
-    def expert_loss(self, *args, **kwargs):
+    def source_loss(self, *args, **kwargs):
         return self._loss(
             *args,
             **kwargs,
-            policy_loss_fn=self.expert_policy_loss_fn,
-            state_loss_fn=self.expert_state_loss_fn,
+            policy_loss_fn=self.source_policy_loss_fn,
+            state_loss_fn=self.source_state_loss_fn,
         )
 
 class InDomainEncoderLoss(DomainEncoderLossMixin):
@@ -85,69 +84,96 @@ class InDomainEncoderLoss(DomainEncoderLossMixin):
         self,
         params: Params,
         state: TrainState,
-        batch: DataType,
-        expert_batch: DataType,
+        target_random_batch: DataType,
+        target_expert_batch: DataType,
+        source_random_batch: DataType,
+        source_expert_batch: DataType,
         policy_discriminator: Discriminator,
         state_discriminator: Discriminator,
         state_loss_scale: float,
     ):
-        learner_loss, learner_info = self.learner_loss(
+        (
+            target_loss,
+            target_policy_loss,
+            target_state_loss,
+            target_random_batch,
+            target_expert_batch,
+        ) = self.target_loss(
             params=params,
             state=state,
-            batch=batch,
+            random_batch=target_random_batch,
+            expert_batch=target_expert_batch,
             policy_discriminator=policy_discriminator,
             state_discriminator=state_discriminator,
             state_loss_scale=state_loss_scale,
         )
-        expert_loss, expert_info = self.expert_loss(
+        (
+            source_loss,
+            source_policy_loss,
+            source_state_loss,
+            source_random_batch,
+            source_expert_batch,
+        ) = self.source_loss(
             params=params,
             state=state,
-            batch=expert_batch,
+            random_batch=source_random_batch,
+            expert_batch=source_expert_batch,
             policy_discriminator=policy_discriminator,
             state_discriminator=state_discriminator,
             state_loss_scale=state_loss_scale,
         )
-        loss = (learner_loss + expert_loss) * 0.5
+        loss = (target_loss + source_loss) * 0.5
         info = {
-            **learner_info,
-            **{re.sub("learner", "expert", k): v for k, v in expert_info.items()},
+            state.info_key: loss,
+            f"{state.info_key}/target_policy_loss": target_policy_loss,
+            f"{state.info_key}/target_state_loss": target_state_loss,
+            f"{state.info_key}/source_policy_loss": source_policy_loss,
+            f"{state.info_key}/source_state_loss": source_state_loss,
+            "target_random_batch": target_random_batch,
+            "target_expert_batch": target_expert_batch,
+            "source_random_batch": source_random_batch,
+            "source_expert_batch": source_expert_batch,           
         }
         return loss, info
 
-class CrossDomainLearnerEncoderLoss(DomainEncoderLossMixin):
+class CrossDomainTargetEncoderLoss(DomainEncoderLossMixin):
     def __call__(
         self,
         params: Params,
         state: TrainState,
-        batch: DataType,
+        target_random_batch: DataType,
+        target_expert_batch: DataType,
         policy_discriminator: Discriminator,
         state_discriminator: Discriminator,
         state_loss_scale: float,
     ):
-        loss, info = self.learner_loss(
+        loss, info = self.target_loss(
             params=params,
             state=state,
-            batch=batch,
+            random_batch=target_random_batch,
+            expert_batch=target_expert_batch,
             policy_discriminator=policy_discriminator,
             state_discriminator=state_discriminator,
             state_loss_scale=state_loss_scale,
         )
         return loss, info
 
-class CrossDomainExpertEncoderLoss(DomainEncoderLossMixin):
+class CrossDomainSourceEncoderLoss(DomainEncoderLossMixin):
     def __call__(
         self,
         params: Params,
         state: TrainState,
-        batch: DataType,
+        source_random_batch: DataType,
+        source_expert_batch: DataType,
         policy_discriminator: Discriminator,
         state_discriminator: Discriminator,
         state_loss_scale: float,
     ):
-        loss, info = self.expert_loss(
+        loss, info = self.target_loss(
             params=params,
             state=state,
-            batch=batch,
+            random_batch=source_random_batch,
+            expert_batch=source_expert_batch,
             policy_discriminator=policy_discriminator,
             state_discriminator=state_discriminator,
             state_loss_scale=state_loss_scale,
