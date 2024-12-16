@@ -17,7 +17,7 @@ class GAILDiscriminator(Discriminator):
     def create(
         cls,
         *,
-        neg_reward_factor: float = 1.,
+        neg_reward_factor: float = 0.,
         reward_transform_config: DictConfig = None,
         **discriminator_kwargs,
     ):
