@@ -197,7 +197,13 @@ class CrossDomainTargetEncoderLoss(DomainEncoderLossMixin):
         state_discriminator: Discriminator,
         state_loss_scale: float,
     ):
-        loss, info = self.target_loss(
+        (
+            target_loss,
+            target_policy_loss,
+            target_state_loss,
+            target_random_batch,
+            target_expert_batch,
+        ) = self.target_loss(
             params=params,
             state=state,
             random_batch=target_random_batch,
@@ -206,7 +212,14 @@ class CrossDomainTargetEncoderLoss(DomainEncoderLossMixin):
             state_discriminator=state_discriminator,
             state_loss_scale=state_loss_scale,
         )
-        return loss, info
+        info = {
+            state.info_key: target_loss,
+            f"{state.info_key}/target_policy_loss": target_policy_loss,
+            f"{state.info_key}/target_state_loss": target_state_loss,
+            "target_random_batch": target_random_batch,
+            "target_expert_batch": target_expert_batch,
+        }
+        return target_loss, info
 
 class CrossDomainSourceEncoderLoss(DomainEncoderLossMixin):
     def __call__(
@@ -219,7 +232,13 @@ class CrossDomainSourceEncoderLoss(DomainEncoderLossMixin):
         state_discriminator: Discriminator,
         state_loss_scale: float,
     ):
-        loss, info = self.target_loss(
+        (
+            source_loss,
+            source_policy_loss,
+            source_state_loss,
+            source_random_batch,
+            source_expert_batch,
+        ) = self.source_loss(
             params=params,
             state=state,
             random_batch=source_random_batch,
@@ -228,4 +247,11 @@ class CrossDomainSourceEncoderLoss(DomainEncoderLossMixin):
             state_discriminator=state_discriminator,
             state_loss_scale=state_loss_scale,
         )
-        return loss, info
+        info = {
+            state.info_key: source_loss,
+            f"{state.info_key}/source_policy_loss": source_policy_loss,
+            f"{state.info_key}/source_state_loss": source_state_loss,
+            "source_random_batch": source_random_batch,
+            "source_expert_batch": source_expert_batch,
+        }
+        return source_loss, info
