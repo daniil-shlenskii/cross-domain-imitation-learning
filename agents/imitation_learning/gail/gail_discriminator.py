@@ -10,14 +10,12 @@ from .reward_transforms import BaseRewardTransform
 
 
 class GAILDiscriminator(Discriminator):
-    neg_reward_factor: float
     reward_transform: BaseRewardTransform
 
     @classmethod
     def create(
         cls,
         *,
-        neg_reward_factor: float = 0.,
         reward_transform_config: DictConfig = None,
         **discriminator_kwargs,
     ):
@@ -26,7 +24,6 @@ class GAILDiscriminator(Discriminator):
         else:
             reward_transform = BaseRewardTransform.create()
         return super().create(
-            neg_reward_factor=neg_reward_factor,
             reward_transform=reward_transform,
             info_key="policy_discriminator",
             _save_attrs=("state", "reward_transform"),
@@ -98,5 +95,5 @@ def _get_base_rewards(
     learner_state_pairs: jnp.ndarray,
 ):
     learner_logits = gail_discriminator(learner_state_pairs)
-    base_rewards = learner_logits + jnp.clip(learner_logits, max=0.) * gail_discriminator.neg_reward_factor
+    base_rewards = learner_logits
     return base_rewards
