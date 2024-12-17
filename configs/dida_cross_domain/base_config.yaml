@@ -14,8 +14,8 @@ environment:
   _target_: gymnasium.wrappers.TimeLimit
   max_episode_steps: 1000
   env:
-      _target_: gymnasium.make
-      id: *env_name
+    _target_: gymnasium.make
+    id: *env_name
 
 replay_buffer:
   _target_: utils.utils.instantiate_jitted_fbx_buffer
@@ -142,13 +142,5 @@ evaluation:
     _target_: gymnasium.wrappers.TimeLimit
     max_episode_steps: 1000
     env:
-        _target_: gymnasium.make
-        id: *env_name
-
-archive:
-  agent_load_dir: &agent_dir archive/agents/dida
-  agent_save_dir: *agent_dir
-  agent_buffer_load_dir: *agent_dir
-  agent_buffer_save_dir: *agent_dir
-  random_buffer_load_dir: &random_buffer_dir archive/random_buffers
-  random_buffer_save_dir: *random_buffer_dir
+      _target_: gymnasium.make
+      id: *env_name

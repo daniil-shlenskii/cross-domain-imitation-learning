@@ -14,8 +14,8 @@ environment:
   _target_: gymnasium.wrappers.TimeLimit
   max_episode_steps: 1000
   env:
-      _target_: gymnasium.make
-      id: *env_name
+    _target_: gymnasium.make
+    id: *env_name
 
 replay_buffer:
   _target_: utils.utils.instantiate_jitted_fbx_buffer
@@ -72,5 +72,5 @@ evaluation:
     _target_: gymnasium.wrappers.TimeLimit
     max_episode_steps: 1000
     env:
-        _target_: gymnasium.make
-        id: *env_name
+      _target_: gymnasium.make
+      id: *env_name
