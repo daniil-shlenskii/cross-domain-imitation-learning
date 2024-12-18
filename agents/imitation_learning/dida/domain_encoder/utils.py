@@ -74,7 +74,7 @@ def get_discriminator_score(discriminator: Discriminator, x: jnp.ndarray, is_rea
     score = mask.sum() / len(mask)
     return score
 
-def get_discriminators_gradients_scalar_products(domain_encoder: "DomainEncoder", seed: int=0):
+def get_discriminators_gradients_cosine_similarity(domain_encoder: "DomainEncoder", seed: int=0):
     rng = jax.random.key(seed)
 
     # sample encoded batches
@@ -102,14 +102,15 @@ def get_discriminators_gradients_scalar_products(domain_encoder: "DomainEncoder"
         for k, state_pair in state_pairs.items()
     }
 
-    # scalar products
-    scalar_products = {
-        k: (state_gradients[k] * policy_gradients[k]).sum(-1).mean(0)
+    # cosine sim
+    cosine_similarities = {
+        k: (state_gradients[k] * policy_gradients[k]).sum(-1).mean(0) /
+            jnp.linalg.norm(state_gradients[k]) * jnp.linalg.norm(policy_gradients[k])
         for k in batches
     }
-    scalar_product = sum(scalar_products.values()) / len(scalar_products)
+    cosine_similarity = sum(cosine_similarities.values()) / len(cosine_similarities)
 
     return {
-        "scalar_product": scalar_product,
-        **{f"scalar_product_{k}": v for k, v in scalar_products.items()}
+        "cosine_similarity": cosine_similarity,
+        **{f"cosine_similarity_{k}": v for k, v in cosine_similarities.items()}
     }
