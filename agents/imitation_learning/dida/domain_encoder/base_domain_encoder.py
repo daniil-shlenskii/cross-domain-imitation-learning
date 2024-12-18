@@ -174,11 +174,11 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             stats_info,
         )
 
-    def evaluate(self):
-        return get_discriminators_scores(domain_encoder=self)
+    def evaluate(self, seed: int=0):
+        return get_discriminators_scores(domain_encoder=self, seed=seed)
 
-    def sample_batches(self):
-        new_rng, target_random_batch = sample_batch(self.rng, self.target_buffer, self.target_random_buffer_state)
+    def sample_batches(self, rng: PRNGKey):
+        new_rng, target_random_batch = sample_batch(rng, self.target_buffer, self.target_random_buffer_state)
         new_rng, source_random_batch = sample_batch(new_rng, self.source_buffer, self.source_random_buffer_state)
         new_rng, source_expert_batch = sample_batch(new_rng, self.source_buffer, self.source_expert_buffer_state)
         return new_rng, target_random_batch, source_random_batch, source_expert_batch,
@@ -195,11 +195,13 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         batch["observations_next"] = self.encode_source_state(batch["observations_next"])
         return batch
 
-    def sample_encoded_batches(self):
-        new_rng, target_random_batch, source_random_batch, source_expert_batch = self.sample_batches()
-        target_random_batch = self.encode_target_state(target_random_batch)
-        source_random_batch = self.encode_source_state(source_random_batch)
-        source_expert_batch = self.encode_source_state(source_expert_batch)
+    def sample_encoded_batches(self, rng: PRNGKey):
+        new_rng, target_random_batch, source_random_batch, source_expert_batch = self.sample_batches(rng)
+
+        for k in ["observations", "observations_next"]:
+            target_random_batch[k] = self.encode_target_state(target_random_batch[k])
+            source_random_batch[k] = self.encode_source_state(source_random_batch[k])
+            source_expert_batch[k] = self.encode_source_state(source_expert_batch[k])
         return new_rng, target_random_batch, source_random_batch, source_expert_batch,
 
     @abstractmethod
@@ -220,7 +222,7 @@ def _pretrain_update_jit(domain_encoder: BaseDomainEncoder):
         target_random_batch,
         source_random_batch,
         source_expert_batch,
-    ) = domain_encoder.sample_batches()
+    ) = domain_encoder.sample_batches(domain_encoder.rng)
     new_domain_encoder = domain_encoder.replace(rng=new_rng)
     return _update(
         domain_encoder=new_domain_encoder,
@@ -240,7 +242,7 @@ def _update_jit(
         target_random_batch,
         source_random_batch,
         source_expert_batch,
-    ) = domain_encoder.sample_batches()
+    ) = domain_encoder.sample_batches(domain_encoder.rng)
     new_domain_encoder = domain_encoder.replace(rng=new_rng)
     return _update(
         domain_encoder=new_domain_encoder,
@@ -295,7 +297,6 @@ def _update(
 
     # update domain encoder
     new_domain_encoder = new_domain_encoder.replace(
-        rng=new_rng,
         state_discriminator=new_state_disc,
         policy_discriminator=new_policy_disc,
     )

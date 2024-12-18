@@ -7,9 +7,11 @@ from gan.discriminator import Discriminator
 
 
 @jax.jit
-def get_discriminators_scores(domain_encoder: "BaseDomainEncoder"):
+def get_discriminators_scores(domain_encoder: "BaseDomainEncoder", seed: int=0):
+    rng = jax.random.key(seed)
+
     # sample encoded batches
-    target_random_batch, source_random_batch, source_expert_batch = domain_encoder.sample_encoded_batches()
+    rng, target_random_batch, source_random_batch, source_expert_batch = domain_encoder.sample_encoded_batches(rng)
     batches = {
         "target_random": target_random_batch,
         "source_random": source_random_batch,
@@ -71,3 +73,22 @@ def get_discriminator_score(discriminator: Discriminator, x: jnp.ndarray, is_rea
     )
     score = mask.sum() / len(mask)
     return score
+
+# def get_discriminators_gradients_scalar_products(domain_encoder: "DomainEncoder"):
+#     # sample encoded batches
+#     target_random_batch, source_random_batch, source_expert_batch = domain_encoder.sample_encoded_batches()
+#     batches = {
+#         "target_random": target_random_batch,
+#         "source_random": source_random_batch,
+#         "source_expert": source_expert_batch,
+#     }
+#
+#     # prepare state pairs
+#     state_pairs = {
+#         k: get_state_pairs(batch) for k, batch in batches.items()
+#     }
+#
+#     # policy gradients
+#     policy_gradients = {
+#         k: jax.grad(domain_encoder.policy_discriminator)
+#     }
