@@ -102,15 +102,36 @@ def get_discriminators_gradients_cosine_similarity(domain_encoder: "DomainEncode
         for k, state_pair in state_pairs.items()
     }
 
-    # cosine sim
+    # cosine similarity
     cosine_similarities = {
-        k: (state_gradients[k] * policy_gradients[k]).sum(-1).mean(0) /
-            jnp.linalg.norm(state_gradients[k]) * jnp.linalg.norm(policy_gradients[k])
+        k: jnp.absolute(get_cosine_similarity(
+            policy_gradients[k],
+            state_gradients[k]
+        ))
         for k in batches
     }
     cosine_similarity = sum(cosine_similarities.values()) / len(cosine_similarities)
 
-    return {
+    unnormalized_cs = {
         "cosine_similarity": cosine_similarity,
         **{f"cosine_similarity_{k}": v for k, v in cosine_similarities.items()}
     }
+
+    # normalized cosine similarity
+    rng, k1, k2 = jax.random.split(rng)
+    batch_size, dim = state_pairs["target_random"].shape
+    s1 = jax.random.normal(k1, shape(batch_size, dim))
+    s2 = jax.random.normal(k2, shape(batch_size, dim))
+    random_cosine_similarity = jnp.absolute(get_cosine_similarity(s1, s2))
+
+    normalized_cs = {
+        f"{k}_normalized": v / random_cosine_similarity
+        for k, v in unnormalized_cs.items()
+    }
+    return {**unnormalized_cs, **normalized_cs}
+
+def get_cosine_similarity(a, b):
+    return scalar_product(a, b) / scalar_product(a, a)**0.5 / scalar_product(b, b)**0.5
+
+def get_scalar_product(a, b):
+    return (a * b).sum(-1)
