@@ -64,7 +64,7 @@ def main(args: argparse.Namespace):
 
     for i in tqdm(range(config.n_iters_training)):
         # evaluate model
-        if i == 0 or (i + 1) % config.eval_every == 0:
+        if (i + 1) % config.eval_every == 0:
             eval_info = model.evaluate(config.seed)
             for k, v in eval_info.items():
                 wandb.log({f"evaluation/{k}": v}, step=i)
