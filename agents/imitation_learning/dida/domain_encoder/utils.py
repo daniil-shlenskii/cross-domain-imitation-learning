@@ -56,8 +56,8 @@ def get_discriminators_scores(domain_encoder: "BaseDomainEncoder"):
     eval_info = {
         "policy_score": policy_score,
         "state_score": state_score,
-        **{f"policy_{k}_score": score for k, v in policy_scores.items()},
-        **{f"state_{k}_score": score for k, v in state_scores.items()},
+        **{f"policy_{k}_score": score for k, score in policy_scores.items()},
+        **{f"state_{k}_score": score for k, score in state_scores.items()},
     }
     return eval_info
 

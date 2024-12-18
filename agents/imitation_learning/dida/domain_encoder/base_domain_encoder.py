@@ -139,6 +139,18 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     def encode_source_state(self, state: jnp.ndarray):
         pass
 
+    def pretrain_update(self):
+        (
+            new_domain_encoder,
+            _,
+            _,
+            _,
+            _,
+            info,
+            stats_info,
+        ) = _pretrain_update_jit(domain_encoder=self)
+        return new_domain_encoder, info, stats_info
+
     def update(self, target_expert_batch: DataType):
         (
             new_domain_encoder,
@@ -202,6 +214,23 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         pass
 
 @jax.jit
+def _pretrain_update_jit(domain_encoder: BaseDomainEncoder):
+    (
+        new_rng,
+        target_random_batch,
+        source_random_batch,
+        source_expert_batch,
+    ) = domain_encoder.sample_batches()
+    new_domain_encoder = domain_encoder.replace(rng=new_rng)
+    return _update(
+        domain_encoder=new_domain_encoder,
+        target_random_batch=target_random_batch,
+        target_expert_batch=target_random_batch,
+        source_random_batch=source_random_batch,
+        source_expert_batch=source_expert_batch,
+    )
+
+@jax.jit
 def _update_jit(
     domain_encoder: BaseDomainEncoder,
     target_expert_batch: DataType,
@@ -212,7 +241,22 @@ def _update_jit(
         source_random_batch,
         source_expert_batch,
     ) = domain_encoder.sample_batches()
+    new_domain_encoder = domain_encoder.replace(rng=new_rng)
+    return _update(
+        domain_encoder=new_domain_encoder,
+        target_random_batch=target_random_batch,
+        target_expert_batch=target_expert_batch,
+        source_random_batch=source_random_batch,
+        source_expert_batch=source_expert_batch,
+    )
 
+def _update(
+    domain_encoder: BaseDomainEncoder,
+    target_random_batch: DataType,
+    target_expert_batch: DataType,
+    source_random_batch: DataType,
+    source_expert_batch: DataType,
+):
     # update encoder
     new_domain_encoder, info, stats_info = domain_encoder._update_encoder(
         target_random_batch=target_random_batch,

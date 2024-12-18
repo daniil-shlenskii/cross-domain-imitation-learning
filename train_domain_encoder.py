@@ -70,7 +70,7 @@ def main(args: argparse.Namespace):
                 wandb.log({f"evaluation/{k}": v}, step=i)
 
         # optimization step
-        model, update_info, stats_info = model.update(None)
+        model, update_info, stats_info = model.pretrain_update()
 
         # logging
         if (i + 1) % config.log_every == 0:
