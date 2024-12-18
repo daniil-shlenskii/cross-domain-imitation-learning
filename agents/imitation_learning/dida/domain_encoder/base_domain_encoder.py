@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from typing import Any, Tuple
 
 import jax
@@ -8,6 +9,8 @@ from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
+from agents.imitation_learning.dida.domain_encoder.utils import \
+    get_discriminators_scores
 from agents.imitation_learning.utils import (
     get_random_from_expert_buffer_state, get_state_pairs, prepare_buffer)
 from gan.discriminator import Discriminator
@@ -159,11 +162,32 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             stats_info,
         )
 
+    def evaluate(self):
+        return get_discriminators_scores(domain_encoder=self)
+
     def sample_batches(self):
         new_rng, target_random_batch = sample_batch(self.rng, self.target_buffer, self.target_random_buffer_state)
         new_rng, source_random_batch = sample_batch(new_rng, self.source_buffer, self.source_random_buffer_state)
         new_rng, source_expert_batch = sample_batch(new_rng, self.source_buffer, self.source_expert_buffer_state)
+        return new_rng, target_random_batch, source_random_batch, source_expert_batch,
 
+    def encode_target_batch(self, batch):
+        batch = deepcopy(batch)
+        batch["observations"] = self.encode_target_state(batch["observations"])
+        batch["observations_next"] = self.encode_target_state(batch["observations_next"])
+        return batch
+
+    def encode_source_batch(self, batch):
+        batch = deepcopy(batch)
+        batch["observations"] = self.encode_source_state(batch["observations"])
+        batch["observations_next"] = self.encode_source_state(batch["observations_next"])
+        return batch
+
+    def sample_encoded_batches(self):
+        new_rng, target_random_batch, source_random_batch, source_expert_batch = self.sample_batches()
+        target_random_batch = self.encode_target_state(target_random_batch)
+        source_random_batch = self.encode_source_state(source_random_batch)
+        source_expert_batch = self.encode_source_state(source_expert_batch)
         return new_rng, target_random_batch, source_random_batch, source_expert_batch,
 
     @abstractmethod
