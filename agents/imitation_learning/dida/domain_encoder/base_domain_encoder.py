@@ -9,8 +9,8 @@ from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
-from agents.imitation_learning.dida.domain_encoder.utils import \
-    get_discriminators_scores
+from agents.imitation_learning.dida.domain_encoder.utils import (
+    get_discriminators_gradients_scalar_products, get_discriminators_scores)
 from agents.imitation_learning.utils import (
     get_random_from_expert_buffer_state, get_state_pairs, prepare_buffer)
 from gan.discriminator import Discriminator
@@ -175,7 +175,10 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         )
 
     def evaluate(self, seed: int=0):
-        return get_discriminators_scores(domain_encoder=self, seed=seed)
+        scores = get_discriminators_scores(domain_encoder=self, seed=seed)
+        scalar_products = get_discriminators_gradients_scalar_products(domain_encoder=self, seed=seed)
+        eval_info = {**scores, **scalar_products}
+        return eval_info
 
     def sample_batches(self, rng: PRNGKey):
         new_rng, target_random_batch = sample_batch(rng, self.target_buffer, self.target_random_buffer_state)

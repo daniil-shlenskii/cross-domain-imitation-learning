@@ -74,21 +74,42 @@ def get_discriminator_score(discriminator: Discriminator, x: jnp.ndarray, is_rea
     score = mask.sum() / len(mask)
     return score
 
-# def get_discriminators_gradients_scalar_products(domain_encoder: "DomainEncoder"):
-#     # sample encoded batches
-#     target_random_batch, source_random_batch, source_expert_batch = domain_encoder.sample_encoded_batches()
-#     batches = {
-#         "target_random": target_random_batch,
-#         "source_random": source_random_batch,
-#         "source_expert": source_expert_batch,
-#     }
-#
-#     # prepare state pairs
-#     state_pairs = {
-#         k: get_state_pairs(batch) for k, batch in batches.items()
-#     }
-#
-#     # policy gradients
-#     policy_gradients = {
-#         k: jax.grad(domain_encoder.policy_discriminator)
-#     }
+def get_discriminators_gradients_scalar_products(domain_encoder: "DomainEncoder", seed: int=0):
+    rng = jax.random.key(seed)
+
+    # sample encoded batches
+    rng, target_random_batch, source_random_batch, source_expert_batch = domain_encoder.sample_encoded_batches(rng)
+    batches = {
+        "target_random": target_random_batch,
+        "source_random": source_random_batch,
+        "source_expert": source_expert_batch,
+    }
+
+    # prepare state pairs
+    state_pairs = {
+        k: get_state_pairs(batch) for k, batch in batches.items()
+    }
+
+    # policy gradients
+    policy_gradients = {
+        k: jax.vmap(jax.grad(domain_encoder.policy_discriminator))(state_pair)
+        for k, state_pair in state_pairs.items()
+    }
+
+    # state gradients
+    state_gradients = {
+        k: jax.vmap(jax.grad(domain_encoder.state_discriminator))(state_pair)
+        for k, state_pair in state_pairs.items()
+    }
+
+    # scalar products
+    scalar_products = {
+        k: (state_gradients[k] * policy_gradients[k]).sum(-1).mean(0)
+        for k in batches
+    }
+    scalar_product = sum(scalar_products.values()) / len(scalar_products)
+
+    return {
+        "scalar_product": scalar_product,
+        **{f"scalar_product_{k}": v for k, v in scalar_products.items()}
+    }
