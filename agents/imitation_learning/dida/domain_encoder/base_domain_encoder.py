@@ -177,7 +177,6 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     def evaluate(self, seed: int=0):
         scores = get_discriminators_scores(domain_encoder=self, seed=seed)
         cosine_similarity = get_discriminators_gradients_cosine_similarity(domain_encoder=self, seed=seed)
-        print("HERE")
         eval_info = {**scores, **cosine_similarity}
         return eval_info
 
