@@ -118,7 +118,7 @@ def get_discriminators_gradients_cosine_similarity(domain_encoder: "DomainEncode
     }
 
     # normalized cosine similarity
-    rng, k1, k2 = jax.random.split(rng)
+    rng, k1, k2 = jax.random.split(rng, 3)
     batch_size, dim = state_pairs["target_random"].shape
     s1 = jax.random.normal(k1, shape=(batch_size, dim))
     s2 = jax.random.normal(k2, shape=(batch_size, dim))
