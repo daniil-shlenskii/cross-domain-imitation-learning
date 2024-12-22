@@ -81,7 +81,7 @@ class DomainEncoderLossMixin:
         return policy_loss_fn(logits).mean(), {
             "states": states,
             "states_next": states_next,
-        } 
+        }
 
     # grad function template
 
@@ -183,20 +183,61 @@ class DomainEncoderLossMixin:
             grads_processor=self.grads_processor,
         )
 
-    @abstractmethod
+class InDomainEncoderLoss(DomainEncoderLossMixin):
     def __call__(
         self,
         params: Params,
         state: TrainState,
-        state_discrimiantor: Discriminator,
+        state_discriminator: Discriminator,
         policy_discriminator: Discriminator,
         target_random_batch: DataType,
         source_expert_batch: DataType,
         state_loss_scale: float,
-        *args,
-        **kwargs,
     ):
-        pass
+        # compute state and policy losses
+        ts_loss, _ = self.target_state_loss(
+            params=params,
+            state=state,
+            discriminator=state_discriminator,
+            states=target_random_batch["observations"],
+        )
+        tp_loss, tp_info = self.target_policy_loss(
+            params=params,
+            state=state,
+            discriminator=policy_discriminator,
+            states=target_random_batch["observations"],
+            states_next=target_random_batch["observations_next"],
+        )
+        ss_loss, _ = self.source_state_loss(
+            params=params,
+            state=state,
+            discriminator=state_discriminator,
+            states=source_expert_batch["observations"],
+        )
+        sp_loss, sp_info = self.source_policy_loss(
+            params=params,
+            state=state,
+            discriminator=policy_discriminator,
+            states=source_expert_batch["observations"],
+            states_next=source_expert_batch["observations_next"],
+        )
+
+        # final loss
+        state_loss = ts_loss + ss_loss
+        policy_loss = tp_loss + sp_loss
+        loss = policy_loss + state_loss * state_loss_scale
+
+        # update batches
+        target_random_batch["observations"] = tp_info["states"]
+        target_random_batch["observations_next"] = tp_info["states_next"]
+        source_expert_batch["observations"] = sp_info["states"]
+        source_expert_batch["observations_next"] = sp_info["states_next"]
+
+        return loss, {
+            f"{state.info_key}/loss": loss,
+            "target_random_batch": target_random_batch,
+            "source_expert_batch": source_expert_batch
+        }
 
 class InDomainEncoderGradFunc(DomainEncoderLossMixin):
     def __call__(
@@ -249,7 +290,7 @@ class InDomainEncoderGradFunc(DomainEncoderLossMixin):
         }
         return grad, info
 
-class CrossDomainTargetEncoderLoss(DomainEncoderLossMixin):
+class CrossDomainTargetEncoderGradFunc(DomainEncoderLossMixin):
     def __call__(
         self,
         params: Params,
@@ -278,7 +319,7 @@ class CrossDomainTargetEncoderLoss(DomainEncoderLossMixin):
         info["target_random_batch"] = target_random_batch
         return grad, info
 
-class CrossDomainSourceEncoderLoss(DomainEncoderLossMixin):
+class CrossDomainSourceEncoderGradFunc(DomainEncoderLossMixin):
     def __call__(
         self,
         params: Params,
