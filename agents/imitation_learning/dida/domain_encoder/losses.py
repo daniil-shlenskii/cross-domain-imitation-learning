@@ -1,13 +1,10 @@
-from abc import abstractmethod
 from copy import deepcopy
 from typing import Callable
 
-import jax
 import jax.numpy as jnp
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
-from agents.imitation_learning.utils import get_state_pairs
 from gan.discriminator import Discriminator
 from gan.losses import GANLoss
 from nn.train_state import TrainState
@@ -194,6 +191,9 @@ class InDomainEncoderLoss(DomainEncoderLossMixin):
         source_expert_batch: DataType,
         state_loss_scale: float,
     ):
+        target_random_batch = deepcopy(target_random_batch)
+        source_expert_batch = deepcopy(source_expert_batch)
+
         # compute state and policy losses
         ts_loss, _ = self.target_state_loss(
             params=params,

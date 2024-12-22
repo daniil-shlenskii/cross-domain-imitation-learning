@@ -10,7 +10,7 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
 from agents.imitation_learning.dida.domain_encoder.utils import (
-    get_discriminators_gradients_cosine_similarity, get_discriminators_scores)
+    get_discriminators_scores, get_policy_discriminator_divergence_score)
 from agents.imitation_learning.utils import (
     get_random_from_expert_buffer_state, get_state_pairs, prepare_buffer)
 from gan.discriminator import Discriminator
@@ -131,13 +131,18 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             **kwargs,
         )
 
+    def __getattribute__(self, item) -> Any:
+        if item == "source_encoder":
+            return self.target_encoder
+        return super().__getattribute__(item)
+
     @jax.jit
     def encode_target_state(self, state: jnp.ndarray):
         return self.target_encoder(state)
 
-    @abstractmethod
+    @jax.jit
     def encode_source_state(self, state: jnp.ndarray):
-        pass
+        return self.source_encoder(state)
 
     def pretrain_update(self):
         (
@@ -176,8 +181,8 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
 
     def evaluate(self, seed: int=0):
         scores = get_discriminators_scores(domain_encoder=self, seed=seed)
-        cosine_similarity = get_discriminators_gradients_cosine_similarity(domain_encoder=self, seed=seed)
-        eval_info = {**scores, **cosine_similarity}
+        divergence_scores = get_policy_discriminator_divergence_score(domain_encoder=self, seed=seed)
+        eval_info = {**scores, **divergence_scores}
         return eval_info
 
     def sample_batches(self, rng: PRNGKey):

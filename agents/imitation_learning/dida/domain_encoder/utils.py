@@ -1,8 +1,7 @@
 import jax
 import jax.numpy as jnp
 
-from agents.imitation_learning.utils import (
-    get_random_from_expert_buffer_state, get_state_pairs, prepare_buffer)
+from agents.imitation_learning.utils import get_state_pairs
 from gan.discriminator import Discriminator
 
 
@@ -30,7 +29,7 @@ def get_discriminators_scores(domain_encoder: "BaseDomainEncoder", seed: int=0):
         "source_expert": True,
     }
     policy_scores = {
-        k: get_discriminator_score(
+        k: _get_discriminator_score(
             discriminator=domain_encoder.policy_discriminator,
             x=state_pairs[k],
             is_real=is_reals[k],
@@ -46,7 +45,7 @@ def get_discriminators_scores(domain_encoder: "BaseDomainEncoder", seed: int=0):
         "source_expert": True,
     }
     state_scores = {
-        k: get_discriminator_score(
+        k: _get_discriminator_score(
             discriminator=domain_encoder.state_discriminator,
             x=state_pairs[k],
             is_real=is_reals[k],
@@ -63,7 +62,7 @@ def get_discriminators_scores(domain_encoder: "BaseDomainEncoder", seed: int=0):
     }
     return eval_info
 
-def get_discriminator_score(discriminator: Discriminator, x: jnp.ndarray, is_real: bool):
+def _get_discriminator_score(discriminator: Discriminator, x: jnp.ndarray, is_real: bool):
     logits = discriminator(x)
     mask = jax.lax.cond(
         is_real,
@@ -74,66 +73,45 @@ def get_discriminator_score(discriminator: Discriminator, x: jnp.ndarray, is_rea
     score = mask.sum() / len(mask)
     return score
 
-def get_discriminators_gradients_cosine_similarity(domain_encoder: "DomainEncoder", seed: int=0):
+def get_policy_discriminator_divergence_score(domain_encoder: "BaseDomainEncoder", seed: int=0):
+    # sample batches
     rng = jax.random.key(seed)
+    rng, target_random_batch, source_random_batch, source_expert_batch = domain_encoder.sample_batches(rng)
 
-    # sample encoded batches
-    rng, target_random_batch, source_random_batch, source_expert_batch = domain_encoder.sample_encoded_batches(rng)
-    batches = {
-        "target_random": target_random_batch,
-        "source_random": source_random_batch,
-        "source_expert": source_expert_batch,
-    }
+    #
+    source_state = domain_encoder.source_encoder
+    loss_fn = domain_encoder.target_encoder.state.loss_fn
 
-    # prepare state pairs
-    state_pairs = {
-        k: get_state_pairs(batch) for k, batch in batches.items()
-    }
+    # divergence score
+    ## source expert
+    _, source_expert_state_grad = jax.vmap(jax.value_and_grad(loss_fn.source_state_loss, has_aux=True))(
+        source_state.params,
+        state=source_state,
+        discriminator=domain_encoder.state_discriminator,
+        states=source_expert_batch["observations"],
+    )
+    _, source_expert_policy_grad = jax.vmap(jax.value_and_grad(loss_fn.source_policy_loss, has_aux=True))(
+        source_state.params,
+        state=source_state,
+        discriminator=domain_encoder.state_discriminator,
+        states=source_expert_batch["observations"],
+    )
+    source_expert_divergence_score = divergence_score_fn(state_grad=source_expert_state_grad, policy_grad=source_expert_policy_grad)
 
-    # policy gradients
-    policy_gradients = {
-        k: jax.vmap(jax.grad(domain_encoder.policy_discriminator))(state_pair)
-        for k, state_pair in state_pairs.items()
-    }
+    return {"source_expert_diverence_score": source_expert_divergence_score}
 
-    # state gradients
-    state_gradients = {
-        k: jax.vmap(jax.grad(domain_encoder.state_discriminator))(state_pair)
-        for k, state_pair in state_pairs.items()
-    }
+def divergence_score_fn(state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
+    projection = project_a_to_b(a=policy_grad, b=state_grad)
+    diverged_part = jnp.clip(projection, max=0.)
+    diverged_part_norm = jnp.linalg.norm(diverged_part, axis=1).mean()
+    state_grad_norm = jnp.linalg.norm(state_grad, axis=1).mean()
+    return diverged_part_norm / state_grad_norm
 
-    # cosine similarity
-    cosine_similarities = {
-        k: jnp.absolute(get_cosine_similarity(
-            policy_gradients[k],
-            state_gradients[k]
-        )).mean()
-        for k in batches
-    }
-    cosine_similarity = sum(cosine_similarities.values()) / len(cosine_similarities)
+def project_a_to_b(a: jnp.ndarray, b: jnp.ndarray):
+    return cosine_similarity_fn(a, b) * a
 
-    unnormalized_cs = {
-        "cosine_similarity": cosine_similarity,
-        **{f"cosine_similarity_{k}": v for k, v in cosine_similarities.items()}
-    }
+def cosine_similarity_fn(a, b):
+    return scalar_product_fn(a, b) / scalar_product_fn(a, a)**0.5 / scalar_product_fn(b, b)**0.5
 
-    # normalized cosine similarity
-    rng = jax.random.key(0)
-    k1, k2 = jax.random.split(rng)
-    batch_size, dim = 4096, state_pairs["target_random"].shape[-1]
-
-    s1 = jax.random.normal(k1, shape=(batch_size, dim))
-    s2 = jax.random.normal(k2, shape=(batch_size, dim))
-    random_cosine_similarity = jnp.absolute(get_cosine_similarity(s1, s2)).mean()
-
-    normalized_cs = {
-        f"{k}_normalized": v / random_cosine_similarity
-        for k, v in unnormalized_cs.items()
-    }
-    return {**unnormalized_cs, **normalized_cs}
-
-def get_cosine_similarity(a, b):
-    return get_scalar_product(a, b) / get_scalar_product(a, a)**0.5 / get_scalar_product(b, b)**0.5
-
-def get_scalar_product(a, b):
+def scalar_product_fn(a, b):
     return (a * b).sum(-1)
