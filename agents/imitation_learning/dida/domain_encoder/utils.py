@@ -1,3 +1,5 @@
+import functools
+
 import jax
 import jax.numpy as jnp
 
@@ -47,7 +49,7 @@ def get_discriminators_scores(domain_encoder: "BaseDomainEncoder", seed: int=0):
     state_scores = {
         k: _get_discriminator_score(
             discriminator=domain_encoder.state_discriminator,
-            x=state_pairs[k],
+            x=batches[k]["observations"],
             is_real=is_reals[k],
         )
         for k in batches
@@ -79,32 +81,46 @@ def get_policy_discriminator_divergence_score(domain_encoder: "BaseDomainEncoder
     rng, target_random_batch, source_random_batch, source_expert_batch = domain_encoder.sample_batches(rng)
 
     #
-    source_state = domain_encoder.source_encoder
+    source_state = domain_encoder.source_encoder.state
     loss_fn = domain_encoder.target_encoder.state.loss_fn
+    flatten_fn = lambda params_dict: jnp.concatenate([
+        jnp.ravel(x) for x in
+        jax.tree.flatten(params_dict, is_leaf=lambda x: isinstance(x, float))[0]
+    ])
 
     # divergence score
     ## source expert
-    _, source_expert_state_grad = jax.vmap(jax.value_and_grad(loss_fn.source_state_loss, has_aux=True))(
+    ### state grad
+    _, source_expert_state_grad = jax.value_and_grad(loss_fn.source_state_loss, has_aux=True)(
         source_state.params,
         state=source_state,
         discriminator=domain_encoder.state_discriminator,
         states=source_expert_batch["observations"],
     )
-    _, source_expert_policy_grad = jax.vmap(jax.value_and_grad(loss_fn.source_policy_loss, has_aux=True))(
+    source_expert_state_grad = flatten_fn(source_expert_state_grad)
+
+    ### policy grad
+    _, source_expert_policy_grad = jax.value_and_grad(loss_fn.source_policy_loss, has_aux=True)(
         source_state.params,
         state=source_state,
-        discriminator=domain_encoder.state_discriminator,
+        discriminator=domain_encoder.policy_discriminator,
         states=source_expert_batch["observations"],
+        states_next=source_expert_batch["observations_next"],
     )
-    source_expert_divergence_score = divergence_score_fn(state_grad=source_expert_state_grad, policy_grad=source_expert_policy_grad)
+    source_expert_policy_grad = flatten_fn(source_expert_policy_grad)
+
+    source_expert_divergence_score = divergence_score_fn(
+        state_grad=source_expert_state_grad,
+        policy_grad=source_expert_policy_grad
+    )
 
     return {"source_expert_diverence_score": source_expert_divergence_score}
 
 def divergence_score_fn(state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
     projection = project_a_to_b(a=policy_grad, b=state_grad)
     diverged_part = jnp.clip(projection, max=0.)
-    diverged_part_norm = jnp.linalg.norm(diverged_part, axis=1).mean()
-    state_grad_norm = jnp.linalg.norm(state_grad, axis=1).mean()
+    diverged_part_norm = jnp.linalg.norm(diverged_part)
+    state_grad_norm = jnp.linalg.norm(state_grad)
     return diverged_part_norm / state_grad_norm
 
 def project_a_to_b(a: jnp.ndarray, b: jnp.ndarray):
