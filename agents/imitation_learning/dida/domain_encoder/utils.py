@@ -114,7 +114,7 @@ def get_policy_discriminator_divergence_score(domain_encoder: "BaseDomainEncoder
         policy_grad=source_expert_policy_grad
     )
 
-    return {"source_expert_diverence_score": source_expert_divergence_score}
+    return {"discriminator_params_grad_diverence/source_expert": source_expert_divergence_score}
 
 def divergence_score_fn(state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
     projection = project_a_to_b(a=policy_grad, b=state_grad)
