@@ -83,55 +83,55 @@ class DomainEncoderLossMixin:
             "states_next": states_next,
         }
 
-    # grad function template
-
-    def _grad_fn(
-        params: Params,
-        state: TrainState,
-        state_discriminator: Discriminator,
-        policy_discriminator: Discriminator,
-        states: jnp.ndarray,
-        states_next: jnp.ndarray,
-        state_loss_scale: float,
-        #
-        info_key: str,
-        state_loss: Callable,
-        policy_loss: Callable,
-        grads_processor: Callable,
-    ):
-        (state_loss, _), state_grad = jax.vmap(jax.value_and_grad(state_loss, has_aux=True))(
-            params,
-            state=state,
-            discriminator=state_discriminator,
-            state=states,
-        )
-        (policy_loss, policy_info), policy_grad = jax.vmap(jax.value_and_grad(policy_loss, has_aux=True))(
-            params,
-            state=state,
-            discriminator=policy_discriminator,
-            states=states,
-            states_next=states_next,
-        )
-        grad, info = grads_processor(state_grad, policy_grad, state_loss_scale)
-
-        # prepare info
-        info["state_loss"] = state_loss
-        info["policy_loss"] = policy_loss
-        info["loss"] = policy_loss + state_loss * state_loss_scale
-
-        ## specify info key
-        if info_key is None:
-            info_key = state.info_key
-        else:
-            info_key = f"{state.info_key}/info_key"
-
-        ## update info key
-        old_info_keys = list(info.key())
-        for k in old_info_keys:
-            new_k = f"{info_key}/{k}"
-            info[new_k] = info.pop(k)
-
-        return grad, info, policy_info["states"], policy_info["states_next"]
+    # # grad function template
+    #
+    # def _grad_fn(
+    #     params: Params,
+    #     state: TrainState,
+    #     state_discriminator: Discriminator,
+    #     policy_discriminator: Discriminator,
+    #     states: jnp.ndarray,
+    #     states_next: jnp.ndarray,
+    #     state_loss_scale: float,
+    #     #
+    #     info_key: str,
+    #     state_loss: Callable,
+    #     policy_loss: Callable,
+    #     grads_processor: Callable,
+    # ):
+    #     (state_loss, _), state_grad = jax.vmap(jax.value_and_grad(state_loss, has_aux=True))(
+    #         params,
+    #         state=state,
+    #         discriminator=state_discriminator,
+    #         state=states,
+    #     )
+    #     (policy_loss, policy_info), policy_grad = jax.vmap(jax.value_and_grad(policy_loss, has_aux=True))(
+    #         params,
+    #         state=state,
+    #         discriminator=policy_discriminator,
+    #         states=states,
+    #         states_next=states_next,
+    #     )
+    #     grad, info = grads_processor(state_grad, policy_grad, state_loss_scale)
+    #
+    #     # prepare info
+    #     info["state_loss"] = state_loss
+    #     info["policy_loss"] = policy_loss
+    #     info["loss"] = policy_loss + state_loss * state_loss_scale
+    #
+    #     ## specify info key
+    #     if info_key is None:
+    #         info_key = state.info_key
+    #     else:
+    #         info_key = f"{state.info_key}/info_key"
+    #
+    #     ## update info key
+    #     old_info_keys = list(info.key())
+    #     for k in old_info_keys:
+    #         new_k = f"{info_key}/{k}"
+    #         info[new_k] = info.pop(k)
+    #
+    #     return grad, info, policy_info["states"], policy_info["states_next"]
 
     # losses
 
@@ -139,49 +139,49 @@ class DomainEncoderLossMixin:
         return self._state_loss(
             *args,
             **kwargs,
-            state_loss_fn=self.target_state_loss_fn,
+            state_loss_fn=self.fake_state_loss_fn,
         )
 
     def target_policy_loss(self, *args, **kwargs):
         return self._policy_loss(
             *args,
             **kwargs,
-            policy_loss_fn=self.target_policy_loss_fn,
+            policy_loss_fn=self.fake_policy_loss_fn,
         )
 
     def source_state_loss(self, *args, **kwargs):
         return self._state_loss(
             *args,
             **kwargs,
-            state_loss_fn=self.source_state_loss_fn,
+            state_loss_fn=self.real_state_loss_fn,
         )
 
     def source_policy_loss(self, *args, **kwargs):
         return self._policy_loss(
             *args,
             **kwargs,
-            policy_loss_fn=self.source_state_loss_fn,
+            policy_loss_fn=self.real_policy_loss_fn,
         )
 
-    # grad functions
-
-    def target_grad_fn(self, *args, **kwargs):
-        return self._grad_fn(
-            *args,
-            **kwargs,
-            state_loss=self.target_state_loss,
-            policy_loss=self.target_policy_loss,
-            grads_processor=self.grads_processor,
-        )
-
-    def source_grad_fn(self, *args, **kwargs):
-        return self._grad_fn(
-            *args,
-            **kwargs,
-            state_loss=self.source_state_loss,
-            policy_loss=self.source_policy_loss,
-            grads_processor=self.grads_processor,
-        )
+    # # grad functions
+    #
+    # def target_grad_fn(self, *args, **kwargs):
+    #     return self._grad_fn(
+    #         *args,
+    #         **kwargs,
+    #         state_loss=self.target_state_loss,
+    #         policy_loss=self.target_policy_loss,
+    #         grads_processor=self.grads_processor,
+    #     )
+    #
+    # def source_grad_fn(self, *args, **kwargs):
+    #     return self._grad_fn(
+    #         *args,
+    #         **kwargs,
+    #         state_loss=self.source_state_loss,
+    #         policy_loss=self.source_policy_loss,
+    #         grads_processor=self.grads_processor,
+    #     )
 
 class InDomainEncoderLoss(DomainEncoderLossMixin):
     def __call__(
@@ -239,111 +239,111 @@ class InDomainEncoderLoss(DomainEncoderLossMixin):
             "source_expert_batch": source_expert_batch
         }
 
-class InDomainEncoderGradFunc(DomainEncoderLossMixin):
-    def __call__(
-        self,
-        params: Params,
-        state: TrainState,
-        state_discriminator: Discriminator,
-        policy_discriminator: Discriminator,
-        target_random_batch: DataType,
-        source_expert_batch: DataType,
-        state_loss_scale: float,
-        *args,
-        **kwargs,
-    ):
-        (
-            target_grad,
-            target_info,
-            target_random_batch["observations"],
-            target_random_batch["observations_next"],
-        ) = self.target_grad_fn(
-            params=params,
-            state=state,
-            state_discriminator=state_discriminator,
-            policy_discriminator=policy_discriminator,
-            states=target_random_batch["observations"],
-            states_next=target_random_batch["observations_next"],
-            state_loss_scale=state_loss_scale,
-        )
-        (
-            source_grad,
-            source_info,
-            source_expert_batch["observations"],
-            source_expert_batch["observations_next"],
-        ) = self.source_grad_fn(
-            params=params,
-            state=state,
-            state_discriminator=state_discriminator,
-            policy_discriminator=policy_discriminator,
-            states=source_expert_batch["observations"],
-            states_next=source_expert_batch["observations_next"],
-            state_loss_scale=state_loss_scale,
-        )
-
-        grad = target_grad + source_grad
-        info = {
-            **target_info,
-            **source_info,
-            "target_random_batch": target_random_batch,
-            "source_expert_batch": source_expert_batch,
-        }
-        return grad, info
-
-class CrossDomainTargetEncoderGradFunc(DomainEncoderLossMixin):
-    def __call__(
-        self,
-        params: Params,
-        state: TrainState,
-        target_random_batch: DataType,
-        policy_discriminator: Discriminator,
-        state_discriminator: Discriminator,
-        state_loss_scale: float,
-        *args,
-        **kwargs,
-    ):
-        (
-            grad,
-            info,
-            target_random_batch["observations"],
-            target_random_batch["observations_next"],
-        ) = self.target_grad_fn(
-            params=params,
-            state=state,
-            state_discriminator=state_discriminator,
-            policy_discriminator=policy_discriminator,
-            states=target_random_batch["observations"],
-            states_next=target_random_batch["observations_next"],
-            state_loss_scale=state_loss_scale,
-        )
-        info["target_random_batch"] = target_random_batch
-        return grad, info
-
-class CrossDomainSourceEncoderGradFunc(DomainEncoderLossMixin):
-    def __call__(
-        self,
-        params: Params,
-        state: TrainState,
-        source_expert_batch: DataType,
-        policy_discriminator: Discriminator,
-        state_discriminator: Discriminator,
-        state_loss_scale: float,
-        *args,
-        **kwargs,
-    ):
-        (
-            grad,
-            info,
-            source_expert_batch["observations"],
-            source_expert_batch["observations_next"],
-        ) = self.target_grad_fn(
-            params=params,
-            state=state,
-            state_discriminator=state_discriminator,
-            policy_discriminator=policy_discriminator,
-            states=source_expert_batch["observations"],
-            states_next=source_expert_batch["observations_next"],
-            state_loss_scale=state_loss_scale,
-        )
-        info["source_expert_batch"] = source_expert_batch
-        return grad, info
+# class InDomainEncoderGradFunc(DomainEncoderLossMixin):
+#     def __call__(
+#         self,
+#         params: Params,
+#         state: TrainState,
+#         state_discriminator: Discriminator,
+#         policy_discriminator: Discriminator,
+#         target_random_batch: DataType,
+#         source_expert_batch: DataType,
+#         state_loss_scale: float,
+#         *args,
+#         **kwargs,
+#     ):
+#         (
+#             target_grad,
+#             target_info,
+#             target_random_batch["observations"],
+#             target_random_batch["observations_next"],
+#         ) = self.target_grad_fn(
+#             params=params,
+#             state=state,
+#             state_discriminator=state_discriminator,
+#             policy_discriminator=policy_discriminator,
+#             states=target_random_batch["observations"],
+#             states_next=target_random_batch["observations_next"],
+#             state_loss_scale=state_loss_scale,
+#         )
+#         (
+#             source_grad,
+#             source_info,
+#             source_expert_batch["observations"],
+#             source_expert_batch["observations_next"],
+#         ) = self.source_grad_fn(
+#             params=params,
+#             state=state,
+#             state_discriminator=state_discriminator,
+#             policy_discriminator=policy_discriminator,
+#             states=source_expert_batch["observations"],
+#             states_next=source_expert_batch["observations_next"],
+#             state_loss_scale=state_loss_scale,
+#         )
+#
+#         grad = target_grad + source_grad
+#         info = {
+#             **target_info,
+#             **source_info,
+#             "target_random_batch": target_random_batch,
+#             "source_expert_batch": source_expert_batch,
+#         }
+#         return grad, info
+#
+# class CrossDomainTargetEncoderGradFunc(DomainEncoderLossMixin):
+#     def __call__(
+#         self,
+#         params: Params,
+#         state: TrainState,
+#         target_random_batch: DataType,
+#         policy_discriminator: Discriminator,
+#         state_discriminator: Discriminator,
+#         state_loss_scale: float,
+#         *args,
+#         **kwargs,
+#     ):
+#         (
+#             grad,
+#             info,
+#             target_random_batch["observations"],
+#             target_random_batch["observations_next"],
+#         ) = self.target_grad_fn(
+#             params=params,
+#             state=state,
+#             state_discriminator=state_discriminator,
+#             policy_discriminator=policy_discriminator,
+#             states=target_random_batch["observations"],
+#             states_next=target_random_batch["observations_next"],
+#             state_loss_scale=state_loss_scale,
+#         )
+#         info["target_random_batch"] = target_random_batch
+#         return grad, info
+#
+# class CrossDomainSourceEncoderGradFunc(DomainEncoderLossMixin):
+#     def __call__(
+#         self,
+#         params: Params,
+#         state: TrainState,
+#         source_expert_batch: DataType,
+#         policy_discriminator: Discriminator,
+#         state_discriminator: Discriminator,
+#         state_loss_scale: float,
+#         *args,
+#         **kwargs,
+#     ):
+#         (
+#             grad,
+#             info,
+#             source_expert_batch["observations"],
+#             source_expert_batch["observations_next"],
+#         ) = self.target_grad_fn(
+#             params=params,
+#             state=state,
+#             state_discriminator=state_discriminator,
+#             policy_discriminator=policy_discriminator,
+#             states=source_expert_batch["observations"],
+#             states_next=source_expert_batch["observations_next"],
+#             state_loss_scale=state_loss_scale,
+#         )
+#         info["source_expert_batch"] = source_expert_batch
+#         return grad, info

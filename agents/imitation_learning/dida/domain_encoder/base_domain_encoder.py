@@ -215,7 +215,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         target_expert_batch: DataType,
         source_random_batch: DataType,
         source_expert_batch: DataType,
-   ):
+    ):
         pass
 
 @jax.jit
