@@ -270,8 +270,6 @@ def _update(
         source_expert_batch=source_expert_batch,
     )
     target_random_batch = info.pop("target_random_batch")
-    target_expert_batch = info.pop("target_expert_batch")
-    source_random_batch = info.pop("source_random_batch")
     source_expert_batch = info.pop("source_expert_batch")
 
     new_domain_encoder = jax.lax.cond(
@@ -280,6 +278,9 @@ def _update(
         lambda: domain_encoder,
     )
 
+    # encode target expert and source random batches
+    target_expert_batch = domain_encoder.encode_target_batch(target_expert_batch)
+    source_random_batch = domain_encoder.encode_source_batch(source_random_batch)
 
     # update state discriminator
     new_state_disc, state_disc_info, state_disc_stats_info = new_domain_encoder.state_discriminator.update(
