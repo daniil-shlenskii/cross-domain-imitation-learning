@@ -93,19 +93,7 @@ agent:
           - _target_: optax.adamw
             learning_rate: 3e-4
       loss_config:
-        _target_: agents.imitation_learning.dida.domain_encoder.losses.CrossDomainLearnerEncoderLoss
-    expert_encoder_config:
-      _target_: gan.generator.Generator.create
-      module_config:
-        _target_: networks.dida.AffineTransform
-      optimizer_config:
-        transforms:
-          - _target_: optax.clip
-            max_delta: 1.0
-          - _target_: optax.adamw
-            learning_rate: 3e-4
-      loss_config:
-        _target_: agents.imitation_learning.dida.domain_encoder.losses.CrossDomainExpertEncoderLoss
+        _target_: agents.imitation_learning.dida.domain_encoder.losses.InDomainLearnerEncoderLoss
     state_discriminator_config:
       _target_: gan.discriminator.Discriminator.create
       module_config:
