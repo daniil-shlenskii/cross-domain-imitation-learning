@@ -109,19 +109,31 @@ def get_policy_discriminator_divergence_score(domain_encoder: "BaseDomainEncoder
     )
     source_expert_policy_grad = flatten_fn(source_expert_policy_grad)
 
-    source_expert_divergence_score = divergence_score_fn(
+    se_neg_divergence_score, se_pos_divergence_score = divergence_scores_fn(
         state_grad=source_expert_state_grad,
         policy_grad=source_expert_policy_grad
     )
 
-    return {"discriminator_params_grad_diverence/source_expert": source_expert_divergence_score}
+    return {
+        "neg_divergence_score/source_expert": se_neg_divergence_score,
+        "pos_divergence_score/source_expert": se_pos_divergence_score,
+    }
 
-def divergence_score_fn(state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
+def divergence_scores_fn(state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
     projection = project_a_to_b(a=policy_grad, b=state_grad)
-    diverged_part = jnp.clip(projection, max=0.)
-    diverged_part_norm = jnp.linalg.norm(diverged_part)
+
+    neg_diverged_part = jnp.clip(projection, max=0.)
+    neg_diverged_part_norm = jnp.linalg.norm(neg_diverged_part)
+
+    pos_diverged_part = jnp.clip(projection, min=0.)
+    pos_diverged_part_norm = jnp.linalg.norm(pos_diverged_part)
+
     state_grad_norm = jnp.linalg.norm(state_grad)
-    return diverged_part_norm / state_grad_norm
+
+    neg_divergence_score = neg_diverged_part_norm / state_grad_norm
+    pos_divergence_score = pos_diverged_part_norm / state_grad_norm
+
+    return neg_divergence_score, pos_divergence_score
 
 def project_a_to_b(a: jnp.ndarray, b: jnp.ndarray):
     return cosine_similarity_fn(a, b) * a
