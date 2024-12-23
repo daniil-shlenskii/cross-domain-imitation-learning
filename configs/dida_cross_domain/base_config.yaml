@@ -80,12 +80,19 @@ agent:
   #
   domain_encoder_config:
     _target_: agents.dida.CrossDomainEncoder.create
-    update_encoder_every: 100
     state_loss_scale: 0.2
-    learner_encoder_config:
+    #
+    target_batch_size: *batch_size
+    target_random_buffer_state_path: ._tmp_archive_dir/random_buffers/HalfCheetah-v5.pickle
+    #
+    source_batch_size: *batch_size
+    source_expert_buffer_state_path: *expert_path
+    #
+    target_encoder_config:
       _target_: gan.generator.Generator.create
       module_config:
-        _target_: networks.dida.AffineTransform
+        _target_: networks.common.MLP
+        hidden_dims: [256]
       optimizer_config:
         transforms:
           - _target_: optax.clip
@@ -93,7 +100,20 @@ agent:
           - _target_: optax.adamw
             learning_rate: 3e-4
       loss_config:
-        _target_: agents.imitation_learning.dida.domain_encoder.losses.InDomainLearnerEncoderLoss
+        _target_: agents.imitation_learning.dida.domain_encoder.losses.CrossDomainTargetEncoderLoss
+    source_encoder_config:
+      _target_: gan.generator.Generator.create
+      module_config:
+        _target_: networks.common.MLP
+        hidden_dims: [256]
+      optimizer_config:
+        transforms:
+          - _target_: optax.clip
+            max_delta: 1.0
+          - _target_: optax.adamw
+            learning_rate: 3e-4
+      loss_config:
+        _target_: agents.imitation_learning.dida.domain_encoder.losses.CrossDomainSourceEncoderLoss
     state_discriminator_config:
       _target_: gan.discriminator.Discriminator.create
       module_config:

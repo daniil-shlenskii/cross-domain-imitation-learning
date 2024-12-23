@@ -131,7 +131,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             **kwargs,
         )
 
-    def __getattribute__(self, item) -> Any:
+    def __getattr__(self, item) -> Any:
         if item == "source_encoder":
             return self.target_encoder
         return super().__getattribute__(item)

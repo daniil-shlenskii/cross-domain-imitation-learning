@@ -19,7 +19,6 @@ class CrossDomainEncoder(BaseDomainEncoder):
         *,
         seed: int,
         #
-        source_dim: int,
         encoding_dim: int,
         #
         source_encoder_config: DictConfig,
@@ -29,6 +28,7 @@ class CrossDomainEncoder(BaseDomainEncoder):
         # base domain encoder init
         base_domain_encoder = super().create(
             seed=seed,
+            encoding_dim=encoding_dim,
             source_encoder=None,
             **kwargs,
         )
@@ -37,6 +37,8 @@ class CrossDomainEncoder(BaseDomainEncoder):
         source_encoder_config = OmegaConf.to_container(source_encoder_config)
         source_encoder_config["loss_config"]["state_loss"] = base_domain_encoder.state_discriminator.state.loss_fn
         source_encoder_config["loss_config"]["policy_loss"] = base_domain_encoder.policy_discriminator.state.loss_fn
+
+        source_dim = base_domain_encoder.source_random_buffer_state.experience["observations"].shape[-1]
 
         source_encoder = instantiate(
             source_encoder_config,
@@ -55,28 +57,21 @@ class CrossDomainEncoder(BaseDomainEncoder):
             _save_attrs=_save_attrs,
         )
 
-    @jax.jit
-    def encode_source_state(self, state: jnp.ndarray):
-        return self.source_encoder(state)
-
     def _update_encoder(
         self,
         *,
         target_random_batch: DataType,
-        target_source_batch: DataType,
-        source_random_batch: DataType,
-        source_source_batch: DataType,
+        source_expert_batch: DataType,
+        **kwargs,
    ):
         new_target_encoder, target_info, target_stats_info = self.target_encoder.update(
             target_random_batch=target_random_batch,
-            target_source_batch=target_source_batch,
             policy_discriminator=self.policy_discriminator,
             state_discriminator=self.state_discriminator,
             state_loss_scale=self.state_loss_scale,
         )
         new_source_encoder, source_info, source_stats_info = self.source_encoder.update(
-            source_random_batch=source_random_batch,
-            source_source_batch=source_source_batch,
+            source_expert_batch=source_expert_batch,
             policy_discriminator=self.policy_discriminator,
             state_discriminator=self.state_discriminator,
             state_loss_scale=self.state_loss_scale,

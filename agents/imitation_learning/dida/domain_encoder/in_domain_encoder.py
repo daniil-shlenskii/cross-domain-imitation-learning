@@ -7,10 +7,6 @@ from .base_domain_encoder import BaseDomainEncoder
 
 
 class InDomainEncoder(BaseDomainEncoder):
-    @jax.jit
-    def encode_source_state(self, state: jnp.ndarray):
-        return self.target_encoder(state)
-
     def _update_encoder(
         self,
         *,
