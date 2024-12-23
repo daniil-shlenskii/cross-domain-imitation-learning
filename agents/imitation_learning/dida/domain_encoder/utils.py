@@ -49,10 +49,10 @@ def get_discriminators_scores(domain_encoder: "BaseDomainEncoder", seed: int=0):
     state_scores = {
         k: _get_discriminator_score(
             discriminator=domain_encoder.state_discriminator,
-            x=batches[k]["observations"],
+            x=v["observations"],
             is_real=is_reals[k],
         )
-        for k in batches
+        for k, v in batches.items()
     }
     state_score = sum(state_scores.values()) / len(state_scores)
 
