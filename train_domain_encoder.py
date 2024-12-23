@@ -31,6 +31,9 @@ def get_config_archive(config: Dict, config_path: str):
     config_archive["load_dir"] = Path(config_archive.get("load_dir", default_storage_dir))
     config_archive["save_dir"] = Path(config_archive.get("save_dir", default_storage_dir))
 
+    config_archive["load_dir"].mkdir(exist_ok=True, parents=True)
+    config_archive["save_dir"].mkdir(exist_ok=True, parents=True)
+
     return config_archive
 
 def main(args: argparse.Namespace):
@@ -64,7 +67,7 @@ def main(args: argparse.Namespace):
 
     for i in tqdm(range(config.n_iters_training)):
         # evaluate model
-        if (i + 1) % config.eval_every == 0:
+        if i == 0 or (i + 1) % config.eval_every == 0:
             eval_info = model.evaluate(config.seed)
             for k, v in eval_info.items():
                 wandb.log({f"evaluation/{k}": v}, step=i)
