@@ -88,8 +88,8 @@ class InDomainEncoderProjectedGradLoss(DomainEncoderLossMixin):
 
     def backward(self, intermediates, input_grad):
         _, (ts_grad, tp_grad, ss_grad, sp_grad, state_loss_scale) = intermediates
-        tp_grad = project_a_to_b(a=tp_grad, b=ts_grad) 
-        sp_grad = project_a_to_b(a=sp_grad, b=ss_grad) 
+        tp_grad = tp_grad - project_a_to_b(a=tp_grad, b=ts_grad) 
+        sp_grad = sp_grad - project_a_to_b(a=sp_grad, b=ss_grad) 
         policy_grad = tp_grad + sp_grad
         state_grad = ts_grad + ss_grad
         grad = policy_grad + state_grad * state_loss_scale
