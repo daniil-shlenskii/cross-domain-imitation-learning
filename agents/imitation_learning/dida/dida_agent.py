@@ -1,3 +1,4 @@
+import gymnasium as gym
 import jax
 import numpy as np
 from flax import struct
@@ -77,6 +78,30 @@ class DIDAAgent(GAILAgent):
             learner_batch=batch,
         )
         return new_dida_agent, info, stats_info
+
+    def evaluate(
+        self,
+        *,
+        seed: int,
+        env: gym.Env,
+        num_episodes: int,
+        convert_to_wandb_type: bool = True,
+        return_trajectories: bool = False
+    ):
+        eval_info, trajs = super().evaluate(
+            seed=seed,
+            env=env,
+            num_episodes=num_episodes,
+            convert_to_wandb_type=convert_to_wandb_type,
+            return_trajectories=True,
+        )
+
+        domain_encoder_eval_info = self.domain_encoder.evaluate(seed=seed)
+        eval_info.update(domain_encoder_eval_info)
+
+        if return_trajectories:
+            return eval_info, trajs
+        return eval_info
 
 def _update_jit(dida_agent: DIDAAgent, learner_batch: DataType):
     return _update_no_das_jit(
