@@ -9,6 +9,8 @@ from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
+from agents.imitation_learning.dida.domain_encoder import \
+    BaseDomainEncoderDiscriminators
 from agents.imitation_learning.dida.domain_encoder.utils import (
     get_discriminators_scores, get_policy_discriminator_divergence_score)
 from agents.imitation_learning.utils import (
@@ -23,8 +25,7 @@ from utils.utils import sample_batch
 class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     rng: PRNGKey
     target_encoder: Generator
-    state_discriminator: Discriminator
-    policy_discriminator: Discriminator
+    discriminators: BaseDomainEncoderDiscriminators
     target_buffer: Any = struct.field(pytree_node=False)
     source_buffer: Any = struct.field(pytree_node=False)
     target_random_buffer_state: BufferState = struct.field(pytree_node=False)
@@ -49,8 +50,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         source_expert_buffer_state_path,
         #
         target_encoder_config: DictConfig,
-        state_discriminator_config: DictConfig,
-        policy_discriminator_config: DictConfig,
+        discriminators_config: DictConfig,
         #
         state_loss_scale: float,
         update_encoder_every: int = 1,
@@ -77,28 +77,18 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             seed=seed, expert_buffer_state=source_expert_buffer_state
         )
 
-        # state discriminator init
-        state_discriminator = instantiate(
-            state_discriminator_config,
+        # discriminators init
+        discriminators = instantiate(
+            discriminators_config,
             seed=seed,
-            input_dim=encoding_dim,
-            info_key="domain_encoder/state_discriminator",
-            _recursive_=False,
-        )
-
-        # policy discriminator init
-        policy_discriminator = instantiate(
-            policy_discriminator_config,
-            seed=seed,
-            input_dim=encoding_dim * 2,
-            info_key="domain_encoder/policy_discriminator",
+            encoding_dim=encoding_dim,
             _recursive_=False,
         )
 
         # target encoder init
         target_encoder_config = OmegaConf.to_container(target_encoder_config)
-        target_encoder_config["loss_config"]["state_loss"] = state_discriminator.state.loss_fn
-        target_encoder_config["loss_config"]["policy_loss"] = policy_discriminator.state.loss_fn
+        target_encoder_config["loss_config"]["state_loss"] = discriminators.get_state_loss()
+        target_encoder_config["loss_config"]["policy_loss"] = discriminators.get_policy_loss()
 
         target_dim = target_random_buffer_state.experience["observations"].shape[-1]
 
@@ -119,14 +109,12 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             source_random_buffer_state=source_random_buffer_state,
             source_expert_buffer_state=source_expert_buffer_state,
             target_encoder=target_encoder,
-            state_discriminator=state_discriminator,
-            policy_discriminator=policy_discriminator,
+            discriminators=discriminators,
             state_loss_scale=state_loss_scale,
             update_encoder_every=update_encoder_every,
             _save_attrs=(
                 "target_encoder",
-                "state_discriminator",
-                "policy_discriminator"
+                "discriminators",
             ),
             **kwargs,
         )
@@ -135,6 +123,14 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         if item == "source_encoder":
             return self.target_encoder
         return super().__getattribute__(item)
+
+    @property
+    def state_discriminator(self):
+        return self.discriminators.get_state_discriminator()
+
+    @property
+    def policy_discriminator(self):
+        return self.discriminators.get_policy_discriminator()
 
     @jax.jit
     def encode_target_state(self, state: jnp.ndarray):
@@ -205,6 +201,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
 
     def sample_encoded_batches(self, rng: PRNGKey):
         new_rng, target_random_batch, source_random_batch, source_expert_batch = self.sample_batches(rng)
+
 
         for k in ["observations", "observations_next"]:
             target_random_batch[k] = self.encode_target_state(target_random_batch[k])
@@ -287,31 +284,17 @@ def _update(
     target_expert_batch = domain_encoder.encode_target_batch(target_expert_batch)
     source_random_batch = domain_encoder.encode_source_batch(source_random_batch)
 
-    # update state discriminator
-    new_state_disc, state_disc_info, state_disc_stats_info = new_domain_encoder.state_discriminator.update(
-        fake_batch=target_expert_batch["observations"],
-        real_batch=source_expert_batch["observations"],
+    # update discriminators
+    new_discrs, discrs_info, discrs_stats_info = domain_encoder.discriminators.update(
+        target_random_batch=target_random_batch,
+        source_random_batch=source_random_batch,
+        source_expert_batch=source_expert_batch,
     )
 
-    # update policy discriminator
-    ## construct pairs
-    target_random_pairs = get_state_pairs(target_random_batch)
-    source_random_pairs = get_state_pairs(source_random_batch)
-    source_expert_pairs = get_state_pairs(source_expert_batch)
-
-    ## update
-    new_policy_disc, policy_disc_info, policy_disc_stats_info = new_domain_encoder.policy_discriminator.update(
-        fake_batch=jnp.concatenate([target_random_pairs, source_random_pairs]),
-        real_batch=jnp.concatenate([source_expert_pairs, source_expert_pairs]), # TODO: jax-based crutch for Gradient Penalty usage
-    )
-
-    # update domain encoder
-    new_domain_encoder = new_domain_encoder.replace(
-        state_discriminator=new_state_disc,
-        policy_discriminator=new_policy_disc,
-    )
-    info.update({**state_disc_info, **policy_disc_info})
-    stats_info.update({**state_disc_stats_info, **policy_disc_stats_info})
+    # final update
+    new_domain_encoder = new_domain_encoder.replace(discriminators=new_discrs)
+    info.update(discrs_info)
+    stats_info.update(discrs_stats_info)
 
     return (
         new_domain_encoder,

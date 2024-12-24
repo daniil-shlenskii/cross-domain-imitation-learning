@@ -32,31 +32,33 @@ model:
           learning_rate: 3e-4
     loss_config:
       _target_: agents.imitation_learning.dida.domain_encoder.losses.InDomainEncoderLoss
-  state_discriminator_config:
-    _target_: gan.discriminator.Discriminator.create
-    module_config:
-      _target_: networks.discriminator.Discriminator
-      hidden_dims: [256, 256]
-    optimizer_config:
-      transforms:
-        - _target_: optax.clip
-          max_delta: 1.0
-        - _target_: optax.adamw
-          learning_rate: 3e-4
-    loss_config:
-      _target_: gan.losses.SoftplusLoss
-      is_generator: False
-  policy_discriminator_config:
-    _target_: gan.discriminator.Discriminator.create
-    module_config:
-      _target_: networks.discriminator.Discriminator
-      hidden_dims: [256, 256]
-    optimizer_config:
-      transforms:
-        - _target_: optax.clip
-          max_delta: 1.0
-        - _target_: optax.adamw
-          learning_rate: 3e-4
-    loss_config:
-      _target_: gan.losses.SoftplusLoss
-      is_generator: False
+  discriminators_config:
+    _target_: agents.imitation_learning.dida.domain_encoder.DomainEncoderDiscriminators.create
+    state_discriminator_config:
+      _target_: gan.discriminator.Discriminator.create
+      module_config:
+        _target_: networks.discriminator.Discriminator
+        hidden_dims: [256, 256]
+      optimizer_config:
+        transforms:
+          - _target_: optax.clip
+            max_delta: 1.0
+          - _target_: optax.adamw
+            learning_rate: 3e-4
+      loss_config:
+        _target_: gan.losses.SoftplusLoss
+        is_generator: False
+    policy_discriminator_config:
+      _target_: gan.discriminator.Discriminator.create
+      module_config:
+        _target_: networks.discriminator.Discriminator
+        hidden_dims: [256, 256]
+      optimizer_config:
+        transforms:
+          - _target_: optax.clip
+            max_delta: 1.0
+          - _target_: optax.adamw
+            learning_rate: 3e-4
+      loss_config:
+        _target_: gan.losses.SoftplusLoss
+        is_generator: False
