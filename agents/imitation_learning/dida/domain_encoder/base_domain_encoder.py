@@ -254,7 +254,7 @@ def _update_jit(
     new_domain_encoder = domain_encoder.replace(rng=new_rng)
     return _update(
         domain_encoder=new_domain_encoder,
-        target_random_batch=target_random_batch,
+        target_random_batch=target_expert_batch,
         target_expert_batch=target_expert_batch,
         source_random_batch=source_random_batch,
         source_expert_batch=source_expert_batch,
