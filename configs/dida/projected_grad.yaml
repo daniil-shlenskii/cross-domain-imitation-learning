@@ -102,7 +102,7 @@ agent:
           - _target_: optax.adamw
             learning_rate: 3e-4
       loss_config:
-        _target_: agents.imitation_learning.dida.domain_encoder.losses.InDomainEncoderLoss
+        _target_: agents.imitation_learning.dida.domain_encoder.losses.InDomainEncoderProjectedGradLoss
     state_discriminator_config:
       _target_: gan.discriminator.Discriminator.create
       module_config:
