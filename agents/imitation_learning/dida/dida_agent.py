@@ -61,6 +61,7 @@ class DIDAAgent(GAILAgent):
             #
             domain_encoder=domain_encoder,
             das=das,
+            _save_attrs=_save_attrs,
             **kwargs,
         )
 
