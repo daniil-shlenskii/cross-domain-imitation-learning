@@ -28,8 +28,8 @@ def get_config_archive(config: Dict, config_path: str):
 
     default_storage_dir = config_path[:-len(".yaml")]
 
-    config_archive["load_dir"] = Path(config_archive.get("load_dir", default_storage_dir))
-    config_archive["save_dir"] = Path(config_archive.get("save_dir", default_storage_dir))
+    config_archive["load_dir"] = Path(config_archive.get("load_dir", default_storage_dir)) / "domain_encoder"
+    config_archive["save_dir"] = Path(config_archive.get("save_dir", default_storage_dir)) / "domain_encoder"
 
     config_archive["load_dir"].mkdir(exist_ok=True, parents=True)
     config_archive["save_dir"].mkdir(exist_ok=True, parents=True)
