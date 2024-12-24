@@ -78,7 +78,6 @@ def _update_jit(
     new_state_disc, state_disc_info, state_disc_stats_info = discriminators.state_discriminator.update(
         fake_batch=target_random_batch["observations"],
         real_batch=source_expert_batch["observations"],
-        return_logits=True,
     )
 
     # update policy discriminator
