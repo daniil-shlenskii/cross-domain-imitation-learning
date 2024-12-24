@@ -143,6 +143,6 @@ evaluation:
       id: *env_name
 
 archive:
-  agent_load_dir: &load_dir configs/domain_encoder/base_config
+  agent_load_dir: &load_dir configs/domain_encoder/projected_grad
   agent_buffer_load_dir: *load_dir
 
