@@ -123,7 +123,7 @@ def divergence_scores_fn(state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
     state_grad_norm = jnp.linalg.norm(state_grad)
 
     s = jnp.sign(cosine_similarity_fn(state_grad, projection))
-    
+
     divergence_score = s * projection_norm / state_grad_norm
 
     return divergence_score
