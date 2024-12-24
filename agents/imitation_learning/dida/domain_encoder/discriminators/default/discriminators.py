@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import jax
 import jax.numpy as jnp
 from hydra.utils import instantiate
@@ -13,6 +15,7 @@ from utils.types import DataType
 class DomainEncoderDiscriminators(BaseDomainEncoderDiscriminators):
     state_discriminator: Discriminator
     policy_discriminator: Discriminator
+    _save_attrs: Tuple[str]
 
     @classmethod
     def create(
