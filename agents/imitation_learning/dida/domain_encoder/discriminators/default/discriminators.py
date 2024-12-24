@@ -39,7 +39,7 @@ class DomainEncoderDiscriminators(BaseDomainEncoderDiscriminators):
         return cls(
             state_discriminator=state_discriminator,
             policy_discriminator=policy_discriminator,
-            _save_attr=("state_discriminator", "policy_discriminator")
+            _save_attrs=("state_discriminator", "policy_discriminator")
         )
 
     def get_state_discriminator(self):
