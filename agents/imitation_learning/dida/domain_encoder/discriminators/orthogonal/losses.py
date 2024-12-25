@@ -5,7 +5,7 @@ from nn.train_state import TrainState
 from utils.types import Params
 
 
-def _discrimiantors_gan_loss_decorator(cls: GANLoss):
+def _orthogonal_discrimiantors_gan_loss_decorator(cls: GANLoss):
     class DiscrimantorsGANLoss(cls):
         def __init__(self, *args, **kwargs):
             is_generator = kwargs.pop("is_generator", False)
@@ -15,7 +15,7 @@ def _discrimiantors_gan_loss_decorator(cls: GANLoss):
             self,
             params: Params,
             state: TrainState,
-            *
+            *,
             target_random_pairs: jnp.ndarray,
             source_random_pairs: jnp.ndarray,
             source_expert_pairs: jnp.ndarray,
@@ -44,7 +44,7 @@ def _discrimiantors_gan_loss_decorator(cls: GANLoss):
             )
 
             # loss
-            loss = state_loss + policy_loss
+            loss = (state_loss + policy_loss) * 0.5
 
             info = {
                 f"{state.info_key}/loss": loss,
@@ -54,4 +54,4 @@ def _discrimiantors_gan_loss_decorator(cls: GANLoss):
             return loss, info
     return DiscrimantorsGANLoss
 
-DiscriminatorsSoftplusLoss = _discrimiantors_gan_loss_decorator(SoftplusLoss)
+DiscriminatorsSoftplusLoss = _orthogonal_discrimiantors_gan_loss_decorator(SoftplusLoss)

@@ -11,35 +11,18 @@ from utils import SaveLoadFrozenDataclassMixin
 
 class TrainState(FlaxTrainState, SaveLoadFrozenDataclassMixin):
     loss_fn: Optional[Callable] = struct.field(pytree_node=False)
-    grad_fn: Callable = struct.field(pytree_node=False)
     info_key: str = struct.field(pytree_node=False)
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     @classmethod
     def create(
-        cls,
-        *,
-        apply_fn,
-        params,
-        tx,
-        loss_fn: Optional[Callable] = None,
-        grad_fn: Optional[Callable] = None,
-        **kwargs
+        cls, *, apply_fn, params, tx, loss_fn: Callable, **kwargs
     ):
-        assert not (loss_fn is None and grad_fn is None)
-        if grad_fn is None:
-            def grad_fn(params, state, **loss_kwargs):
-                grads, info = jax.grad(loss_fn, has_aux=True)(
-                    params, state=state, **loss_kwargs
-                )
-                return grads, info
-
         return super().create(
             apply_fn=apply_fn,
             params=params,
             tx=tx,
             loss_fn=loss_fn,
-            grad_fn=grad_fn,
             _save_attrs=("step", "params", "opt_state"),
             **kwargs,
         )
@@ -48,7 +31,9 @@ class TrainState(FlaxTrainState, SaveLoadFrozenDataclassMixin):
         return self.apply_fn({"params": self.params}, *args, **kwargs)
 
     def update(self, **loss_kwargs):
-        grads, info = self.grad_fn(self.params, state=self, **loss_kwargs)
+        grads, info = jax.grad(self.loss_fn, has_aux=True)(
+            self.params, state=self, **loss_kwargs
+        )
 
         stats_info = {}
         stats_info[f"{self.info_key}/max_grad_norm"] = _compute_norms(grads)

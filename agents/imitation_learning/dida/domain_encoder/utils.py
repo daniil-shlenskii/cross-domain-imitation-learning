@@ -102,12 +102,22 @@ def get_policy_discriminator_divergence_score(domain_encoder: "BaseDomainEncoder
     # divergence score
     ## source expert
     ### state grad
-    _, source_expert_state_grad = jax.value_and_grad(loss_fn.source_state_loss, has_aux=True)(
-        source_state.params,
-        state=source_state,
-        discriminator=domain_encoder.state_discriminator,
-        states=source_expert_batch["observations"],
-    )
+    if domain_encoder.discriminators.has_state_discriminator_paired_input:
+        _, source_expert_state_grad = jax.value_and_grad(loss_fn.source_state_loss, has_aux=True)(
+            source_state.params,
+            state=source_state,
+            discriminator=domain_encoder.state_discriminator,
+            states=source_expert_batch["observations"],
+            states_next=source_expert_batch["observations_next"],
+        )
+    else:
+        _, source_expert_state_grad = jax.value_and_grad(loss_fn.source_state_loss, has_aux=True)(
+            source_state.params,
+            state=source_state,
+            discriminator=domain_encoder.state_discriminator,
+            states=source_expert_batch["observations"],
+        )
+
     source_expert_state_grad = flatten_fn(source_expert_state_grad)
 
     ### policy grad

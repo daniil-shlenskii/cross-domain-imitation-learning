@@ -27,6 +27,7 @@ class InDomainEncoderLoss(DomainEncoderLossMixin):
             state=state,
             discriminator=state_discriminator,
             states=target_random_batch["observations"],
+            states_next=target_random_batch["observations_next"],
         )
         tp_loss, tp_info = self.target_policy_loss(
             params=params,
@@ -40,6 +41,7 @@ class InDomainEncoderLoss(DomainEncoderLossMixin):
             state=state,
             discriminator=state_discriminator,
             states=source_expert_batch["observations"],
+            states_next=source_expert_batch["observations_next"],
         )
         sp_loss, sp_info = self.source_policy_loss(
             params=params,
@@ -84,6 +86,7 @@ class CrossDomainTargetEncoderLoss(DomainEncoderLossMixin):
             state=state,
             discriminator=state_discriminator,
             states=target_random_batch["observations"],
+            states_next=target_random_batch["observations", "observations_next"],
         )
         tp_loss, tp_info = self.target_policy_loss(
             params=params,
@@ -123,6 +126,7 @@ class CrossDomainSourceEncoderLoss(DomainEncoderLossMixin):
             state=state,
             discriminator=state_discriminator,
             states=source_expert_batch["observations"],
+            states_next=source_expert_batch["observations_next"],
         )
         sp_loss, sp_info = self.source_policy_loss(
             params=params,

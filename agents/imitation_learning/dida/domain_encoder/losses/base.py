@@ -1,8 +1,6 @@
 from typing import Callable
 
 import jax.numpy as jnp
-from hydra.utils import instantiate
-from omegaconf import DictConfig
 
 from gan.discriminator import Discriminator
 from gan.losses import GANLoss
@@ -15,17 +13,15 @@ class DomainEncoderLossMixin:
         self,
         policy_loss: GANLoss,
         state_loss: GANLoss,
-        grads_processor_config: DictConfig=None,
+        has_state_discriminator_paired_input: bool = False,
     ):
         self._set_policy_loss_fns(policy_loss)
         self._set_state_loss_fns(state_loss)
-        if grads_processor_config is None:
-            def grads_processor(state_grad, policy_grad, state_loss_scale):
-                return policy_grad + state_grad * state_loss_scale, {}
-        else:
-            grads_processor = instantiate(grads_processor_config)
-        self.grads_processor = grads_processor
 
+        if has_state_discriminator_paired_input:
+            self._state_loss = self._state_paired_input_loss
+        else:
+            self._state_loss = self._state_single_input_loss
 
     def _set_state_loss_fns(self, state_loss: GANLoss):
         """For discriminator deceiving."""
@@ -45,12 +41,13 @@ class DomainEncoderLossMixin:
 
     # losses templates
 
-    def _state_loss(
+    def _state_single_input_loss(
         self,
         params: Params,
         state: TrainState,
         discriminator: Discriminator,
         states: jnp.ndarray,
+        states_next: jnp.ndarray,
         #
         state_loss_fn: Callable,
     ):
@@ -58,6 +55,25 @@ class DomainEncoderLossMixin:
         logits = discriminator(states)
         return state_loss_fn(logits).mean(), {
             "states": states
+        }
+
+    def _state_paired_input_loss(
+        self,
+        params: Params,
+        state: TrainState,
+        discriminator: Discriminator,
+        states: jnp.ndarray,
+        states_next: jnp.ndarray,
+        #
+        state_loss_fn: Callable,
+    ):
+        states = state.apply_fn({"params": params}, states)
+        states_next = state.apply_fn({"params": params}, states_next)
+        state_pairs = jnp.concatenate([states, states_next], axis=1)
+        logits = discriminator(state_pairs)
+        return state_loss_fn(logits).mean(), {
+            "states": states,
+            "states_next": states_next,
         }
 
     def _policy_loss(

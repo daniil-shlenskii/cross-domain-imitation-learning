@@ -1,5 +1,3 @@
-from typing import Callable
-
 import jax
 import jax.numpy as jnp
 from flax.struct import PyTreeNode
@@ -44,16 +42,16 @@ class OrthogonalDomainEncoderDiscriminators(BaseDomainEncoderDiscriminators):
 
     def get_state_discriminator(self):
         class StateDiscriminator(PyTreeNode):
-            discriminators_state: "OrthogonalDomainEncoderDiscriminators"
+            state: "OrthogonalDomainEncoderDiscriminators"
             def __call__(self, x: jnp.ndarray):
-                return self.discriminators_state(x)[0]
+                return self.state(x)[0]
         return StateDiscriminator(self.state)
 
     def get_policy_discriminator(self):
         class PolicyDiscriminator(PyTreeNode):
-            discriminators_state: "OrthogonalDomainEncoderDiscriminators"
-            def __call___(self, x: jnp.ndarray):
-                return self.discriminators_state(x)[1]
+            state: "OrthogonalDomainEncoderDiscriminators"
+            def __call__(self, x: jnp.ndarray):
+                return self.state(x)[1]
         return PolicyDiscriminator(self.state)
 
     def get_state_loss(self):

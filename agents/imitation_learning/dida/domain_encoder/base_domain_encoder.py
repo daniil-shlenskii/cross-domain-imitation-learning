@@ -14,8 +14,7 @@ from agents.imitation_learning.dida.domain_encoder import \
 from agents.imitation_learning.dida.domain_encoder.utils import (
     get_discriminators_scores, get_policy_discriminator_divergence_score)
 from agents.imitation_learning.utils import (
-    get_random_from_expert_buffer_state, get_state_pairs, prepare_buffer)
-from gan.discriminator import Discriminator
+    get_random_from_expert_buffer_state, prepare_buffer)
 from gan.generator import Generator
 from utils import SaveLoadFrozenDataclassMixin
 from utils.types import BufferState, DataType, PRNGKey
@@ -89,6 +88,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         target_encoder_config = OmegaConf.to_container(target_encoder_config)
         target_encoder_config["loss_config"]["state_loss"] = discriminators.get_state_loss()
         target_encoder_config["loss_config"]["policy_loss"] = discriminators.get_policy_loss()
+        target_encoder_config["loss_config"]["has_state_discriminator_paired_input"] = discriminators.has_state_discriminator_paired_input
 
         target_dim = target_random_buffer_state.experience["observations"].shape[-1]
 
