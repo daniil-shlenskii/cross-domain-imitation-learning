@@ -1,0 +1,47 @@
+seed: &seed 0
+
+n_iters_training: 5_000_000
+batch_size: &batch_size 2048
+
+log_every: 500
+eval_every: 5_000
+save_every: 5_000
+
+model:
+  _target_: agents.dida.InDomainEncoder.create
+  seed: *seed
+  encoding_dim: 17
+  state_loss_scale: 0.2
+  #
+  target_batch_size: *batch_size
+  target_random_buffer_state_path: ._tmp_archive_dir/random_buffers/HalfCheetah-v5.pickle
+  #
+  source_batch_size: *batch_size
+  source_expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
+  #
+  target_encoder_config:
+    _target_: gan.generator.Generator.create
+    module_config:
+      _target_: networks.common.MLP
+      hidden_dims: [128]
+    optimizer_config:
+      transforms:
+        - _target_: optax.clip
+          max_delta: 1.0
+        - _target_: optax.adamw
+          learning_rate: 3e-4
+    loss_config:
+      _target_: agents.imitation_learning.dida.domain_encoder.losses.InDomainEncoderLoss
+  discriminators_config:
+    _target_: agents.imitation_learning.dida.domain_encoder.OrthogonalDomainEncoderDiscriminators.create
+    module_config:
+      _target_: agents.imitation_learning.dida.domain_encoder.discriminators.orthogonal.networks.DiscriminatorsModule
+      hidden_dims: [64]
+    optimizer_config:
+      transforms:
+        - _target_: optax.clip
+          max_delta: 1.0
+        - _target_: optax.adamw
+          learning_rate: 3e-4
+    loss_fn_config:
+      _target_: agents.imitation_learning.dida.domain_encoder.discriminators.orthogonal.losses.DiscriminatorsSoftplusLoss

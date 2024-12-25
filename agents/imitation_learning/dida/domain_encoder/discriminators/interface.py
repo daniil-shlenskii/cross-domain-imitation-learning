@@ -9,6 +9,7 @@ from utils.types import DataType
 
 
 class BaseDomainEncoderDiscriminators(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
+    has_state_discriminator_paired_input: str = struct.field(pytree_node=False)
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     @abstractmethod

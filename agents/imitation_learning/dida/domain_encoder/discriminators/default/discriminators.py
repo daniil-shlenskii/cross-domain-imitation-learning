@@ -39,6 +39,7 @@ class DomainEncoderDiscriminators(BaseDomainEncoderDiscriminators):
         return cls(
             state_discriminator=state_discriminator,
             policy_discriminator=policy_discriminator,
+            has_state_discriminator_paired_input=False,
             _save_attrs=("state_discriminator", "policy_discriminator")
         )
 

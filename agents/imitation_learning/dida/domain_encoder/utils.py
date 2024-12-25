@@ -1,5 +1,3 @@
-import functools
-
 import jax
 import jax.numpy as jnp
 
@@ -7,7 +5,6 @@ from agents.imitation_learning.utils import get_state_pairs
 from gan.discriminator import Discriminator
 
 
-@jax.jit
 def get_discriminators_scores(domain_encoder: "BaseDomainEncoder", seed: int=0):
     rng = jax.random.key(seed)
 
@@ -19,10 +16,41 @@ def get_discriminators_scores(domain_encoder: "BaseDomainEncoder", seed: int=0):
         "source_expert": source_expert_batch,
     }
 
-    # prepare state pairs
+    # prepare states and state pairs
+    states = {
+        k: batch["observations"] for k, batch in batches.items()
+    }
     state_pairs = {
         k: get_state_pairs(batch) for k, batch in batches.items()
     }
+
+    # get scores
+    def _get_scores(discriminator, inputs, is_reals):
+        scores = {
+            k: _get_discriminator_score(
+                discriminator=discriminator,
+                x=inputs[k],
+                is_real=is_reals[k],
+            )
+            for k in batches
+        }
+        return scores
+
+    ## get state scores
+    is_reals = {
+        "target_random": False,
+        "source_random": True,
+        "source_expert": True,
+    }
+    if domain_encoder.discriminators.has_state_discriminator_paired_input:
+        state_scores = _get_scores(
+            domain_encoder.state_discriminator, state_pairs, is_reals
+        )
+    else:
+        state_scores = _get_scores(
+            domain_encoder.state_discriminator, states, is_reals
+        )
+    state_score = sum(state_scores.values()) / len(state_scores)
 
     # get policy scores
     is_reals = {
@@ -30,40 +58,23 @@ def get_discriminators_scores(domain_encoder: "BaseDomainEncoder", seed: int=0):
         "source_random": False,
         "source_expert": True,
     }
-    policy_scores = {
-        k: _get_discriminator_score(
-            discriminator=domain_encoder.policy_discriminator,
-            x=state_pairs[k],
-            is_real=is_reals[k],
-        )
-        for k in batches
-    }
+    policy_scores = _get_scores(
+        domain_encoder.policy_discriminator,
+        state_pairs,
+        is_reals,
+    )
     policy_score = sum(policy_scores.values()) / len(policy_scores) # TODO: batches may have differnt size
 
-    # get state scores
-    is_reals = {
-        "target_random": False,
-        "source_random": True,
-        "source_expert": True,
-    }
-    state_scores = {
-        k: _get_discriminator_score(
-            discriminator=domain_encoder.state_discriminator,
-            x=v["observations"],
-            is_real=is_reals[k],
-        )
-        for k, v in batches.items()
-    }
-    state_score = sum(state_scores.values()) / len(state_scores)
-
     eval_info = {
-        "policy_score": policy_score,
-        "state_score": state_score,
-        **{f"policy_{k}_score": score for k, score in policy_scores.items()},
-        **{f"state_{k}_score": score for k, score in state_scores.items()},
-    }
+            "policy_score": policy_score,
+            "state_score": state_score,
+            **{f"policy_{k}_score": score for k, score in policy_scores.items()},
+            **{f"state_{k}_score": score for k, score in state_scores.items()},
+        }
     return eval_info
 
+
+@jax.jit
 def _get_discriminator_score(discriminator: Discriminator, x: jnp.ndarray, is_real: bool):
     logits = discriminator(x)
     mask = jax.lax.cond(
