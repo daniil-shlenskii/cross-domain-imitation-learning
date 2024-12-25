@@ -82,7 +82,7 @@ def _get_discriminator_score(discriminator: Discriminator, x: jnp.ndarray, is_re
     score = mask.sum() / len(mask)
     return score
 
-def get_policy_discriminator_divergence_score(domain_encoder: "BaseDomainEncoder", seed: int=0):
+def get_policy_discriminator_divergence_score_params(domain_encoder: "BaseDomainEncoder", seed: int=0):
     # sample batches
     rng = jax.random.key(seed)
     rng, target_random_batch, source_random_batch, source_expert_batch = domain_encoder.sample_batches(rng)
@@ -123,7 +123,39 @@ def get_policy_discriminator_divergence_score(domain_encoder: "BaseDomainEncoder
         policy_grad=source_expert_policy_grad
     )
 
-    return {"divergence_score/source_expert": se_divergence_score,}
+    return {"divergence_score_params/source_expert": se_divergence_score,}
+
+def get_policy_discriminator_divergence_score_embeddings(domain_encoder: "BaseDomainEncoder", seed: int=0):
+    # sample batches
+    rng = jax.random.key(seed)
+    rng, target_random_batch, source_random_batch, source_expert_batch = domain_encoder.sample_encoded_batches(rng)
+
+    # get_pairs
+    source_expert_pairs = get_state_pairs(source_expert_batch)
+
+    #
+    loss_fn = domain_encoder.target_encoder.state.loss_fn
+
+    # divergence score
+    ## source expert
+    ### state grad
+    source_expert_state_grad = jax.grad(
+        lambda x: loss_fn.real_state_loss_fn(domain_encoder.state_discriminator(x))
+    )(source_expert_pairs)
+    source_expert_state_grad = source_expert_state_grad.mean(0)
+
+    ### policy grad
+    source_expert_policy_grad = jax.grad(
+        lambda x: loss_fn.real_policy_loss_fn(domain_encoder.policy_discriminator(x))
+    )(source_expert_pairs)
+    source_expert_policy_grad = source_expert_policy_grad.mean(0)
+
+    se_divergence_score = divergence_scores_fn(
+        state_grad=source_expert_state_grad,
+        policy_grad=source_expert_policy_grad
+    )
+
+    return {"divergence_score_embeddings/source_expert": se_divergence_score,}
 
 def divergence_scores_fn(state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
     projection = project_a_to_b(a=policy_grad, b=state_grad)
