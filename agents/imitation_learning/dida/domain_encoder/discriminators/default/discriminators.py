@@ -96,7 +96,7 @@ def _update_jit(
     # final update
     new_discriminators = discriminators.replace(
         state_discriminator=new_state_disc,
-        policy_discriminator=new_policy_disc, 
+        policy_discriminator=new_policy_disc,
     )
     info = {**state_disc_info, **policy_disc_info}
     stats_info = {**state_disc_stats_info, **policy_disc_stats_info}

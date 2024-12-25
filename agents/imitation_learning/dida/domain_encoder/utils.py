@@ -43,13 +43,9 @@ def get_discriminators_scores(domain_encoder: "BaseDomainEncoder", seed: int=0):
         "source_expert": True,
     }
     if domain_encoder.discriminators.has_state_discriminator_paired_input:
-        state_scores = _get_scores(
-            domain_encoder.state_discriminator, state_pairs, is_reals
-        )
+        state_scores = _get_scores(domain_encoder.state_discriminator, state_pairs, is_reals)
     else:
-        state_scores = _get_scores(
-            domain_encoder.state_discriminator, states, is_reals
-        )
+        state_scores = _get_scores(domain_encoder.state_discriminator, states, is_reals)
     state_score = sum(state_scores.values()) / len(state_scores)
 
     # get policy scores
@@ -102,21 +98,13 @@ def get_policy_discriminator_divergence_score(domain_encoder: "BaseDomainEncoder
     # divergence score
     ## source expert
     ### state grad
-    if domain_encoder.discriminators.has_state_discriminator_paired_input:
-        _, source_expert_state_grad = jax.value_and_grad(loss_fn.source_state_loss, has_aux=True)(
-            source_state.params,
-            state=source_state,
-            discriminator=domain_encoder.state_discriminator,
-            states=source_expert_batch["observations"],
-            states_next=source_expert_batch["observations_next"],
-        )
-    else:
-        _, source_expert_state_grad = jax.value_and_grad(loss_fn.source_state_loss, has_aux=True)(
-            source_state.params,
-            state=source_state,
-            discriminator=domain_encoder.state_discriminator,
-            states=source_expert_batch["observations"],
-        )
+    _, source_expert_state_grad = jax.value_and_grad(loss_fn.source_state_loss, has_aux=True)(
+        source_state.params,
+        state=source_state,
+        discriminator=domain_encoder.state_discriminator,
+        states=source_expert_batch["observations"],
+        states_next=source_expert_batch["observations_next"],
+     )
 
     source_expert_state_grad = flatten_fn(source_expert_state_grad)
 
