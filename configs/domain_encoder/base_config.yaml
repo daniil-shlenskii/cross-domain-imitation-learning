@@ -7,16 +7,20 @@ log_every: 500
 eval_every: 5_000
 save_every: 5_000
 
+update_encoder_every: &update_encoder_every 5
+
 model:
   _target_: agents.dida.InDomainEncoder.create
   seed: *seed
-  encoding_dim: 17
+  encoding_dim: 16
   #
   target_batch_size: *batch_size
   target_random_buffer_state_path: ._tmp_archive_dir/random_buffers/HalfCheetah-v5.pickle
   #
   source_batch_size: *batch_size
   source_expert_buffer_state_path: experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
+  #
+  update_encoder_every: *update_encoder_every
   #
   target_encoder_config:
     _target_: gan.generator.Generator.create
@@ -34,7 +38,7 @@ model:
       state_loss_scale: 0.2
   discriminators_config:
     _target_: agents.imitation_learning.dida.domain_encoder.DomainEncoderDiscriminators.create
-    update_policy_discriminator_every: 5
+    update_policy_discriminator_every: *update_encoder_every
     state_discriminator_config:
       _target_: gan.discriminator.Discriminator.create
       module_config:
