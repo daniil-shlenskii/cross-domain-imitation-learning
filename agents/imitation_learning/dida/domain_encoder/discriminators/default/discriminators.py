@@ -95,7 +95,7 @@ def _update_jit(
         real_batch=source_expert_pairs,
     )
     new_policy_disc = jax.lax.cond(
-        (discriminators.policy_discriminator.state.step + 1) % discriminators.update_policy_discriminator_every == 0,
+        (discriminators.state_discriminator.state.step + 1) % discriminators.update_policy_discriminator_every == 0,
         lambda: new_policy_disc,
         lambda: discriminators.policy_discriminator,
     )
