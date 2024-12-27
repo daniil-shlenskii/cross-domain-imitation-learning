@@ -143,15 +143,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         return self.source_encoder(state)
 
     def pretrain_update(self):
-        (
-            new_domain_encoder,
-            _,
-            _,
-            _,
-            _,
-            info,
-            stats_info,
-        ) = _pretrain_update_jit(domain_encoder=self)
+        new_domain_encoder, info, stats_info = _pretrain_update_jit(domain_encoder=self)
         return new_domain_encoder, info, stats_info
 
     def update(self, target_expert_batch: DataType):
@@ -177,7 +169,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             stats_info,
         )
 
-    def evaluate(self, seed: int=0):
+    def evaluate(self, seed: int):
         scores = get_discriminators_scores(domain_encoder=self, seed=seed)
         divergence_scores = get_policy_discriminator_divergence_score_params(domain_encoder=self, seed=seed)
         eval_info = {**scores, **divergence_scores}
@@ -218,45 +210,41 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         self,
         *,
         target_random_batch: DataType,
-        target_expert_batch: DataType,
-        source_random_batch: DataType,
         source_expert_batch: DataType,
     ):
         pass
 
 @jax.jit
 def _pretrain_update_jit(domain_encoder: BaseDomainEncoder):
-    (
-        new_rng,
-        target_random_batch,
-        source_random_batch,
-        source_expert_batch,
-    ) = domain_encoder.sample_batches(domain_encoder.rng)
+    new_rng, target_random_batch, source_random_batch, source_expert_batch = \
+        domain_encoder.sample_batches(domain_encoder.rng)
     new_domain_encoder = domain_encoder.replace(rng=new_rng)
-    return _update(
+    (
+        new_domain_encoder,
+        _,
+        _,
+        _,
+        info,
+        stats_info,
+    ) = _update(
         domain_encoder=new_domain_encoder,
         target_random_batch=target_random_batch,
-        target_expert_batch=target_random_batch,
         source_random_batch=source_random_batch,
         source_expert_batch=source_expert_batch,
     )
+    return new_domain_encoder, info, stats_info
 
 @jax.jit
 def _update_jit(
     domain_encoder: BaseDomainEncoder,
     target_expert_batch: DataType,
 ):
-    (
-        new_rng,
-        target_random_batch,
-        source_random_batch,
-        source_expert_batch,
-    ) = domain_encoder.sample_batches(domain_encoder.rng)
+    new_rng, _, source_random_batch, source_expert_batch = \
+        domain_encoder.sample_batches(domain_encoder.rng)
     new_domain_encoder = domain_encoder.replace(rng=new_rng)
     return _update(
         domain_encoder=new_domain_encoder,
         target_random_batch=target_expert_batch,
-        target_expert_batch=target_expert_batch,
         source_random_batch=source_random_batch,
         source_expert_batch=source_expert_batch,
     )
@@ -264,15 +252,12 @@ def _update_jit(
 def _update(
     domain_encoder: BaseDomainEncoder,
     target_random_batch: DataType,
-    target_expert_batch: DataType,
     source_random_batch: DataType,
     source_expert_batch: DataType,
 ):
     # update encoder
     new_domain_encoder, info, stats_info = domain_encoder._update_encoder(
         target_random_batch=target_random_batch,
-        target_expert_batch=target_expert_batch,
-        source_random_batch=source_random_batch,
         source_expert_batch=source_expert_batch,
     )
     target_random_batch = info.pop("target_random_batch")
@@ -284,8 +269,7 @@ def _update(
         lambda: domain_encoder,
     )
 
-    # encode target expert and source random batches
-    target_expert_batch = domain_encoder.encode_target_batch(target_expert_batch)
+    # encode source random batch
     source_random_batch = domain_encoder.encode_source_batch(source_random_batch)
 
     # update discriminators
@@ -303,7 +287,6 @@ def _update(
     return (
         new_domain_encoder,
         target_random_batch,
-        target_expert_batch,
         source_random_batch,
         source_expert_batch,
         info,

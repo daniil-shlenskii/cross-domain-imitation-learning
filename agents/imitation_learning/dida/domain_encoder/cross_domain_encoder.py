@@ -62,7 +62,6 @@ class CrossDomainEncoder(BaseDomainEncoder):
         *,
         target_random_batch: DataType,
         source_expert_batch: DataType,
-        **kwargs,
    ):
         new_target_encoder, target_info, target_stats_info = self.target_encoder.update(
             target_random_batch=target_random_batch,
