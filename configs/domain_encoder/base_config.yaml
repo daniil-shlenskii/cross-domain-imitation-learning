@@ -31,7 +31,7 @@ model:
           learning_rate: 3e-4
     loss_config:
       _target_: agents.imitation_learning.dida.domain_encoder.losses.InDomainEncoderLoss
-      state_loss_scale: 0.5
+      state_loss_scale: 0.2
   discriminators_config:
     _target_: agents.imitation_learning.dida.domain_encoder.DomainEncoderDiscriminators.create
     update_policy_discriminator_every: 5
