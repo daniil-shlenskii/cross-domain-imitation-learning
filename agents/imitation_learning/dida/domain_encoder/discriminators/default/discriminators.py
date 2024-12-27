@@ -21,6 +21,7 @@ class DomainEncoderDiscriminators(BaseDomainEncoderDiscriminators):
         encoding_dim: int,
         state_discriminator_config: DictConfig,
         policy_discriminator_config: DictConfig,
+        update_policy_discriminator_every: int = 1,
     ):
         state_discriminator = instantiate(
             state_discriminator_config,
@@ -39,6 +40,7 @@ class DomainEncoderDiscriminators(BaseDomainEncoderDiscriminators):
         return cls(
             state_discriminator=state_discriminator,
             policy_discriminator=policy_discriminator,
+            update_policy_discriminator_every=update_policy_discriminator_every,
             has_state_discriminator_paired_input=False,
             _save_attrs=("state_discriminator", "policy_discriminator")
         )
@@ -91,6 +93,11 @@ def _update_jit(
     new_policy_disc, policy_disc_info, policy_disc_stats_info = discriminators.policy_discriminator.update(
         fake_batch=jnp.concatenate([target_random_pairs, source_random_pairs]),
         real_batch=source_expert_pairs,
+    )
+    new_policy_disc = jax.lax.cond(
+        (discriminators.policy_discriminator.state.step + 1) % discriminators.update_policy_discriminator_every == 0,
+        lambda: new_policy_disc,
+        lambda: discriminators.policy_discriminator,
     )
 
     # final update

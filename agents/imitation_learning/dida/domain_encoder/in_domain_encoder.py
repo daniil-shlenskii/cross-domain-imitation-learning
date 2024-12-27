@@ -1,6 +1,3 @@
-import jax
-import jax.numpy as jnp
-
 from utils.types import DataType
 
 from .base_domain_encoder import BaseDomainEncoder
