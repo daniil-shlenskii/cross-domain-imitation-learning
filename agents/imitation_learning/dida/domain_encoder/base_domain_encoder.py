@@ -19,7 +19,7 @@ from agents.imitation_learning.utils import (
     get_random_from_expert_buffer_state, prepare_buffer)
 from gan.generator import Generator
 from utils import SaveLoadFrozenDataclassMixin
-from utils.types import BufferState, DataType, PRNGKey
+from utils.types import Buffer, BufferState, DataType, PRNGKey
 from utils.utils import sample_batch
 
 
@@ -27,8 +27,8 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     rng: PRNGKey
     target_encoder: Generator
     discriminators: BaseDomainEncoderDiscriminators
-    target_buffer: Any = struct.field(pytree_node=False)
-    source_buffer: Any = struct.field(pytree_node=False)
+    target_buffer: Buffer = struct.field(pytree_node=False)
+    source_buffer: Buffer = struct.field(pytree_node=False)
     target_random_buffer_state: BufferState = struct.field(pytree_node=False)
     source_random_buffer_state: BufferState = struct.field(pytree_node=False)
     source_expert_buffer_state: BufferState = struct.field(pytree_node=False)
@@ -191,7 +191,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         new_rng, target_random_batch = sample_batch(rng, self.target_buffer, self.target_random_buffer_state)
         new_rng, source_random_batch = sample_batch(new_rng, self.source_buffer, self.source_random_buffer_state)
         new_rng, source_expert_batch = sample_batch(new_rng, self.source_buffer, self.source_expert_buffer_state)
-        return new_rng, target_random_batch, source_random_batch, source_expert_batch,
+        return new_rng, target_random_batch, source_random_batch, source_expert_batch
 
     def encode_target_batch(self, batch):
         batch = deepcopy(batch)
@@ -207,13 +207,11 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
 
     def sample_encoded_batches(self, rng: PRNGKey):
         new_rng, target_random_batch, source_random_batch, source_expert_batch = self.sample_batches(rng)
-
-
         for k in ["observations", "observations_next"]:
             target_random_batch[k] = self.encode_target_state(target_random_batch[k])
             source_random_batch[k] = self.encode_source_state(source_random_batch[k])
             source_expert_batch[k] = self.encode_source_state(source_expert_batch[k])
-        return new_rng, target_random_batch, source_random_batch, source_expert_batch,
+        return new_rng, target_random_batch, source_random_batch, source_expert_batch
 
     @abstractmethod
     def _update_encoder(
