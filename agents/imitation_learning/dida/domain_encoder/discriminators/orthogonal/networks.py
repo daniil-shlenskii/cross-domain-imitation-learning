@@ -18,13 +18,15 @@ class BaseDiscrimiantorAffineTransform(nn.Module):
         x_dim = x.shape[-1]
 
         if self.is_params_first:
-            x_to_process, _ = jnp.split(x, (self.n_params,), axis=-1)
+            x_to_process, x_to_zero = jnp.split(x, (self.n_params,), axis=-1)
         else:
-            _, x_to_process = jnp.split(x, (x_dim - self.n_params,), axis=-1)
+            x_to_zero, x_to_process = jnp.split(x, (x_dim - self.n_params,), axis=-1)
 
-        logits = nn.Dense(1, kernel_init=default_init(), use_bias=self.use_bias)(x_to_process)
+        processed_x = nn.Dense(1, kernel_init=default_init(), use_bias=self.use_bias)(x_to_process).squeeze(-1) 
+        zeroed_x = (x_to_zero * 0.).mean(-1)
+        logits = processed_x + zeroed_x
 
-        return logits.squeeze(-1)
+        return logits
 
 class DiscriminatorsModule(nn.Module):
     n_state_discriminator_params: int = None

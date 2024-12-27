@@ -1,1 +1,30 @@
+# Exceptions
+!.gitignore
+!.py
+
+#
 __pycache__
+.DS_Store
+
+# Temporary Files
+tmp*
+
+# Heavy Data Files
+*.pickle
+*.npy
+*.pt
+
+# Logs
+*.log
+*wandb*
+
+# Configs
+*.yaml
+*.txt
+
+# Non-files
+\b[^\.]+\b
+
+#
+archive*
+experts*

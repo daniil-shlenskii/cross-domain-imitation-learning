@@ -92,7 +92,7 @@ def get_policy_discriminator_divergence_score_params(domain_encoder: "BaseDomain
     loss_fn = domain_encoder.target_encoder.state.loss_fn
     flatten_fn = lambda params_dict: jnp.concatenate([
         jnp.ravel(x) for x in
-        jax.tree.flatten(params_dict, is_leaf=lambda x: isinstance(x, float))[0]
+        jax.tree.flatten(params_dict, is_leaf=lambda x: isinstance(x, jnp.ndarray))[0]
     ])
 
     # divergence score
@@ -105,7 +105,6 @@ def get_policy_discriminator_divergence_score_params(domain_encoder: "BaseDomain
         states=source_expert_batch["observations"],
         states_next=source_expert_batch["observations_next"],
      )
-
     source_expert_state_grad = flatten_fn(source_expert_state_grad)
 
     ### policy grad
@@ -163,7 +162,10 @@ def divergence_scores_fn(state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
     projection_norm = jnp.linalg.norm(projection)
     state_grad_norm = jnp.linalg.norm(state_grad)
 
-    s = jnp.sign(cosine_similarity_fn(state_grad, projection))
+    if projection_norm == 0.:
+        s = 1.
+    else:
+        s = jnp.sign(cosine_similarity_fn(state_grad, projection))
 
     divergence_score = s * projection_norm / state_grad_norm
 
