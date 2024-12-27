@@ -32,7 +32,6 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     target_random_buffer_state: BufferState = struct.field(pytree_node=False)
     source_random_buffer_state: BufferState = struct.field(pytree_node=False)
     source_expert_buffer_state: BufferState = struct.field(pytree_node=False)
-    state_loss_scale: float = struct.field(pytree_node=False)
     update_encoder_every: int = struct.field(pytree_node=False)
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
@@ -53,11 +52,8 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         target_encoder_config: DictConfig,
         discriminators_config: DictConfig,
         #
-        state_loss_scale: float,
         update_encoder_every: int = 1,
-        #
         source_buffer_state_processor_config: DictConfig = None,
-        #
         **kwargs,
     ):
         # target random buffer state init
@@ -112,7 +108,6 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             source_expert_buffer_state=source_expert_buffer_state,
             target_encoder=target_encoder,
             discriminators=discriminators,
-            state_loss_scale=state_loss_scale,
             update_encoder_every=update_encoder_every,
             _save_attrs=(
                 "target_encoder",

@@ -11,7 +11,6 @@ model:
   _target_: agents.dida.InDomainEncoder.create
   seed: *seed
   encoding_dim: 17
-  state_loss_scale: 0.2
   #
   target_batch_size: *batch_size
   target_random_buffer_state_path: ._tmp_archive_dir/random_buffers/HalfCheetah-v5.pickle
@@ -32,6 +31,7 @@ model:
           learning_rate: 3e-4
     loss_config:
       _target_: agents.imitation_learning.dida.domain_encoder.losses.InDomainEncoderLoss
+      state_loss_scale: 0.2
   discriminators_config:
     _target_: agents.imitation_learning.dida.domain_encoder.DomainEncoderDiscriminators.create
     state_discriminator_config:

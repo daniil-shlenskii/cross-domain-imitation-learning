@@ -42,7 +42,7 @@ class InDomainEncoderProjectedGradLoss(DomainEncoderLossMixin):
             discriminator=state_discriminator,
             states=target_random_batch["observations"],
         )
-        (tp_loss, tp_info), tp_grad = jax.value_and_grad(self.target_policy_loss, has_aux=True)(
+        (tp_loss, tp_info), tp_grad = jax.value_and_grad(self.target_random_policy_loss, has_aux=True)(
             params,
             state=state,
             discriminator=policy_discriminator,
@@ -55,7 +55,7 @@ class InDomainEncoderProjectedGradLoss(DomainEncoderLossMixin):
             discriminator=state_discriminator,
             states=source_expert_batch["observations"],
         )
-        (sp_loss, sp_info), sp_grad = jax.value_and_grad(self.source_policy_loss, has_aux=True)(
+        (sp_loss, sp_info), sp_grad = jax.value_and_grad(self.source_expert_policy_loss, has_aux=True)(
             params,
             state=state,
             discriminator=policy_discriminator,

@@ -63,14 +63,12 @@ class CrossDomainEncoder(BaseDomainEncoder):
             target_random_batch=target_random_batch,
             policy_discriminator=self.policy_discriminator,
             state_discriminator=self.state_discriminator,
-            state_loss_scale=self.state_loss_scale,
         )
         new_source_encoder, source_info, source_stats_info = self.source_encoder.update(
             source_random_batch=source_random_batch,
             source_expert_batch=source_expert_batch,
             policy_discriminator=self.policy_discriminator,
             state_discriminator=self.state_discriminator,
-            state_loss_scale=self.state_loss_scale,
         )
         new_encoder = self.replace(
             target_encoder=new_target_encoder,

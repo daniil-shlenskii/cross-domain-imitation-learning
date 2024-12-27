@@ -20,7 +20,6 @@ class InDomainEncoder(BaseDomainEncoder):
             source_expert_batch=source_expert_batch,
             policy_discriminator=self.policy_discriminator,
             state_discriminator=self.state_discriminator,
-            state_loss_scale=self.state_loss_scale,
         )
         new_encoder = self.replace(target_encoder=new_target_encoder)
         return new_encoder, info, stats_info
