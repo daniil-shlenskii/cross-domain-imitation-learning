@@ -138,9 +138,12 @@ def get_policy_discriminator_divergence_score_embeddings(domain_encoder: "BaseDo
     # divergence score
     ## source expert
     ### state grad
+    state_discriminator_input = source_expert_batch["observations"]
+    if domain_encoder.discriminators.has_state_discriminator_paired_input:
+        state_discriminator_input = source_expert_pairs
     source_expert_state_grad = jax.grad(
         lambda x: loss_fn.real_state_loss_fn(domain_encoder.state_discriminator(x))
-    )(source_expert_pairs)
+    )(state_discriminator_input)
     source_expert_state_grad = source_expert_state_grad.mean(0)
 
     ### policy grad
@@ -148,6 +151,7 @@ def get_policy_discriminator_divergence_score_embeddings(domain_encoder: "BaseDo
         lambda x: loss_fn.real_policy_loss_fn(domain_encoder.policy_discriminator(x))
     )(source_expert_pairs)
     source_expert_policy_grad = source_expert_policy_grad.mean(0)
+    source_expert_policy_grad = source_expert_policy_grad.at[:source_expert_state_grad.shape[-1]].get()
 
     se_divergence_score = divergence_scores_fn(
         state_grad=source_expert_state_grad,

@@ -172,11 +172,9 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     def evaluate(self, seed: int):
         scores = get_discriminators_scores(domain_encoder=self, seed=seed)
         divergence_scores = get_policy_discriminator_divergence_score_params(domain_encoder=self, seed=seed)
-        eval_info = {**scores, **divergence_scores}
+        divergence_scores_embeddings = get_policy_discriminator_divergence_score_embeddings(domain_encoder=self, seed=seed)
 
-        if self.discriminators.has_state_discriminator_paired_input:
-            divergence_scores_embeddings = get_policy_discriminator_divergence_score_embeddings(domain_encoder=self, seed=seed)
-            eval_info.update(divergence_scores_embeddings)
+        eval_info = {**scores, **divergence_scores, **divergence_scores_embeddings}
         return eval_info
 
     def sample_batches(self, rng: PRNGKey):
