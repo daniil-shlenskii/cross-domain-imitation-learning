@@ -104,13 +104,6 @@ class DomainEncoderLossMixin:
             state_loss_fn=self.fake_state_loss_fn,
         )
 
-    def target_policy_loss(self, *args, **kwargs):
-        return self._policy_loss(
-            *args,
-            **kwargs,
-            policy_loss_fn=self.fake_policy_loss_fn,
-        )
-
     def source_state_loss(self, *args, **kwargs):
         return self._state_loss(
             *args,
@@ -118,7 +111,21 @@ class DomainEncoderLossMixin:
             state_loss_fn=self.real_state_loss_fn,
         )
 
-    def source_policy_loss(self, *args, **kwargs):
+    def target_random_policy_loss(self, *args, **kwargs):
+        return self._policy_loss(
+            *args,
+            **kwargs,
+            policy_loss_fn=self.fake_policy_loss_fn,
+        )
+
+    def source_random_policy_loss(self, *args, **kwargs):
+        return self._policy_loss(
+            *args,
+            **kwargs,
+            policy_loss_fn=self.fake_policy_loss_fn,
+        )
+
+    def source_expert_policy_loss(self, *args, **kwargs):
         return self._policy_loss(
             *args,
             **kwargs,

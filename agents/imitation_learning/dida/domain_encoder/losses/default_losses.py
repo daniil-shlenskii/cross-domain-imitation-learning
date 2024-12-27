@@ -15,24 +15,19 @@ class InDomainEncoderLoss(DomainEncoderLossMixin):
         state_discriminator: Discriminator,
         policy_discriminator: Discriminator,
         target_random_batch: DataType,
+        source_random_batch: DataType,
         source_expert_batch: DataType,
         state_loss_scale: float,
     ):
         target_random_batch = deepcopy(target_random_batch)
+        source_random_batch = deepcopy(source_random_batch)
         source_expert_batch = deepcopy(source_expert_batch)
 
-        # compute state and policy losses
+        # state losses
         ts_loss, _ = self.target_state_loss(
             params=params,
             state=state,
             discriminator=state_discriminator,
-            states=target_random_batch["observations"],
-            states_next=target_random_batch["observations_next"],
-        )
-        tp_loss, tp_info = self.target_policy_loss(
-            params=params,
-            state=state,
-            discriminator=policy_discriminator,
             states=target_random_batch["observations"],
             states_next=target_random_batch["observations_next"],
         )
@@ -43,7 +38,23 @@ class InDomainEncoderLoss(DomainEncoderLossMixin):
             states=source_expert_batch["observations"],
             states_next=source_expert_batch["observations_next"],
         )
-        sp_loss, sp_info = self.source_policy_loss(
+
+        # policy losses
+        trp_loss, trp_info = self.target_random_policy_loss(
+            params=params,
+            state=state,
+            discriminator=policy_discriminator,
+            states=target_random_batch["observations"],
+            states_next=target_random_batch["observations_next"],
+        )
+        srp_loss, srp_info = self.source_random_policy_loss(
+            params=params,
+            state=state,
+            discriminator=policy_discriminator,
+            states=source_random_batch["observations"],
+            states_next=source_random_batch["observations_next"],
+        )
+        sep_loss, sep_info = self.source_expert_policy_loss(
             params=params,
             state=state,
             discriminator=policy_discriminator,
@@ -53,18 +64,21 @@ class InDomainEncoderLoss(DomainEncoderLossMixin):
 
         # final loss
         state_loss = ts_loss + ss_loss
-        policy_loss = tp_loss + sp_loss
+        policy_loss = trp_loss + srp_loss + sep_loss
         loss = policy_loss + state_loss * state_loss_scale
 
         # update batches
-        target_random_batch["observations"] = tp_info["states"]
-        target_random_batch["observations_next"] = tp_info["states_next"]
-        source_expert_batch["observations"] = sp_info["states"]
-        source_expert_batch["observations_next"] = sp_info["states_next"]
+        target_random_batch["observations"] = trp_info["states"]
+        target_random_batch["observations_next"] = trp_info["states_next"]
+        source_random_batch["observations"] = srp_info["states"]
+        source_random_batch["observations_next"] = srp_info["states_next"]
+        source_expert_batch["observations"] = sep_info["states"]
+        source_expert_batch["observations_next"] = sep_info["states_next"]
 
         return loss, {
             f"{state.info_key}/loss": loss,
             "target_random_batch": target_random_batch,
+            "source_random_batch": source_random_batch,
             "source_expert_batch": source_expert_batch
         }
 
@@ -80,7 +94,7 @@ class CrossDomainTargetEncoderLoss(DomainEncoderLossMixin):
     ):
         target_random_batch = deepcopy(target_random_batch)
 
-        # compute state and policy losses
+        # state loss
         ts_loss, _ = self.target_state_loss(
             params=params,
             state=state,
@@ -88,7 +102,9 @@ class CrossDomainTargetEncoderLoss(DomainEncoderLossMixin):
             states=target_random_batch["observations"],
             states_next=target_random_batch["observations", "observations_next"],
         )
-        tp_loss, tp_info = self.target_policy_loss(
+
+        # policy loss
+        trp_loss, trp_info = self.target_random_policy_loss(
             params=params,
             state=state,
             discriminator=policy_discriminator,
@@ -97,11 +113,11 @@ class CrossDomainTargetEncoderLoss(DomainEncoderLossMixin):
         )
 
         # final loss
-        loss = tp_loss + ts_loss * state_loss_scale
+        loss = trp_loss + ts_loss * state_loss_scale
 
         # update batches
-        target_random_batch["observations"] = tp_info["states"]
-        target_random_batch["observations_next"] = tp_info["states_next"]
+        target_random_batch["observations"] = trp_info["states"]
+        target_random_batch["observations_next"] = trp_info["states_next"]
 
         return loss, {
             f"{state.info_key}/target/loss": loss,
@@ -115,12 +131,14 @@ class CrossDomainSourceEncoderLoss(DomainEncoderLossMixin):
         state: TrainState,
         state_discriminator: Discriminator,
         policy_discriminator: Discriminator,
+        source_random_batch: DataType,
         source_expert_batch: DataType,
         state_loss_scale: float,
     ):
+        source_random_batch = deepcopy(source_random_batch)
         source_expert_batch = deepcopy(source_expert_batch)
 
-        # compute state and policy losses
+        # state loss
         ss_loss, _ = self.source_state_loss(
             params=params,
             state=state,
@@ -128,7 +146,16 @@ class CrossDomainSourceEncoderLoss(DomainEncoderLossMixin):
             states=source_expert_batch["observations"],
             states_next=source_expert_batch["observations_next"],
         )
-        sp_loss, sp_info = self.source_policy_loss(
+
+        # policy losses
+        srp_loss, srp_info = self.source_expert_policy_loss(
+            params=params,
+            state=state,
+            discriminator=policy_discriminator,
+            states=source_random_batch["observations"],
+            states_next=source_random_batch["observations_next"],
+        )
+        sep_loss, sep_info = self.source_expert_policy_loss(
             params=params,
             state=state,
             discriminator=policy_discriminator,
@@ -137,13 +164,18 @@ class CrossDomainSourceEncoderLoss(DomainEncoderLossMixin):
         )
 
         # final loss
-        loss = sp_loss + ss_loss * state_loss_scale
+        state_loss = ss_loss
+        policy_loss = srp_loss + sep_loss
+        loss = policy_loss + state_loss * state_loss_scale
 
         # update batches
-        source_expert_batch["observations"] = sp_info["states"]
-        source_expert_batch["observations_next"] = sp_info["states_next"]
+        source_random_batch["observations"] = srp_info["states"]
+        source_random_batch["observations_next"] = srp_info["states_next"]
+        source_expert_batch["observations"] = sep_info["states"]
+        source_expert_batch["observations_next"] = sep_info["states_next"]
 
         return loss, {
             f"{state.info_key}/source/loss": loss,
-            "source_expert_batch": source_expert_batch
+            "source_random_batch": source_random_batch,
+            "source_expert_batch": source_expert_batch,
         }

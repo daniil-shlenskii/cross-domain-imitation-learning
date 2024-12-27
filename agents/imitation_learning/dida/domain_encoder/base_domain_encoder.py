@@ -210,6 +210,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         self,
         *,
         target_random_batch: DataType,
+        source_random_batch: DataType,
         source_expert_batch: DataType,
     ):
         pass
@@ -258,9 +259,11 @@ def _update(
     # update encoder
     new_domain_encoder, info, stats_info = domain_encoder._update_encoder(
         target_random_batch=target_random_batch,
+        source_random_batch=source_random_batch,
         source_expert_batch=source_expert_batch,
     )
     target_random_batch = info.pop("target_random_batch")
+    source_random_batch = info.pop("source_random_batch")
     source_expert_batch = info.pop("source_expert_batch")
 
     new_domain_encoder = jax.lax.cond(
@@ -268,9 +271,6 @@ def _update(
         lambda: new_domain_encoder,
         lambda: domain_encoder,
     )
-
-    # encode source random batch
-    source_random_batch = domain_encoder.encode_source_batch(source_random_batch)
 
     # update discriminators
     new_discrs, discrs_info, discrs_stats_info = domain_encoder.discriminators.update(

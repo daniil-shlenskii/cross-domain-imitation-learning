@@ -108,7 +108,7 @@ def get_policy_discriminator_divergence_score_params(domain_encoder: "BaseDomain
     source_expert_state_grad = flatten_fn(source_expert_state_grad)
 
     ### policy grad
-    _, source_expert_policy_grad = jax.value_and_grad(loss_fn.source_policy_loss, has_aux=True)(
+    _, source_expert_policy_grad = jax.value_and_grad(loss_fn.source_expert_policy_loss, has_aux=True)(
         source_state.params,
         state=source_state,
         discriminator=domain_encoder.policy_discriminator,

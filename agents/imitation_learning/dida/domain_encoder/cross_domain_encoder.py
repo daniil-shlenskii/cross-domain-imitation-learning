@@ -1,5 +1,3 @@
-import jax
-import jax.numpy as jnp
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 from omegaconf.omegaconf import OmegaConf
@@ -18,11 +16,8 @@ class CrossDomainEncoder(BaseDomainEncoder):
         cls,
         *,
         seed: int,
-        #
         encoding_dim: int,
-        #
         source_encoder_config: DictConfig,
-        #
         **kwargs,
     ):
         # base domain encoder init
@@ -61,6 +56,7 @@ class CrossDomainEncoder(BaseDomainEncoder):
         self,
         *,
         target_random_batch: DataType,
+        source_random_batch: DataType,
         source_expert_batch: DataType,
    ):
         new_target_encoder, target_info, target_stats_info = self.target_encoder.update(
@@ -70,6 +66,7 @@ class CrossDomainEncoder(BaseDomainEncoder):
             state_loss_scale=self.state_loss_scale,
         )
         new_source_encoder, source_info, source_stats_info = self.source_encoder.update(
+            source_random_batch=source_random_batch,
             source_expert_batch=source_expert_batch,
             policy_discriminator=self.policy_discriminator,
             state_discriminator=self.state_discriminator,
