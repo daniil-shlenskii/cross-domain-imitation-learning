@@ -6,10 +6,13 @@ from flax import struct
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
+import wandb
 from agents.imitation_learning.gail import GAILAgent
+from utils import convert_figure_to_array
 from utils.types import DataType
 
 from .domain_encoder.base_domain_encoder import BaseDomainEncoder
+from .utils import get_discriminators_logits_plots
 
 
 class DIDAAgent(GAILAgent):
@@ -102,6 +105,18 @@ class DIDAAgent(GAILAgent):
 
         domain_encoder_eval_info = self.domain_encoder.evaluate(seed=seed)
         eval_info.update(domain_encoder_eval_info)
+
+        target_state_plot, source_state_plot, target_policy_plot, source_policy_plot = \
+            get_discriminators_logits_plots(dida_agent=self, learner_trajs=trajs)
+        if convert_to_wandb_type:
+            target_state_plot = wandb.Image(convert_figure_to_array(target_state_plot), caption="(Discriminators) State Discriminator Learner logits")
+            source_state_plot = wandb.Image(convert_figure_to_array(source_state_plot), caption="(Discriminators) State Discriminator Expert logits")
+            target_policy_plot = wandb.Image(convert_figure_to_array(target_policy_plot), caption="(Discriminators) Policy Discriminator Learner logits")
+            source_policy_plot = wandb.Image(convert_figure_to_array(source_policy_plot), caption="(Discriminators) Policy Discriminator Expert logits")
+        eval_info["target_state_plot"] = target_state_plot
+        eval_info["source_state_plot"] = source_state_plot
+        eval_info["target_policy_plot"] = target_policy_plot
+        eval_info["source_policy_plot"] = source_policy_plot
 
         if return_trajectories:
             return eval_info, trajs
