@@ -1,13 +1,13 @@
 seed: &seed 0
 
-n_iters_training: 5_000_000
+n_iters_training: 2_000_000
 batch_size: &batch_size 2048
 
 log_every: 500
 eval_every: 5_000
 save_every: 5_000
 
-update_encoder_every: &update_encoder_every 10
+update_encoder_every: &update_encoder_every 6
 
 model:
   _target_: agents.dida.InDomainEncoder.create
