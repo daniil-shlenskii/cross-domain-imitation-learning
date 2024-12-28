@@ -7,7 +7,7 @@ log_every: 500
 eval_every: 5_000
 save_every: 5_000
 
-update_encoder_every: &update_encoder_every 5
+update_encoder_every: &update_encoder_every 10
 
 model:
   _target_: agents.dida.InDomainEncoder.create
