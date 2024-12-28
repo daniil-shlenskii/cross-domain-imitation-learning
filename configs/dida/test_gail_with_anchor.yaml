@@ -91,7 +91,6 @@ agent:
       _target_: gan.generator.Generator.create
       module_config:
         _target_: networks._tmp.Identity
-        hidden_dims: [128]
       optimizer_config: &update_opt
         transforms:
           - _target_: optax.clip
