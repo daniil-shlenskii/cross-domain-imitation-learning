@@ -63,7 +63,7 @@ def main(args: argparse.Namespace):
     OmegaConf.save(config, config_archive["agent_save_dir"] / "config.yaml")
 
     # wandb logging init
-    # wandb.init(project=args.wandb_project, dir=config_archive["agent_save_dir"])
+    wandb.init(project=args.wandb_project, dir=config_archive["agent_save_dir"])
 
     logger.info(f"\nCONFIG:\n-------\n{OmegaConf.to_yaml(config)}")
 
@@ -193,8 +193,8 @@ def main(args: argparse.Namespace):
                 #
                 **config.evaluation.get("extra_args", {})
             )
-            # for k, v in eval_info.items():
-            #     wandb.log({f"evaluation/{k}": v}, step=i)
+            for k, v in eval_info.items():
+                wandb.log({f"evaluation/{k}": v}, step=i)
 
         # sample actions
         if i < config.get("agent_starts_sampling_after", 0):
