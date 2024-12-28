@@ -106,17 +106,11 @@ class DIDAAgent(GAILAgent):
         domain_encoder_eval_info = self.domain_encoder.evaluate(seed=seed)
         eval_info.update(domain_encoder_eval_info)
 
-        target_state_plot, source_state_plot, target_policy_plot, source_policy_plot = \
-            get_discriminators_logits_plots(dida_agent=self, learner_trajs=trajs)
+        scores, plots = get_discriminators_logits_plots(dida_agent=self, learner_trajs=trajs)
         if convert_to_wandb_type:
-            target_state_plot = wandb.Image(convert_figure_to_array(target_state_plot), caption="(Discriminators) State Discriminator Learner logits")
-            source_state_plot = wandb.Image(convert_figure_to_array(source_state_plot), caption="(Discriminators) State Discriminator Expert logits")
-            target_policy_plot = wandb.Image(convert_figure_to_array(target_policy_plot), caption="(Discriminators) Policy Discriminator Learner logits")
-            source_policy_plot = wandb.Image(convert_figure_to_array(source_policy_plot), caption="(Discriminators) Policy Discriminator Expert logits")
-        eval_info["discriminators/target_state_plot"] = target_state_plot
-        eval_info["discriminators/source_state_plot"] = source_state_plot
-        eval_info["discriminators/target_policy_plot"] = target_policy_plot
-        eval_info["discriminators/source_policy_plot"] = source_policy_plot
+            for k, v in plots.items():
+                plots[k] = wandb.Image(convert_figure_to_array(v))
+        eval_info.update({**scores, **plots})
 
         if return_trajectories:
             return eval_info, trajs

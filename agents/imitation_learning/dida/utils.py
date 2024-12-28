@@ -39,7 +39,25 @@ def get_discriminators_logits_plots(
     target_policy_logits = apply_model_jit(discs.policy_discriminator, target_state_pairs)
     source_policy_logits = apply_model_jit(discs.policy_discriminator, source_state_pairs)
 
+    # accuracy
+    scores = {}
+    scores["discriminators/target_state_score"] = (target_state_logits < 0.).mean()
+    scores["discriminators/source_state_score"] = (source_state_logits > 0.).mean()
+    scores["discriminators/state_score"] = (
+        scores["discriminators/target_state_score"] +
+        scores["discriminators/source_state_score"]
+    ) * 0.5
+
+    scores["discriminators/target_policy_score"] = (target_policy_logits < 0.).mean()
+    scores["discriminators/source_policy_score"] = (source_policy_logits > 0.).mean()
+    scores["discriminators/policy_score"] = (
+        scores["discriminators/target_policy_score"] +
+        scores["discriminators/source_policy_score"]
+    ) * 0.5
+
     # plots
+    plots = {}
+
     def logits_to_plot(logits):
         figure = plt.figure(figsize=(5, 5))
         plt.plot(logits, "bo")
@@ -47,12 +65,9 @@ def get_discriminators_logits_plots(
         plt.close()
         return figure
 
-    ## state plots
-    target_state_plot = logits_to_plot(target_state_logits)
-    source_state_plot = logits_to_plot(source_state_logits)
+    plots["discriminators/target_state_plot"] = logits_to_plot(target_state_logits)
+    plots["discriminators/source_state_plot"] = logits_to_plot(source_state_logits)
+    plots["discriminators/target_policy_plot"] = logits_to_plot(target_policy_logits)
+    plots["discriminators/source_policy_plot"] = logits_to_plot(source_policy_logits)
 
-    ## policy plots
-    target_policy_plot = logits_to_plot(target_policy_logits)
-    source_policy_plot = logits_to_plot(source_policy_logits)
-
-    return target_state_plot, source_state_plot, target_policy_plot, source_policy_plot
+    return scores, plots
