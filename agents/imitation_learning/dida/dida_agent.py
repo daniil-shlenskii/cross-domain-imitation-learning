@@ -13,6 +13,7 @@ from .domain_encoder.base_domain_encoder import BaseDomainEncoder
 
 class DIDAAgent(GAILAgent):
     domain_encoder: BaseDomainEncoder
+    freeze_domain_encoder: bool = struct.field(pytree_node=False)
     das: float = struct.field(pytree_node=False)
 
     @classmethod
@@ -27,6 +28,7 @@ class DIDAAgent(GAILAgent):
         expert_buffer_state_path: str,
         #
         domain_encoder_config: DictConfig,
+        freeze_domain_encoder: bool = False,
         #
         das_config: DictConfig = None,
         #
@@ -61,6 +63,7 @@ class DIDAAgent(GAILAgent):
             expert_buffer_state_processor_config=expert_buffer_state_processor_config,
             #
             domain_encoder=domain_encoder,
+            freeze_domain_encoder=freeze_domain_encoder,
             das=das,
             _save_attrs=_save_attrs,
             **kwargs,
@@ -119,9 +122,14 @@ def _update_no_das_jit(dida_agent: DIDAAgent, learner_batch: DataType):
         source_expert_batch,
         info,
         stats_info,
-    ) = dida_agent.domain_encoder.update(
-        target_expert_batch=learner_batch,
+    ) = dida_agent.domain_encoder.update(target_expert_batch=learner_batch)
+
+    new_domain_encoder = jax.lax.cond(
+        dida_agent.freeze_domain_encoder,
+        lambda: new_domain_encoder,
+        lambda: dida_agent.domain_encoder,
     )
+
     new_dida_agent = dida_agent.replace(domain_encoder=new_domain_encoder)
 
     # update agent and policy discriminator
