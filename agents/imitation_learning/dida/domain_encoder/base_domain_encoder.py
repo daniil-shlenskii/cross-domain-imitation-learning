@@ -9,18 +9,20 @@ from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
+import wandb
 from agents.imitation_learning.dida.domain_encoder import \
     BaseDomainEncoderDiscriminators
 from agents.imitation_learning.dida.domain_encoder.utils import (
     get_discriminators_scores,
     get_policy_discriminator_divergence_score_embeddings,
-    get_policy_discriminator_divergence_score_params)
+    get_policy_discriminator_divergence_score_params,
+    get_states_tsne_scatterplots)
 from agents.imitation_learning.utils import (
     get_random_from_expert_buffer_state, prepare_buffer)
 from gan.generator import Generator
 from utils import SaveLoadFrozenDataclassMixin
 from utils.types import Buffer, BufferState, DataType, PRNGKey
-from utils.utils import sample_batch
+from utils.utils import convert_figure_to_array, sample_batch
 
 
 class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
@@ -162,12 +164,25 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             stats_info,
         )
 
-    def evaluate(self, seed: int):
+    def evaluate(
+        self,
+        seed: int,
+        convert_to_wandb_type: bool = True,
+    ):
         scores = get_discriminators_scores(domain_encoder=self, seed=seed)
         divergence_scores = get_policy_discriminator_divergence_score_params(domain_encoder=self, seed=seed)
         divergence_scores_embeddings = get_policy_discriminator_divergence_score_embeddings(domain_encoder=self, seed=seed)
 
-        eval_info = {**scores, **divergence_scores, **divergence_scores_embeddings}
+        states_tsne_plots = get_states_tsne_scatterplots(domain_encoder=self, seed=seed)
+        if convert_to_wandb_type:
+            states_tsne_plots = wandb.Image(convert_figure_to_array(states_tsne_plots), caption="TSNE plot of state feautures")
+
+        eval_info = {
+            **scores,
+            **divergence_scores,
+            **divergence_scores_embeddings,
+            "domain_encoder/state_tsne_plots": states_tsne_plots,
+        }
         return eval_info
 
     def sample_batches(self, rng: PRNGKey):

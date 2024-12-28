@@ -130,7 +130,7 @@ def main(args: argparse.Namespace):
                 observations=np.array(observation),
                 actions=np.array(action),
                 rewards=np.array(reward),
-                dones=np.array(done),
+                dones=np.array(done or truncated), # TODO: truncated should not be here
                 observations_next=np.array(observation_next),
             )
         )

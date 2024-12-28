@@ -1,9 +1,65 @@
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.manifold import TSNE
 
 from agents.imitation_learning.utils import get_state_pairs
 from gan.discriminator import Discriminator
+from utils.types import DataType
 
+
+def get_states_tsne_scatterplots(
+    domain_encoder: "BaseDomainEncoder",
+    seed: int,
+):
+    # get trajectories
+    target_random_trajs = domain_encoder.target_random_buffer_state.experience
+    source_random_trajs = domain_encoder.source_random_buffer_state.experience
+    source_expert_trajs = domain_encoder.source_expert_buffer_state.experience
+
+    end_of_firt_traj_idx = np.argmax(target_random_trajs["dones"][0])
+    target_random_traj = target_random_trajs["observations"][0, :end_of_firt_traj_idx]
+    source_random_traj = source_random_trajs["observations"][0, :end_of_firt_traj_idx]
+    source_expert_traj = source_expert_trajs["observations"][0, :end_of_firt_traj_idx]
+
+    # encode trjectories
+    target_random_traj = domain_encoder.encode_target_state(target_random_traj)
+    source_random_traj = domain_encoder.encode_source_state(source_random_traj)
+    source_expert_traj = domain_encoder.encode_source_state(source_expert_traj)
+
+    # combine all states for further processing
+    states = [target_random_traj, source_random_traj, source_expert_traj] 
+    states_sizes_list = [0] + list(np.cumsum(list(map(
+        lambda embs: embs.shape[0],
+        states,
+    ))))
+
+    # tsne
+    tsne_states_united= TSNE(random_state=seed).fit_transform(np.concatenate(states))
+    tsne_states = [
+        tsne_states_united[
+            states_sizes_list[i]: states_sizes_list[i + 1]
+        ]
+        for i in range(len(states))
+    ]
+
+    # scatterplots
+    opaque = np.linspace(.2, 1., num=end_of_firt_traj_idx)
+    scatter_params_list = (
+        {"label": "TR", "c": "tab:green",  "marker": "x", "alpha": opaque},
+        {"label": "SR", "c": "tab:orange", "marker": "s", "alpha": opaque},
+        {"label": "SE", "c": "tab:red",    "marker": "o", "alpha": opaque},
+    )
+    figsize=(5, 5)
+
+    states_figure = plt.figure(figsize=figsize)
+    for tsne_state_embeddings, scatter_params in zip(tsne_states, scatter_params_list):
+        plt.scatter(tsne_state_embeddings[:, 0], tsne_state_embeddings[:, 1], **scatter_params)
+    plt.legend()
+    plt.close()
+
+    return states_figure
 
 def get_discriminators_scores(domain_encoder: "BaseDomainEncoder", seed: int=0):
     rng = jax.random.key(seed)
@@ -68,7 +124,6 @@ def get_discriminators_scores(domain_encoder: "BaseDomainEncoder", seed: int=0):
             **{f"state_{k}_score": score for k, score in state_scores.items()},
         }
     return eval_info
-
 
 @jax.jit
 def _get_discriminator_score(discriminator: Discriminator, x: jnp.ndarray, is_real: bool):
