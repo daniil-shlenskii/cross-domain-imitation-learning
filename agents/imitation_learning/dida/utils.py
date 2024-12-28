@@ -41,18 +41,18 @@ def get_discriminators_logits_plots(
 
     # accuracy
     scores = {}
-    scores["discriminators/target_state_score"] = (target_state_logits < 0.).mean()
-    scores["discriminators/source_state_score"] = (source_state_logits > 0.).mean()
-    scores["discriminators/state_score"] = (
-        scores["discriminators/target_state_score"] +
-        scores["discriminators/source_state_score"]
+    scores["discriminators/trajectories/target_state_score"] = (target_state_logits < 0.).mean()
+    scores["discriminators/trajectories/source_state_score"] = (source_state_logits > 0.).mean()
+    scores["discriminators/trajectories/state_score"] = (
+        scores["discriminators/trajectories/target_state_score"] +
+        scores["discriminators/trajectories/source_state_score"]
     ) * 0.5
 
-    scores["discriminators/target_policy_score"] = (target_policy_logits < 0.).mean()
-    scores["discriminators/source_policy_score"] = (source_policy_logits > 0.).mean()
-    scores["discriminators/policy_score"] = (
-        scores["discriminators/target_policy_score"] +
-        scores["discriminators/source_policy_score"]
+    scores["discriminators/trajectories/target_policy_score"] = (target_policy_logits < 0.).mean()
+    scores["discriminators/trajectories/source_policy_score"] = (source_policy_logits > 0.).mean()
+    scores["discriminators/trajectories/policy_score"] = (
+        scores["discriminators/trajectories/target_policy_score"] +
+        scores["discriminators/trajectories/source_policy_score"]
     ) * 0.5
 
     # plots
@@ -65,9 +65,9 @@ def get_discriminators_logits_plots(
         plt.close()
         return figure
 
-    plots["discriminators/target_state_plot"] = logits_to_plot(target_state_logits)
-    plots["discriminators/source_state_plot"] = logits_to_plot(source_state_logits)
-    plots["discriminators/target_policy_plot"] = logits_to_plot(target_policy_logits)
-    plots["discriminators/source_policy_plot"] = logits_to_plot(source_policy_logits)
+    plots["discriminators/trajectories/target_state_plot"] = logits_to_plot(target_state_logits)
+    plots["discriminators/trajectories/source_state_plot"] = logits_to_plot(source_state_logits)
+    plots["discriminators/trajectories/target_policy_plot"] = logits_to_plot(target_policy_logits)
+    plots["discriminators/trajectories/source_policy_plot"] = logits_to_plot(source_policy_logits)
 
     return scores, plots
