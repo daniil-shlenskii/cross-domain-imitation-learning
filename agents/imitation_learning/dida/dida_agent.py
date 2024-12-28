@@ -126,8 +126,8 @@ def _update_no_das_jit(dida_agent: DIDAAgent, learner_batch: DataType):
 
     new_domain_encoder = jax.lax.cond(
         dida_agent.freeze_domain_encoder,
-        lambda: new_domain_encoder,
         lambda: dida_agent.domain_encoder,
+        lambda: new_domain_encoder,
     )
 
     new_dida_agent = dida_agent.replace(domain_encoder=new_domain_encoder)
