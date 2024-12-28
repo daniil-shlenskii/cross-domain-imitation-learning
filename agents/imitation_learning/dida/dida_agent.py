@@ -113,10 +113,10 @@ class DIDAAgent(GAILAgent):
             source_state_plot = wandb.Image(convert_figure_to_array(source_state_plot), caption="(Discriminators) State Discriminator Expert logits")
             target_policy_plot = wandb.Image(convert_figure_to_array(target_policy_plot), caption="(Discriminators) Policy Discriminator Learner logits")
             source_policy_plot = wandb.Image(convert_figure_to_array(source_policy_plot), caption="(Discriminators) Policy Discriminator Expert logits")
-        eval_info["target_state_plot"] = target_state_plot
-        eval_info["source_state_plot"] = source_state_plot
-        eval_info["target_policy_plot"] = target_policy_plot
-        eval_info["source_policy_plot"] = source_policy_plot
+        eval_info["discriminators/target_state_plot"] = target_state_plot
+        eval_info["discriminators/source_state_plot"] = source_state_plot
+        eval_info["discriminators/target_policy_plot"] = target_policy_plot
+        eval_info["discriminators/source_policy_plot"] = source_policy_plot
 
         if return_trajectories:
             return eval_info, trajs
