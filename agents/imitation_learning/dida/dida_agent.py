@@ -114,9 +114,8 @@ def _update_no_das_jit(dida_agent: DIDAAgent, learner_batch: DataType):
     # update domain encoder
     (
         new_domain_encoder,
-        target_random_batch,
         target_expert_batch,
-        source_random_batch,
+        _,
         source_expert_batch,
         info,
         stats_info,

@@ -144,7 +144,6 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     def update(self, target_expert_batch: DataType):
         (
             new_domain_encoder,
-            target_random_batch,
             target_expert_batch,
             source_random_batch,
             source_expert_batch,
@@ -156,7 +155,6 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         )
         return (
             new_domain_encoder,
-            target_random_batch,
             target_expert_batch,
             source_random_batch,
             source_expert_batch,
