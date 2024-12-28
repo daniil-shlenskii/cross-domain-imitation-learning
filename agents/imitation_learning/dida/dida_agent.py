@@ -1,5 +1,6 @@
 import gymnasium as gym
 import jax
+import jax.numpy as jnp
 import numpy as np
 from flax import struct
 from hydra.utils import instantiate
@@ -118,7 +119,7 @@ def _update_no_das_jit(dida_agent: DIDAAgent, learner_batch: DataType):
     (
         new_domain_encoder,
         target_expert_batch,
-        _,
+        source_random_batch,
         source_expert_batch,
         info,
         stats_info,
@@ -133,10 +134,18 @@ def _update_no_das_jit(dida_agent: DIDAAgent, learner_batch: DataType):
     new_dida_agent = dida_agent.replace(domain_encoder=new_domain_encoder)
 
     # update agent and policy discriminator
+    policy_discriminator_learner_batch = {
+        k: jnp.concatenate([
+            target_expert_batch[k],
+            source_random_batch[k],
+        ])
+        for k in target_expert_batch
+    }
+
     new_dida_agent, gail_info, gail_stats_info = new_dida_agent.update_gail(
         learner_batch=target_expert_batch,
         expert_batch=source_expert_batch,
-        policy_discriminator_learner_batch=target_expert_batch,
+        policy_discriminator_learner_batch=policy_discriminator_learner_batch,
     )
 
     info.update(gail_info)
