@@ -23,13 +23,7 @@ def get_random_from_expert_buffer_state(*, seed: int, expert_buffer_state: Buffe
     random_buffer_state = deepcopy(expert_buffer_state)
 
     np.random.seed(seed)
-    obs_perm_idcs = np.random.choice(buffer_state_size)
     obs_next_perm_idcs = np.random.choice(buffer_state_size)
-
-    random_buffer_state.experience["observations"] = \
-        random_buffer_state.experience["observations"].at[0].set(
-            random_buffer_state.experience["observations"][0, obs_perm_idcs]
-        )
 
     random_buffer_state.experience["observations_next"] = \
         random_buffer_state.experience["observations_next"].at[0].set(
