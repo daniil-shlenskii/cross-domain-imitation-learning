@@ -6,27 +6,33 @@ from sklearn.manifold import TSNE
 
 from agents.imitation_learning.utils import get_state_pairs
 from gan.discriminator import Discriminator
-from utils.types import DataType
 
 
 def get_states_tsne_scatterplots(
     domain_encoder: "BaseDomainEncoder",
     seed: int,
 ):
+    observation_keys = ("observations", "observations_next")
+
     # get trajectories
     target_random_trajs = domain_encoder.target_random_buffer_state.experience
     source_random_trajs = domain_encoder.source_random_buffer_state.experience
     source_expert_trajs = domain_encoder.source_expert_buffer_state.experience
 
     end_of_firt_traj_idx = np.argmax(target_random_trajs["truncated"][0])
-    target_random_traj = target_random_trajs["observations"][0, :end_of_firt_traj_idx]
-    source_random_traj = source_random_trajs["observations"][0, :end_of_firt_traj_idx]
-    source_expert_traj = source_expert_trajs["observations"][0, :end_of_firt_traj_idx]
+    target_random_traj = {k: target_random_trajs[k][0, :end_of_firt_traj_idx] for k in observation_keys}
+    source_random_traj = {k: source_random_trajs[k][0, :end_of_firt_traj_idx] for k in observation_keys}
+    source_expert_traj = {k: source_expert_trajs[k][0, :end_of_firt_traj_idx] for k in observation_keys}
 
     # encode trjectories
-    target_random_traj = domain_encoder.encode_target_state(target_random_traj)
-    source_random_traj = domain_encoder.encode_source_state(source_random_traj)
-    source_expert_traj = domain_encoder.encode_source_state(source_expert_traj)
+    target_random_traj = domain_encoder.encode_target_batch(target_random_traj)
+    source_random_traj = domain_encoder.encode_source_batch(source_random_traj)
+    source_expert_traj = domain_encoder.encode_source_batch(source_expert_traj)
+
+    # get state pairs (in order to anchor to be different from expert buffer)
+    target_random_traj = get_state_pairs(target_random_traj)
+    source_random_traj = get_state_pairs(source_random_traj)
+    source_expert_traj = get_state_pairs(source_expert_traj)
 
     # combine all states for further processing
     states = [target_random_traj, source_random_traj, source_expert_traj] 
