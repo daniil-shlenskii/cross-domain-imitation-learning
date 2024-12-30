@@ -18,7 +18,7 @@ def get_states_tsne_scatterplots(
     source_random_trajs = domain_encoder.source_random_buffer_state.experience
     source_expert_trajs = domain_encoder.source_expert_buffer_state.experience
 
-    end_of_firt_traj_idx = np.argmax(target_random_trajs["dones"][0])
+    end_of_firt_traj_idx = np.argmax(target_random_trajs["truncated"][0])
     target_random_traj = target_random_trajs["observations"][0, :end_of_firt_traj_idx]
     source_random_traj = source_random_trajs["observations"][0, :end_of_firt_traj_idx]
     source_expert_traj = source_expert_trajs["observations"][0, :end_of_firt_traj_idx]
