@@ -10,12 +10,22 @@ from utils.types import DataType, Params
 from .base import DomainEncoderLossMixin
 
 
-class InDomainEncoderProjectedGradLoss(DomainEncoderLossMixin):
+class InDomainEncoderProjectwedGradLoss(DomainEncoderLossMixin):
+    def __init__(self, is_created: bool=False, **kwargs):
+        if not is_created:
+            raise ValueError(
+                f"{self.__class__.__name__} should initialize via `create` method"
+            )
+        super().__init__(**kwargs)
+
     @classmethod
-    def create(cls, *args, **kwargs):
-        _loss = cls(*args, **kwargs)
+    def create(cls, state_to_policy: bool=True, **kwargs):
+        _loss = cls(is_created=True, **kwargs)
         loss = jax.custom_vjp(_loss)
-        loss.defvjp(_loss.forward, _loss.backward)
+        if state_to_policy:
+            loss.defvjp(_loss.forward, _loss.backward_state_to_policy)
+        else:
+            loss.defvjp(_loss.forward, _loss.backward_policy_to_state)
         return loss
 
     def __call__(self, *args, **kwargs):
@@ -86,10 +96,19 @@ class InDomainEncoderProjectedGradLoss(DomainEncoderLossMixin):
 
         return loss, (info, intermediates)
 
-    def backward(self, intermediates, input_grad):
+    def backward_state_to_policy(self, intermediates, input_grad):
+        _, (ts_grad, tp_grad, ss_grad, sp_grad, state_loss_scale) = intermediates
+        ts_grad = ts_grad - project_a_to_b(a=ts_grad, b=tp_grad)
+        ss_grad = ss_grad - project_a_to_b(a=ss_grad, b=sp_grad)
+        policy_grad = tp_grad + sp_grad
+        state_grad = ts_grad + ss_grad
+        grad = policy_grad + state_grad * state_loss_scale
+        return grad * input_grad,
+
+    def backward_policy_to_state(self, intermediates, input_grad):
         _, (ts_grad, tp_grad, ss_grad, sp_grad, state_loss_scale) = intermediates
         tp_grad = tp_grad - project_a_to_b(a=tp_grad, b=ts_grad)
-        sp_grad = sp_grad - project_a_to_b(a=sp_grad, b=ss_grad) 
+        sp_grad = sp_grad - project_a_to_b(a=sp_grad, b=ss_grad)
         policy_grad = tp_grad + sp_grad
         state_grad = ts_grad + ss_grad
         grad = policy_grad + state_grad * state_loss_scale
