@@ -71,7 +71,7 @@ def main(args: argparse.Namespace):
     # buffer init
     observation, _ = env.reset()
     action = env.action_space.sample()
-    observation, reward, done, _, _ = env.step(action)
+    observation, reward, done, truncated, _ = env.step(action)
 
     buffer_config = config.replay_buffer
     buffer_config["fbx_buffer_config"]["min_length"] = 0
@@ -84,6 +84,7 @@ def main(args: argparse.Namespace):
             actions=np.array(action),
             rewards=np.array(reward),
             dones=np.array(done),
+            truncated=np.array(truncated or done),
             observations_next=np.array(observation),
         )
     )
