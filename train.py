@@ -103,7 +103,7 @@ def main(args: argparse.Namespace):
     # buffer init
     observation, _ = env.reset()
     action = env.action_space.sample()
-    observation, reward, done, _, _ = env.step(action)
+    observation, reward, done, truncated, _ = env.step(action)
 
     buffer = instantiate(config.replay_buffer, _recursive_=False)
     state = buffer.init(
@@ -112,6 +112,7 @@ def main(args: argparse.Namespace):
             actions=np.array(action),
             rewards=np.array(reward),
             dones=np.array(done),
+            truncated=np.array(truncated or done),
             observations_next=np.array(observation),
         )
     )
@@ -130,7 +131,8 @@ def main(args: argparse.Namespace):
                 observations=np.array(observation),
                 actions=np.array(action),
                 rewards=np.array(reward),
-                dones=np.array(done or truncated), # TODO: truncated should not be here
+                dones=np.array(done),
+                truncated=np.array(done or truncated),
                 observations_next=np.array(observation_next),
             )
         )

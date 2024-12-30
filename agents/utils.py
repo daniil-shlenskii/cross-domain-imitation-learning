@@ -4,6 +4,15 @@ import flashbax as fbx
 import gymnasium as gym
 import numpy as np
 
+TRAJ_KEYS = [
+    "observations",
+    "actions",
+    "rewards",
+    "dones",
+    "truncated",
+    "observations_next",
+]
+
 
 def get_buffer_state_from_trajectories(trajs):
     # buffer state init
@@ -31,14 +40,7 @@ def sample_random_trajectory(
     env: gym.Env,
     n_samples: int,
 ):
-    traj_keys = [
-        "observations",
-        "actions",
-        "rewards",
-        "dones",
-        "observations_next",
-    ]
-    trajs = {traj_key: [] for traj_key in traj_keys}
+    trajs = {traj_key: [] for traj_key in TRAJ_KEYS}
 
     while True:
         observation, _, done, truncated = *env.reset(seed=seed), False, False
@@ -49,7 +51,8 @@ def sample_random_trajectory(
             trajs["observations"].append(observation)
             trajs["actions"].append(action)
             trajs["rewards"].append(reward)
-            trajs["dones"].append(done or truncated)
+            trajs["dones"].append(done)
+            trajs["truncated"].append(done or truncated)
             trajs["observations_next"].append(next_observation)
 
             observation = next_observation
@@ -68,14 +71,7 @@ def evaluate(
     seed: int = 0,
     return_trajectories: bool = False,
 ) -> Dict[str, float]:
-    traj_keys = [
-        "observations",
-        "actions",
-        "rewards",
-        "dones",
-        "observations_next",
-    ]
-    trajs = {traj_key: [] for traj_key in traj_keys}
+    trajs = {traj_key: [] for traj_key in TRAJ_KEYS}
 
     env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=num_episodes)
     for i in range(num_episodes):
@@ -87,7 +83,8 @@ def evaluate(
             trajs["observations"].append(observation)
             trajs["actions"].append(action)
             trajs["rewards"].append(reward)
-            trajs["dones"].append(done or truncated)
+            trajs["dones"].append(done)
+            trajs["truncated"].append(done or truncated)
             trajs["observations_next"].append(next_observation)
 
             observation = next_observation
