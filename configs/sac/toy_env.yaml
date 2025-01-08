@@ -1,0 +1,58 @@
+seed: &seed 0
+env_name: ToyEnv
+
+n_iters_training: 100_000
+batch_size: &batch_size 256
+
+precollect_buffer_size: &precollect_buffer_size 200
+
+log_every: 100
+eval_every: 500
+save_every: 500
+
+environment:
+  _target_: gymnasium.wrappers.TimeLimit
+  max_episode_steps: 1000
+  env: &env
+    _target_: custom_envs.toy_env.ToyEnv
+
+replay_buffer:
+  _target_: utils.utils.instantiate_jitted_fbx_buffer
+  fbx_buffer_config:
+    _target_: flashbax.make_item_buffer
+    max_length: 10_000 
+    min_length: *precollect_buffer_size
+    sample_batch_size: *batch_size
+    add_batches: False
+
+agent:
+  _target_: agents.sac.SACAgent.create
+  seed: *seed
+  actor_module_config:
+    _target_: networks.policy.NormalTanhPolicy
+    hidden_dims: [256, 256]
+  critic_module_config:
+    _target_: networks.critic.Critic
+    hidden_dims: [256, 256]
+  temperature_module_config:
+    _target_: agents.sac.Temperature
+    initial_temperature: 0.2
+  actor_optimizer_config: &optimizer_config
+    transforms:
+      - _target_: optax.clip
+        max_delta: 1.0
+      - _target_: optax.adam
+        learning_rate: 3e-4
+  critic_optimizer_config: *optimizer_config
+  temperature_optimizer_config:
+    transforms:
+      - _target_: optax.sgd
+        learning_rate: 0.
+
+evaluation:
+  seed: 42
+  num_episodes: 25
+  environment:
+    _target_: gymnasium.wrappers.TimeLimit
+    max_episode_steps: 1000
+    env: *env
