@@ -10,9 +10,8 @@ import numpy as np
 class ToyEnv(gym.Env):
     x_start: float = 0.
 
-    def __init__(self, y: float = 0., length: int = 10., render_mode: Optional[str] = None):
+    def __init__(self, y: float = 0., render_mode: Optional[str] = None):
         self.y = y
-        self.length = length
         self.render_mode = render_mode
 
         self.observation_space = gym.spaces.Box(
@@ -31,7 +30,7 @@ class ToyEnv(gym.Env):
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
 
-        observation = np.array([self.x_start + np.random.rand() / self.length, self.y])
+        observation = np.array([self.x_start + np.random.rand(), self.y])
         info = {}
 
         self._location = observation
@@ -41,15 +40,11 @@ class ToyEnv(gym.Env):
 
     def step(self, action: np.float32):
         observation = self._location
-        observation[0] += action / self.length
+        observation[0] += action
 
-        if observation[0] >= 1.:
-            terminated = True
-            reward = 0.5 * (self.length - 1.)
-        else:
-            terminated = False
-            reward = observation[0] - 1.
+        reward = action
 
+        terminated = False
         truncated = False
         info = {}
 
@@ -61,7 +56,6 @@ class ToyEnv(gym.Env):
     def render(self):
         fig = plt.figure()
         plt.axvline(x=self.x_start, color="g")
-        plt.axvline(x=1., color="r")
         plt.scatter(x=[self._location[0]], y=[self._location[1]])
         plt.savefig(self.save_path)
         plt.close(fig)

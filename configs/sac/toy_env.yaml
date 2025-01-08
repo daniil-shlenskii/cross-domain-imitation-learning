@@ -16,7 +16,6 @@ environment:
   env: 
     _target_: custom_envs.toy_env.ToyEnv
     # render_mode: human
-    length: &length 100.
 
 replay_buffer:
   _target_: utils.utils.instantiate_jitted_fbx_buffer
@@ -59,4 +58,3 @@ evaluation:
     max_episode_steps: 1000
     env: 
       _target_: custom_envs.toy_env.ToyEnv
-      length: *length
