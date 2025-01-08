@@ -19,7 +19,7 @@ class BaseToyEnv(gym.Env, abc.ABC):
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
 
-        x_coord = self.x_start + (np.random.rand() - 0.5) * 0.5 / self.size
+        x_coord = self.x_start + (np.random.rand() - 0.5) * 2. / self.size
 
         observation = self._get_observation_with_x_coord(x_coord)
         info = {}
