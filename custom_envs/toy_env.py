@@ -1,62 +1,69 @@
-import os
-import time
+import abc
 from typing import Optional
 
 import gymnasium as gym
-import matplotlib.pyplot as plt
 import numpy as np
 
 
-class ToyEnv(gym.Env):
+class BaseToyEnv(gym.Env, abc.ABC):
     x_start: float = 0.
 
-    def __init__(self, y: float = 0., render_mode: Optional[str] = None):
-        self.y = y
-        self.render_mode = render_mode
+    def __init__(self, size: float = 10.):
+        self.size = size
 
-        self.observation_space = gym.spaces.Box(
-            low=np.array([-np.inf, y]), high=np.array([np.inf, y])
-        )
+        self.observation_space = self._get_observation_space()
         self.action_space = gym.spaces.Box(-1., 1., shape=(1,))
 
-        self._location = np.array([self.x_start, self.y])
-
-        if render_mode is not None:
-            save_dir = ".render_toy_env"
-            if not os.path.exists(save_dir):
-                os.mkdir(".render_toy_env")
-            self.save_path = f"{save_dir}/figure.png"
+        self._x_location = self.x_start
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
 
-        observation = np.array([self.x_start + np.random.rand(), self.y])
+        x_coord = self.x_start + (np.random.rand() - 0.5) * 0.5 / self.size
+
+        observation = self._get_observation_with_x_coord(x_coord)
         info = {}
 
-        self._location = observation
-        if self.render_mode is not None:
-            self.render()
+        self._x_location = x_coord
         return observation, info
 
     def step(self, action: np.float32):
-        observation = self._location
-        observation[0] += action
+        new_x_coord = self._x_location + action[0]
 
-        reward = observation[0]
-
-        terminated = False
+        observation = self._get_observation_with_x_coord(new_x_coord)
+        reward = new_x_coord if new_x_coord < 1. else 1000.
+        terminated = not (-1. < new_x_coord < 1.)
         truncated = False
         info = {}
 
-        self._location = observation
-        if self.render_mode is not None:
-            self.render()
+        self._x_location = new_x_coord
         return observation, reward, terminated, truncated, info
 
-    def render(self):
-        fig = plt.figure()
-        plt.axvline(x=self.x_start, color="g")
-        plt.scatter(x=[self._location[0]], y=[self._location[1]])
-        plt.savefig(self.save_path)
-        plt.close(fig)
-        time.sleep(0.001)
+    @abc.abstractmethod
+    def _get_observation_space(self):
+        pass
+
+    @abc.abstractmethod
+    def _get_observation_with_x_coord(self, x_coord: np.ndarray):
+        pass
+
+class ToyEnvOneDim(BaseToyEnv):
+    def _get_observation_space(self):
+        observation_space = gym.spaces.Box(-1., 1., shape=(1,))
+        return observation_space
+
+    def _get_observation_with_x_coord(self, x_coord: np.ndarray):
+        return np.asarray([x_coord])
+
+class ToyEnvTwoDim(BaseToyEnv):
+    def __init__(self, y: float = 0., **kwargs):
+        assert -1. <= y <= 1.
+        super().__init__(**kwargs)
+        self.y = y
+
+    def _get_observation_space(self):
+        observation_space = gym.spaces.Box(-1., 1., shape=(2,))
+        return observation_space
+
+    def _get_observation_with_x_coord(self, x_coord: np.ndarray):
+        return np.asarray([x_coord, self.y])
