@@ -13,7 +13,7 @@ class DomainEncoderLossMixin:
         self,
         policy_loss: GANLoss,
         state_loss: GANLoss,
-        state_loss_scale: float,
+        state_loss_scale: float = 1.,
         has_state_discriminator_paired_input: bool = False,
     ):
         self._set_policy_loss_fns(policy_loss)
