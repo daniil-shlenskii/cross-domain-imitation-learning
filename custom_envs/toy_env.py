@@ -42,7 +42,7 @@ class ToyEnv(gym.Env):
         observation = self._location
         observation[0] += action
 
-        reward = action
+        reward = observation[0]
 
         terminated = False
         truncated = False

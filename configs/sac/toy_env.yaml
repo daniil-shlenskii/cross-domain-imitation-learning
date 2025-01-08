@@ -6,9 +6,9 @@ batch_size: &batch_size 256
 
 precollect_buffer_size: &precollect_buffer_size 1_000
 
-log_every: 500
-eval_every: 1_000
-save_every: 1_000
+log_every: 1_000
+eval_every: 5_000
+save_every: 5_000
 
 environment:
   _target_: gymnasium.wrappers.TimeLimit
@@ -21,7 +21,7 @@ replay_buffer:
   _target_: utils.utils.instantiate_jitted_fbx_buffer
   fbx_buffer_config:
     _target_: flashbax.make_item_buffer
-    max_length: 10_000 
+    max_length: 1_000_000 
     min_length: *precollect_buffer_size
     sample_batch_size: *batch_size
     add_batches: False
@@ -37,7 +37,7 @@ agent:
     hidden_dims: [256, 256]
   temperature_module_config:
     _target_: agents.sac.Temperature
-    initial_temperature: 1.
+    initial_temperature: 0.2
   actor_optimizer_config: &optimizer_config
     transforms:
       - _target_: optax.clip
@@ -48,7 +48,7 @@ agent:
   temperature_optimizer_config:
     transforms:
       - _target_: optax.sgd
-        learning_rate: 1e-5
+        learning_rate: 0.
 
 evaluation:
   seed: 42
