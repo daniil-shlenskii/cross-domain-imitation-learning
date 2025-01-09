@@ -7,7 +7,7 @@ from networks.common import MLP
 
 
 class Discriminator(nn.Module):
-    hidden_dims: Sequence[int]
+    hidden_dims: Sequence[int] = []
     activation: Callable[[jnp.ndarray], jnp.ndarray] = nn.relu
     dropout_rate: Optional[float] = None
 
