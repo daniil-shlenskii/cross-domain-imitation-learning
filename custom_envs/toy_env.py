@@ -43,10 +43,12 @@ class BaseToyEnv(gym.Env, abc.ABC):
         return observation, info
 
     def step(self, action: np.float32):
-        new_x_coord = self._x_location + action[0] / self.size
+        shift = action[0] / self.size
+
+        new_x_coord = self._x_location + shift
 
         observation = self._get_observation_with_x_coord(new_x_coord)
-        reward = new_x_coord if new_x_coord < 1. else 1000.
+        reward = shift if new_x_coord < 1. else 1000.
         terminated = not (-1. < new_x_coord < 1.)
         truncated = False
         info = {}
