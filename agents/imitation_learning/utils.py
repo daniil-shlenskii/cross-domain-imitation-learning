@@ -116,8 +116,17 @@ def get_state_and_policy_tsne_scatterplots(
     ))))
 
     # tsne embeddings
-    tsne_state_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(state_embeddings_list))
     tsne_state_pairs_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(state_pairs_embeddings_list))
+
+    if learner_state_embeddings.shape[-1] > 2:
+        tsne_state_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(state_embeddings_list))
+    else:
+        tsne_state_embeddings = np.concatenate(state_embeddings_list)
+        if tsne_state_embeddings.shape[-1] == 1:
+            tsne_state_embeddings = np.concatenate([
+                tsne_state_embeddings,
+                np.ones_like(tsne_state_embeddings)
+            ], axis=-1)
 
     tsne_state_embeddings_list = [
         tsne_state_embeddings[
