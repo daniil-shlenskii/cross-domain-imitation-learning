@@ -3,8 +3,8 @@ env_name: &env_name ToyEnvOneDim
 
 n_iters_training: 1_000_000
 
-batch_size: &batch_size 2048
-precollect_buffer_size: &precollect_buffer_size 3_000
+batch_size: &batch_size 256 
+precollect_buffer_size: &precollect_buffer_size 5_000
 
 log_every: 1_000
 eval_every: 5_000
@@ -13,7 +13,7 @@ save_every: 5_000
 environment:
   _target_: gymnasium.wrappers.TimeLimit
   max_episode_steps: 1000
-  env:
+  env: &env
     _target_: custom_envs.toy_env.ToyEnvOneDim
     size: 100.
 
@@ -30,7 +30,7 @@ agent:
   _target_: agents.gail.GAILAgent.create
   seed: *seed
   expert_batch_size: *batch_size
-  expert_buffer_state_path: experts/ToyEnvOneDim/config/collected_rollouts/buffer_state.pickle
+  expert_buffer_state_path: experts/ToyEnvOneDim/size100/collected_rollouts/buffer_state.pickle
   agent_config:
     _target_: agents.sac.SACAgent.create
     actor_module_config:
@@ -71,6 +71,4 @@ evaluation:
   environment:
     _target_: gymnasium.wrappers.TimeLimit
     max_episode_steps: 1000
-    env:
-      _target_: custom_envs.toy_env.ToyEnvOneDim
-      size: 100.
+    env: *env
