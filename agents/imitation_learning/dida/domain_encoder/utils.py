@@ -8,6 +8,42 @@ from agents.imitation_learning.utils import get_state_pairs
 from gan.discriminator import Discriminator
 
 
+def get_two_dim_data_plot(domain_encoder: "BaseDomainEncoder"):
+    k = "observations"
+
+    # get trajectories
+    target_random_trajs = domain_encoder.target_random_buffer_state.experience
+    source_expert_trajs = domain_encoder.source_expert_buffer_state.experience
+
+    target_random_end_of_firt_traj_idx = np.argmax(target_random_trajs["truncated"][0])
+    source_expert_end_of_firt_traj_idx = np.argmax(source_expert_trajs["truncated"][0])
+
+    target_random_traj = target_random_trajs[k][0, :target_random_end_of_firt_traj_idx]
+    source_expert_traj = source_expert_trajs[k][0, :source_expert_end_of_firt_traj_idx]
+
+    # encode trjectories
+    target_random_traj = domain_encoder.encode_target_batch(target_random_traj)
+    source_expert_traj = domain_encoder.encode_source_batch(source_expert_traj)
+
+    # state discriminator hyperplane
+    x_united = np.concatenate([target_random_traj[0], source_expert_traj[0]])
+    x_min, x_max = np.min(x_united), np.max(x_united)
+    x_space = np.linspace(x_min, x_max, 2048)
+    y_space = domain_encoder.state_discriminator(x_space)
+
+    # plot
+    figsize=(5, 5)
+    figure = plt.figure(figsize=figsize)
+
+    plt.plot(target_random_traj[0], target_random_traj[1], color="g", linestyly="None")
+    plt.plot(source_expert_traj[0], source_expert_traj[1], color="r", linestyly="None")
+    plt.plot(x_space, y_space, color="k")
+
+    plt.legend()
+    plt.close()
+
+    return figure
+
 def get_states_tsne_scatterplots(
     domain_encoder: "BaseDomainEncoder",
     seed: int,

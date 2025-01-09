@@ -10,13 +10,14 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
 import wandb
+from agents.imitation_learning.dida import domain_encoder
 from agents.imitation_learning.dida.domain_encoder import \
     BaseDomainEncoderDiscriminators
 from agents.imitation_learning.dida.domain_encoder.utils import (
     get_discriminators_scores,
     get_policy_discriminator_divergence_score_embeddings,
     get_policy_discriminator_divergence_score_params,
-    get_states_tsne_scatterplots)
+    get_states_tsne_scatterplots, get_two_dim_data_plot)
 from agents.imitation_learning.utils import (
     get_random_from_expert_buffer_state, prepare_buffer)
 from gan.generator import Generator
@@ -168,6 +169,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         self,
         seed: int,
         convert_to_wandb_type: bool = True,
+        two_dim_data_plot_flag: bool = False,
     ):
         scores = get_discriminators_scores(domain_encoder=self, seed=seed)
         divergence_scores = get_policy_discriminator_divergence_score_params(domain_encoder=self, seed=seed)
@@ -183,6 +185,13 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             **divergence_scores_embeddings,
             "domain_encoder/state_tsne_plots": states_tsne_plots,
         }
+
+        if two_dim_data_plot_flag:
+            two_dim_data_figure = get_two_dim_data_plot(domain_encoder=self)
+            if convert_to_wandb_type:
+                two_dim_data_figure = wandb.Image(convert_figure_to_array(two_dim_data_figure), caption="Two Dim Data Plot")
+            eval_info["domain_encoder/two_dim_data_plot"] = two_dim_data_figure
+
         return eval_info
 
     def sample_batches(self, rng: PRNGKey):
