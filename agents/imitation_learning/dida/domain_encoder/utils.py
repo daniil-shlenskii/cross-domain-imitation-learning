@@ -303,10 +303,13 @@ def divergence_scores_fn(state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
     return divergence_score
 
 def project_a_to_b(a: jnp.ndarray, b: jnp.ndarray):
-    return cosine_similarity_fn(a, b) * b
+    return scalar_product_fn(a, b) * b / scalar_product_fn(b, b)
 
 def cosine_similarity_fn(a: jnp.ndarray, b: jnp.ndarray):
-    return scalar_product_fn(a, b) / scalar_product_fn(a, a)**0.5 / scalar_product_fn(b, b)**0.5
+    return scalar_product_fn(a, b) / norm_fn(a) / norm_fn(b) 
+
+def norm_fn(a: jnp.ndarray):
+    return scalar_product_fn(a, a)**0.5
 
 def scalar_product_fn(a: jnp.ndarray, b: jnp.ndarray):
     return (a * b).sum()
