@@ -22,24 +22,46 @@ def get_two_dim_data_plot(domain_encoder: "BaseDomainEncoder"):
     source_expert_traj = source_expert_trajs[k][0, :source_expert_end_of_firt_traj_idx]
 
     # encode trjectories
-    target_random_traj = domain_encoder.encode_target_batch(target_random_traj)
-    source_expert_traj = domain_encoder.encode_source_batch(source_expert_traj)
+    target_random_traj = domain_encoder.encode_target_state(target_random_traj)
+    source_expert_traj = domain_encoder.encode_source_state(source_expert_traj)
 
     # state discriminator hyperplane
-    x_united = np.concatenate([target_random_traj[0], source_expert_traj[0]])
-    x_min, x_max = np.min(x_united), np.max(x_united)
-    x_space = np.linspace(x_min, x_max, 2048)
-    y_space = domain_encoder.state_discriminator(x_space)
+    state_discr_params = domain_encoder.state_discriminator.state.params
+    b, n = jax.tree.flatten(state_discr_params)[0][-2:]
+    b, n = b.squeeze(-1), n.squeeze(-1)
+
+    def get_hyperplane_a_and_x0(n, b):
+        a = np.zeros_like(n) 
+        a[0] = n[1]
+        a[1] = -n[0]
+
+        if n[0] != 0.:
+            c = -b / n[0]
+            x0 = np.array([c, 0.])
+        else:
+            c = -b / n[1]
+            x0 = np.array([0., c])
+
+        a /= np.linalg.norm(a)
+
+        return a, x0
+
+    a, x0 = get_hyperplane_a_and_x0(n, b)
+    assert (
+        np.isclose((a * n).sum(), 0., atol=1e-4) and
+        np.isclose((x0 * n).sum(), -b, atol=1e-4)
+    ), f"{(a * n).sum() = } and {(x0 * n).sum() = },and {b = }"
+
+    h1 = x0 + a
+    h2 = x0 - a
 
     # plot
     figsize=(5, 5)
     figure = plt.figure(figsize=figsize)
 
-    plt.plot(target_random_traj[0], target_random_traj[1], color="g", linestyly="None")
-    plt.plot(source_expert_traj[0], source_expert_traj[1], color="r", linestyly="None")
-    plt.plot(x_space, y_space, color="k")
-
-    plt.legend()
+    plt.plot(target_random_traj[:, 0], target_random_traj[:, 1], "o", color="g")
+    plt.plot(source_expert_traj[:, 0], source_expert_traj[:, 1], "o", color="r")
+    plt.plot([h1[0], h2[0]], [h1[1], h2[1]], color="k")
     plt.close()
 
     return figure
