@@ -30,8 +30,9 @@ def get_two_dim_data_plot(domain_encoder: "BaseDomainEncoder"):
     b, n = jax.tree.flatten(state_discr_params)[0][-2:]
     b, n = b.squeeze(-1), n.squeeze(-1)
 
+    ## get a and x0
     def get_hyperplane_a_and_x0(n, b):
-        a = np.zeros_like(n) 
+        a = np.zeros_like(n)
         a[0] = n[1]
         a[1] = -n[0]
 
@@ -51,6 +52,13 @@ def get_two_dim_data_plot(domain_encoder: "BaseDomainEncoder"):
         np.isclose((a * n).sum(), 0., atol=1e-4) and
         np.isclose((x0 * n).sum(), -b, atol=1e-4)
     ), f"{(a * n).sum() = } and {(x0 * n).sum() = },and {b = }"
+
+    ## project mean of trajectories to the hyperplane
+    traj_mean = np.concatenate([target_random_traj, source_expert_traj]).mean(0)
+    traj_mean_proj = project_a_to_b(
+        traj_mean - x0, a
+    )
+    x0 = x0 + traj_mean_proj
 
     h1 = x0 + a
     h2 = x0 - a
