@@ -1,18 +1,18 @@
 seed: &seed 0
 
 n_iters_training: 2_000_000
-batch_size: &batch_size 512
+batch_size: &batch_size 256
 
-log_every: 500
+log_every: 1_000
 eval_every: 5_000
 save_every: 5_000
 
-update_encoder_every: &update_encoder_every 6
+update_encoder_every: &update_encoder_every 2
 
 model:
   _target_: agents.dida.InDomainEncoder.create
   seed: *seed
-  encoding_dim: 16
+  encoding_dim: 2
   #
   target_batch_size: *batch_size
   target_random_buffer_state_path: ._tmp_archive_dir/random_buffers/ToyEnvTwoDim.pickle
