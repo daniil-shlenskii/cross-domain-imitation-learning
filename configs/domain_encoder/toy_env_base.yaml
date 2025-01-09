@@ -7,7 +7,7 @@ log_every: 1_000
 eval_every: 5_000
 save_every: 5_000
 
-update_encoder_every: &update_encoder_every 2
+update_encoder_every: &update_encoder_every 5
 
 model:
   _target_: agents.dida.InDomainEncoder.create
@@ -15,7 +15,7 @@ model:
   encoding_dim: 2
   #
   target_batch_size: *batch_size
-  target_random_buffer_state_path: ._tmp_archive_dir/random_buffers/ToyEnvTwoDim.pickle
+  target_random_buffer_state_path: ._tmp_archive_dir/random_buffers/ToyEnvTwoDimY1.pickle
   #
   source_batch_size: *batch_size
   source_expert_buffer_state_path: experts/ToyEnvTwoDim/size25/collected_rollouts/buffer_state.pickle
