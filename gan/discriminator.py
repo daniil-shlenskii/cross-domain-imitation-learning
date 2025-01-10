@@ -56,8 +56,8 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
             **kwargs
         )
 
-    def update(self, *, real_batch: jnp.ndarray, fake_batch: jnp.ndarray, return_logits: bool=False):
-        new_state, info, stats_info = self.state.update(real_batch=real_batch, fake_batch=fake_batch)
+    def update(self, *, real_batch: jnp.ndarray, fake_batch: jnp.ndarray, return_logits: bool=False, **kwargs):
+        new_state, info, stats_info = self.state.update(real_batch=real_batch, fake_batch=fake_batch, **kwargs)
         if not return_logits:
             del info["real_logits"], info["fake_logits"]
         return self.replace(state=new_state), info, stats_info

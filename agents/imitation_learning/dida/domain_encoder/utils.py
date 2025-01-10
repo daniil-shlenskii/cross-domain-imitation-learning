@@ -288,17 +288,17 @@ def get_policy_discriminator_divergence_score_embeddings(domain_encoder: "BaseDo
     return {"divergence_score_embeddings/source_expert": se_divergence_score,}
 
 def divergence_scores_fn(state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
-    projection = project_a_to_b(a=policy_grad, b=state_grad)
+    projection = project_a_to_b(a=state_grad, b=policy_grad)
 
     projection_norm = jnp.linalg.norm(projection)
-    state_grad_norm = jnp.linalg.norm(state_grad)
+    policy_grad_norm = jnp.linalg.norm(policy_grad)
 
     if projection_norm == 0.:
         s = 1.
     else:
-        s = jnp.sign(cosine_similarity_fn(state_grad, projection))
+        s = jnp.sign(cosine_similarity_fn(policy_grad, projection))
 
-    divergence_score = s * projection_norm / state_grad_norm
+    divergence_score = s * projection_norm / policy_grad_norm
 
     return divergence_score
 
@@ -312,4 +312,4 @@ def norm_fn(a: jnp.ndarray):
     return scalar_product_fn(a, a)**0.5
 
 def scalar_product_fn(a: jnp.ndarray, b: jnp.ndarray):
-    return (a * b).sum()
+    return (a * b).sum(-1)
