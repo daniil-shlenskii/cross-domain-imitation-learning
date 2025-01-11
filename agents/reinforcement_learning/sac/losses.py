@@ -6,7 +6,7 @@ from nn.train_state import TrainState
 from utils.custom_types import DataType, Params, PRNGKey
 
 
-def actor_loss_fn(
+def actor_loss(
     params: Params,
     state: TrainState,
     batch: DataType,
@@ -26,7 +26,7 @@ def actor_loss_fn(
     loss = (log_prob * temp - state_action_value).mean()
     return loss, {f"{state.info_key}_loss": loss, "entropy": -log_prob.mean()}
 
-def critic_loss_fn(
+def critic_loss(
     params: Params,
     state: TrainState,
     batch: DataType,
@@ -36,7 +36,7 @@ def critic_loss_fn(
     loss = ((preds - target)**2).mean()
     return loss, {f"{state.info_key}_loss": loss}
 
-def temperature_loss_fn(
+def temperature_loss(
     params: Params,
     state: TrainState,
     entropy: float,

@@ -3,8 +3,7 @@ from typing import Optional, Sequence
 import distrax
 import flax.linen as nn
 import jax.numpy as jnp
-
-from networks.common import MLP, default_init
+from nn.networks import MLP, default_init
 
 LOG_STD_MIN = -10.0
 LOG_STD_MAX = 2.0
@@ -14,28 +13,6 @@ def _rescale_from_tanh(x: jnp.ndarray, low: float, high: float) -> jnp.ndarray:
     x = (x + 1) / 2 # (-1, 1) -> (0, 1)
     return x * (high - low) + low
 
-
-class DeterministicPolicy(nn.Module):
-    hidden_dims: Sequence[int]
-    action_dim: int
-    dropout_rate: Optional[float] = None
-    low: Optional[float] = None
-    high: Optional[float] = None
-
-    @nn.compact
-    def __call__(
-        self, observations: jnp.ndarray, train: bool=False
-    ) -> jnp.ndarray:
-        features = MLP(
-            self.hidden_dims, dropout_rate=self.dropout_rate
-        )(observations, train=train)
-        features = nn.Dense(
-            self.action_dim, kernel_init=default_init(),
-        )(features)
-        actions = nn.tanh(features)
-        if self.low is None or self.high is None:
-            return actions
-        return _rescale_from_tanh(actions, low=self.low, high=self.high)
 
 class NormalTanhPolicy(nn.Module):
     hidden_dims: Sequence[int]

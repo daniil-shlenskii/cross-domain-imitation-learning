@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import gymnasium as gym
 import jax
@@ -14,7 +14,7 @@ from omegaconf.dictconfig import DictConfig
 from utils import instantiate_optimizer
 from utils.custom_types import DataType, Params
 
-from .losses import actor_loss_fn, critic_loss_fn, temperature_loss_fn
+from .losses import actor_loss, critic_loss, temperature_loss
 
 
 class SACAgent(Agent): 
@@ -36,8 +36,8 @@ class SACAgent(Agent):
         seed: int,
         observation_dim: gym.Space,
         action_dim: gym.Space,
-        low: np.ndarray[float],
-        high: np.ndarray[float],
+        low: np.ndarray,
+        high: np.ndarray,
         #
         actor_module_config: DictConfig,
         critic_module_config: DictConfig,
@@ -46,6 +46,10 @@ class SACAgent(Agent):
         actor_optimizer_config: DictConfig,
         critic_optimizer_config: DictConfig,
         temperature_optimizer_config: DictConfig,
+        #
+        actor_loss_config: Optional[DictConfig] = None,
+        critic_loss_config: Optional[DictConfig] = None,
+        temperature_loss_config: Optional[DictConfig] = None,
         #
         target_entropy: float = None,
         backup_entropy: bool = True,
@@ -61,11 +65,13 @@ class SACAgent(Agent):
         observation = np.ones(observation_dim)
         action = np.ones(action_dim)
 
+        ## modules init
         actor_module = instantiate(actor_module_config, action_dim=action_dim, low=low, high=high)
         critic1_module = instantiate(critic_module_config)
         critic2_module = instantiate(critic_module_config)
         temperature_module = instantiate(temperature_module_config)
 
+        ## params init
         actor_params = actor_module.init(actor_key, observation)["params"]
         critic1_params = critic1_module.init(critic1_key, observation, action)["params"]
         critic2_params = critic2_module.init(critic2_key, observation, action)["params"]
@@ -74,6 +80,12 @@ class SACAgent(Agent):
         target_critic1_params = deepcopy(critic1_params)
         target_critic2_params = deepcopy(critic2_params)
 
+        ## losses init
+        actor_loss_fn = actor_loss if actor_loss_config is None else instantiate(actor_loss_config)
+        critic_loss_fn = critic_loss if critic_loss_config is None else instantiate(critic_loss_config)
+        temperature_loss_fn = temperature_loss if temperature_loss_config is None else instantiate(temperature_loss_config)
+
+        ## train states init
         actor = TrainState.create(
             loss_fn=actor_loss_fn,
             apply_fn=actor_module.apply,
@@ -120,7 +132,7 @@ class SACAgent(Agent):
             backup_entropy=backup_entropy,
             discount=discount,
             tau=tau,
-            _save_attrs = (
+            _save_attrs=(
                 "actor",
                 "critic1",
                 "critic2",
