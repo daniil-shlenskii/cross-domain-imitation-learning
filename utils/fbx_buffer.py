@@ -1,7 +1,9 @@
 import functools
 import warnings
 
+import gymnasium as gym
 import jax
+import numpy as np
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
@@ -32,6 +34,23 @@ def instantiate_jitted_fbx_buffer(fbx_buffer_config: DictConfig):
         can_sample = jax.jit(buffer.can_sample),
     )
     return buffer
+
+def buffer_init(fbx_buffer_config: DictConfig, env: gym.Env):
+    observation, _ = env.reset()
+    action = env.action_space.sample()
+    observation, reward, done, truncated, _ = env.step(action)
+
+    buffer = instantiate(fbx_buffer_config, _recursive_=False)
+    state = buffer.init({
+        "observations": np.array(observation),
+        "actions": np.array(action),
+        "rewards": np.array(reward),
+        "dones": np.array(done),
+        "truncated": np.array(truncated or done),
+        "observations_next": np.array(observation),
+    })
+
+    return buffer, state
 
 def load_buffer(state: Buffer, path: str, size: int = None):
     stored_state = load_pickle(path)

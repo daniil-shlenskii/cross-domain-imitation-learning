@@ -5,15 +5,16 @@ from pathlib import Path
 from typing import Dict
 
 import jax
-import numpy as np
 import wandb
-from gymnasium.wrappers import RescaleAction
-from hydra.utils import instantiate
+from agents.utils import instantiate_agent
+from envs.collect_random_buffer import (collect_random_buffer,
+                                        do_environment_step_and_update_buffer,
+                                        instantiate_environment)
 from loguru import logger
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
-from utils import get_buffer_state_size, load_buffer, save_pickle
+from utils import buffer_init, get_buffer_state_size, load_buffer, save_pickle
 from utils.common_paths import DEFAULT_RANDOM_BUFFER_STORAGE_DIR
 
 
@@ -71,26 +72,11 @@ def main(args: argparse.Namespace):
     rng = jax.random.PRNGKey(config.seed)
 
     # environment init
-    env = instantiate(config.environment)
-    eval_env = instantiate(config.evaluation.environment)
-
-    env = RescaleAction(env, -1, 1)
-    eval_env = RescaleAction(eval_env, -1, 1)
+    env = instantiate_environment(config.environment)
+    eval_env = instantiate_environment(config.evaluation.environment)
 
     # agent init
-    observation_space = env.observation_space
-    action_space = env.action_space
-
-    observation_dim = observation_space.sample().shape[-1]
-    action_dim = action_space.sample().shape[-1]
-    agent = instantiate(
-        config.agent,
-        observation_dim=observation_dim,
-        action_dim=action_dim,
-        low=None,
-        high=None,
-        _recursive_=False,
-    )
+    agent = instantiate_agent(config.agent, env)
 
     ## load agent params if exist
     if not args.from_scratch and config_archive["agent_load_dir"].exists():
@@ -101,49 +87,9 @@ def main(args: argparse.Namespace):
         )
 
     # buffer init
-    observation, _ = env.reset()
-    action = env.action_space.sample()
-    observation, reward, done, truncated, _ = env.step(action)
+    buffer, state = buffer_init(config.replay_buffer, env)
 
-    buffer = instantiate(config.replay_buffer, _recursive_=False)
-    state = buffer.init(
-        dict(
-            observations=np.array(observation),
-            actions=np.array(action),
-            rewards=np.array(reward),
-            dones=np.array(done),
-            truncated=np.array(truncated or done),
-            observations_next=np.array(observation),
-        )
-    )
-
-    ## load precollected agent buffer or collect random buffer
-    def do_environment_step(action, i):
-        nonlocal env, state, observation
-
-        # do step in the environment
-        observation_next, reward, done, truncated, _ = env.step(action)
-
-        # update buffer
-        state = buffer.add(
-            state,
-            dict(
-                observations=np.array(observation),
-                actions=np.array(action),
-                rewards=np.array(reward),
-                dones=np.array(done),
-                truncated=np.array(done or truncated),
-                observations_next=np.array(observation_next),
-            )
-        )
-
-        observation = observation_next
-
-        # update env if terminated
-        if done or truncated:
-            observation, _ = env.reset(seed=config.seed + i)
-
-    ## precollect agent buffer
+    # load precollected agent buffer or collect random buffer
     if not args.from_scratch and config_archive["agent_buffer_load_path"].exists():
         # load precollected agent buffer
         state = load_buffer(state, config_archive["agent_buffer_load_path"])
@@ -165,10 +111,13 @@ def main(args: argparse.Namespace):
         if n_iters_collect_buffer > 0:
             logger.info("Random Buffer collecting..")
 
-            observation, _  = env.reset(seed=config.seed)
-            for i in tqdm(range(n_iters_collect_buffer)):
-                action = env.action_space.sample()
-                do_environment_step(action, i)
+            state = collect_random_buffer(
+                n_iters=n_iters_collect_buffer,
+                env=env,
+                buffer=buffer,
+                state=state,
+                seed=config.seed,
+            )
 
             logger.info("Random Buffer is collected.")
 
@@ -205,7 +154,14 @@ def main(args: argparse.Namespace):
             action = agent.sample_actions(agent_sample_key, observation[None])[0]
 
         # do step in the environment
-        do_environment_step(action, i)
+        env, observation, state = do_environment_step_and_update_buffer(
+            env=env,
+            observation=observation,
+            action=action,
+            buffer=buffer,
+            state=state,
+            seed=config.seed+i,
+        )
 
         # do RL optimization step
         batch = buffer.sample(state, buffer_sample_key).experience

@@ -1,9 +1,9 @@
 from typing import Any, Dict, Tuple
 
 import jax.numpy as jnp
-
 from nn.train_state import TrainState
-from utils.types import DataType, Params, PRNGKey
+
+from utils.custom_types import DataType, Params, PRNGKey
 
 
 def actor_loss_fn(

@@ -10,8 +10,9 @@ from flax import struct
 from hydra.utils import instantiate
 from nn.train_state import TrainState
 from omegaconf.dictconfig import DictConfig
+
 from utils import instantiate_optimizer
-from utils.types import DataType, Params
+from utils.custom_types import DataType, Params
 
 from .losses import actor_loss_fn, critic_loss_fn, temperature_loss_fn
 
