@@ -2,14 +2,14 @@ import argparse
 import warnings
 from pathlib import Path
 
-import numpy as np
-from gymnasium.wrappers import RescaleAction
-from hydra.utils import instantiate
+from agents.utils import instantiate_agent
+from envs.collect_random_buffer import instantiate_environment
 from loguru import logger
 from omegaconf import OmegaConf
 
-from agents.base_agent import Agent
-from utils import save_json, save_pickle
+from utils import buffer_init, get_state_from_dict, save_json, save_pickle
+
+from .base_agent import Agent
 
 
 def init() -> argparse.Namespace:
@@ -25,33 +25,17 @@ def init() -> argparse.Namespace:
 def main(args: argparse.Namespace):
     # agent config init
     agent_dir = Path(args.agent_dir)
-    
+
     config = OmegaConf.load(agent_dir / "config.yaml")
     logger.info(f"\nCONFIG:\n-------\n{OmegaConf.to_yaml(config)}")
 
     # environment init
     eval_config = config.evaluation
-    env = instantiate(eval_config.environment)
-    env = RescaleAction(env, -1, 1)
+    env = instantiate_environment(eval_config.environment)
 
     # agent init
-    observation_space = env.observation_space
-    action_space = env.action_space
+    agent = instantiate_agent(config.agent, env)
 
-    observation_dim = observation_space.sample().shape[-1]
-    action_dim = action_space.sample().shape[-1]
-    low, high = action_space.low, action_space.high
-    if np.any(low == -1) or np.any(high == 1):
-        low, high = None, None
-
-    agent = instantiate(
-        config.agent,
-        observation_dim=observation_dim,
-        action_dim=action_dim,
-        low=low,
-        high=high,
-        _recursive_=False,
-    )
     agent, loaded_keys = agent.load(agent_dir)
     logger.info(
         f"Agent is initialized with data under the path: {agent_dir}.\n" + \
@@ -69,35 +53,14 @@ def main(args: argparse.Namespace):
     )
 
     # buffer init
-    observation, _ = env.reset()
-    action = env.action_space.sample()
-    observation, reward, done, truncated, _ = env.step(action)
-
     buffer_config = config.replay_buffer
-    buffer_config["fbx_buffer_config"]["min_length"] = 0
+    buffer_config["fbx_buffer_config"]["min_length"] = 1
     buffer_config["fbx_buffer_config"]["max_length"] = trajs["observations"].shape[0]
 
-    buffer = instantiate(config.replay_buffer, _recursive_=False)
-    state = buffer.init(
-        dict(
-            observations=np.array(observation),
-            actions=np.array(action),
-            rewards=np.array(reward),
-            dones=np.array(done),
-            truncated=np.array(truncated or done),
-            observations_next=np.array(observation),
-        )
-    )
+    _, state = buffer_init(buffer_config, env)
 
     # putting roullouts into buffer
-    new_state_exp = trajs
-    for k, v in new_state_exp.items():
-        new_state_exp[k] = v[None]
-    state = state.replace(
-        experience=new_state_exp,
-        is_full=True,
-        current_index=0,
-    )
+    state = get_state_from_dict(state, trajs)
 
     # save rollout and runs info
     info.update({"num_episodes": args.num_episodes})

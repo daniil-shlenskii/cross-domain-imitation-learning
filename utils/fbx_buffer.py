@@ -52,6 +52,17 @@ def buffer_init(fbx_buffer_config: DictConfig, env: gym.Env):
 
     return buffer, state
 
+def get_state_from_dict(state: BufferState, dct: dict):
+    state_exp = dct
+    for k, v in state_exp.items():
+        state_exp[k] = v[None]
+    state = state.replace(
+        experience=state_exp,
+        is_full=True,
+        current_index=0,
+    )
+    return state
+
 def load_buffer(state: Buffer, path: str, size: int = None):
     stored_state = load_pickle(path)
     if state.experience.keys() == stored_state.experience.keys():

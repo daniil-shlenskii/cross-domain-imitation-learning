@@ -6,11 +6,12 @@ import jax.numpy as jnp
 import numpy as np
 from flax import struct
 from flax.struct import PyTreeNode
-
-from agents.utils import evaluate
 from nn.train_state import TrainState
+
 from utils import SaveLoadFrozenDataclassMixin
-from utils.types import PRNGKey
+from utils.custom_types import PRNGKey
+
+from .utils import evaluate
 
 
 class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
