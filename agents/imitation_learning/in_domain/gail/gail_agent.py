@@ -25,8 +25,8 @@ class GAILAgent(ImitationAgent):
         cls,
         *,
         seed: int,
-        observation_dim: gym.Space,
-        action_dim: gym.Space,
+        observation_dim: int,
+        action_dim: int,
         low: np.ndarray,
         high: np.ndarray,
         #

@@ -8,7 +8,7 @@ from utils import apply_model_jit
 
 DISCRIMINATOR_REAL_LABELS = {
     "state": {"SR", "SE"},
-    "policy": {"TE", "SE"},
+    "policy": {"SE"},
 }
 
 def get_discriminator_logits_plot(logits: np.ndarray):
