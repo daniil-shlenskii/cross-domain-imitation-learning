@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import Sequence
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -9,7 +10,7 @@ from sklearn.manifold import TSNE
 
 from utils import (get_buffer_state_size, instantiate_jitted_fbx_buffer,
                    load_pickle)
-from utils.types import BufferState, DataType
+from utils.custom_types import BufferState, DataType
 
 
 def get_state_pairs(batch: DataType):
@@ -72,96 +73,71 @@ def prepare_buffer(
 
     return buffer, buffer_state
 
-def get_state_and_policy_tsne_scatterplots(
-    imitation_agent: "ImitationAgent",
-    seed: int,
-    learner_trajs: DataType,
+##### Visualization #####
+
+FIGSIZE = (5, 5)
+
+TRAJECTORIES_SCATTER_PARAMS = {
+    "TR": {"label": "TR", "c": "tab:green",  "marker": "+"},
+    "TE": {"label": "TE", "c": "tab:blue",   "marker": "x"},
+    "SR": {"label": "SR", "c": "tab:orange", "marker": "o"},
+    "SE": {"label": "SE", "c": "tab:red",    "marker": "s"},
+}
+
+def get_trajectory_from_buffer(state: BufferState):
+    trajs = state.experience
+    end_of_first_traj_idx = np.argmax(trajs["truncated"][0])
+    assert end_of_first_traj_idx > 0
+    traj = {k: trajs[k][0, :end_of_first_traj_idx] for k in trajs}
+    return traj
+
+def get_trajectory_from_dict(trajs: Dict):
+    end_of_first_traj_idx = np.argmax(trajs["truncated"][0])
+    assert end_of_first_traj_idx > 0
+    traj = {k: trajs[k][:end_of_first_traj_idx] for k in trajs}
+    return traj
+
+def get_trajs_tsne_scatterplot(
+    *,
+    traj_dict: dict,
+    keys_to_use: Sequence,
+    seed: int = 0,
 ):
-    observation_keys = ["observations", "observations_next"]
-
-    # get trajectories
-    end_of_firt_traj_idx = np.argmax(learner_trajs["truncated"])
-    learner_traj = {k: learner_trajs[k][:end_of_firt_traj_idx] for k in observation_keys}
-    expert_traj = {k: imitation_agent.expert_buffer_state.experience[k][0, :end_of_firt_traj_idx] for k in observation_keys}
-
-    # encode trjectories
-    for k in observation_keys:
-        learner_traj[k] = imitation_agent._preprocess_observations(learner_traj[k])
-        expert_traj[k] = imitation_agent._preprocess_expert_observations(expert_traj[k])
-
-    # state and state_pairs embeddings
-    learner_state_embeddings = learner_traj["observations"]
-    expert_state_embeddings = expert_traj["observations"]
-
-    learner_state_pairs_embeddings = get_state_pairs(learner_traj)
-    expert_state_pairs_embeddings = get_state_pairs(expert_traj)
-
-    # combine embeddings for further processing
-    state_embeddings_list = [
-        learner_state_embeddings,
-        expert_state_embeddings
-    ]
-    state_pairs_embeddings_list = [
-        learner_state_pairs_embeddings,
-        expert_state_pairs_embeddings,
-    ]
-
-    state_size_list = [0] + list(np.cumsum(list(map(
-        lambda embs: embs.shape[0],
-        state_embeddings_list,
-    ))))
-    state_pairs_size_list = [0] + list(np.cumsum(list(map(
-        lambda embs: embs.shape[0],
-        state_pairs_embeddings_list,
-    ))))
+    assert set(keys_to_use) in TRAJECTORIES_SCATTER_PARAMS
+    keys_to_use = list(keys_to_use)
+    trajs_list = [traj_dict[k] for k in keys_to_use]
 
     # tsne embeddings
-    tsne_state_pairs_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(state_pairs_embeddings_list))
+    tsne_embs = np.concatenate(trajs_list)
 
-    if learner_state_embeddings.shape[-1] > 2:
-        tsne_state_embeddings = TSNE(random_state=seed).fit_transform(np.concatenate(state_embeddings_list))
+    dim = traj_dict[keys_to_use[0]].shape[-1]
+    if dim > 2:
+        tsne_embs = TSNE(random_state=seed).fit_transform(np.concatenate(trajs_list))
+    elif dim == 1:
+            # prepare fake axis to obtain two dim data
+            fake_axis = []
+            eps = 0.01
+            for i, traj in enumerate(trajs_list):
+                fake_axis.append(np.zeros_like(traj) + eps * i)
+            fake_axis = np.concatenate(fake_axis)
+
+            tsne_embs = np.concatenate([tsne_embs, fake_axis], axis=-1)
     else:
-        tsne_state_embeddings = np.concatenate(state_embeddings_list)
-        if learner_state_embeddings.shape[-1] == 1:
-            eps = 0.05
-            y0 = np.zeros_like(state_embeddings_list[0]) + eps
-            y1 = np.zeros_like(state_embeddings_list[1]) - eps
-            tsne_state_embeddings = np.concatenate([
-                tsne_state_embeddings,
-                np.concatenate([y0, y1])
-            ], axis=-1)
+        pass
 
-    tsne_state_embeddings_list = [
-        tsne_state_embeddings[
-            state_size_list[i]: state_size_list[i + 1]
-        ]
-        for i in range(len(state_embeddings_list))
-    ]
-    tsne_state_pairs_embeddings_list = [
-        tsne_state_pairs_embeddings[
-            state_pairs_size_list[i]: state_pairs_size_list[i + 1]
-        ]
-        for i in range(len(state_pairs_embeddings_list))
-    ]
+    # split tsne embs
+    tsne_traj_dict = {}
+    start_idx = 0
+    for k, traj in zip(keys_to_use, trajs_list):
+        end_idx = len(traj)
+        tsne_traj_dict[k] = tsne_embs[start_idx: end_idx]
+        start_idx = end_idx
 
-    # scatterplots
-    opaque = np.linspace(.2, 1., num=end_of_firt_traj_idx)
-    scatter_params_list = (
-        {"label": "TE", "c": "tab:blue",   "marker": "x", "alpha": opaque},
-        {"label": "SE", "c": "tab:red",    "marker": "o", "alpha": opaque},
-    )
-    figsize=(5, 5)
 
-    state_figure = plt.figure(figsize=figsize)
-    for tsne_state_embeddings, scatter_params in zip(tsne_state_embeddings_list, scatter_params_list):
-        plt.scatter(tsne_state_embeddings[:, 0], tsne_state_embeddings[:, 1], **scatter_params)
+    figure = plt.figure(figsize=FIGSIZE)
+    for k, tsne_embs in tsne_traj_dict.items():
+        plt.scatter(tsne_embs[:, 0], tsne_embs[:, 1], **TRAJECTORIES_SCATTER_PARAMS[k])
     plt.legend()
     plt.close()
 
-    state_pairs_figure = plt.figure(figsize=figsize)
-    for tsne_state_pairs_embeddings, scatter_params in zip(tsne_state_pairs_embeddings_list, scatter_params_list):
-        plt.scatter(tsne_state_pairs_embeddings[:, 0], tsne_state_pairs_embeddings[:, 1], **scatter_params)
-    plt.legend()
-    plt.close()
-
-    return state_figure, state_pairs_figure
+    return figure
