@@ -8,7 +8,7 @@ from omegaconf.dictconfig import DictConfig
 
 import wandb
 from agents.imitation_learning.base_imitation_agent import ImitationAgent
-from agents.imitation_learning.gail.utils import \
+from agents.imitation_learning.in_domain.gail.utils import \
     get_trajs_discriminator_logits_and_accuracy
 from agents.imitation_learning.utils import prepare_buffer
 from utils import convert_figure_to_array, sample_batch_jit

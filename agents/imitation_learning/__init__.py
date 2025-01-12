@@ -1,3 +1,3 @@
-from . import base_imitation_agent
 # from .dida import *
-from .gail import *
+from .in_domain import *
+from .in_domain import gail
