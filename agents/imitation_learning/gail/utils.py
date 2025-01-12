@@ -1,46 +1,48 @@
+from typing import Literal, Sequence
+
 import matplotlib.pyplot as plt
 import numpy as np
 
-from agents.base_agent import Agent
-from agents.imitation_learning.utils import get_state_pairs
+from misc.gan import Discriminator
 from utils import apply_model_jit
-from utils.types import DataType
 
+DISCRIMINATOR_REAL_LABELS = {
+    "state": {"SR", "SE"},
+    "policy": {"TE", "SE"},
+}
 
-def get_policy_discriminator_logits_plots(
-    gail_agent: Agent,
-    learner_trajs: DataType,
+def get_discriminator_logits_plot(logits: np.ndarray):
+    figure = plt.figure(figsize=(5, 5))
+    plt.plot(logits, "bo")
+    plt.axhline(y=0., color='r', linestyle='-')
+    plt.close()
+    return figure
+
+def get_trajs_discriminator_logits_and_accuracy(
+    discriminator: Discriminator,
+    traj_dict: dict,
+    keys_to_use: Sequence,
+    discriminator_key: Literal["policy", "state"],
 ):
-    observation_keys = ["observations", "observations_next"]
+    info_key_prefix = f"{discriminator.state.info_key}"
+    # get_logits
+    logits_dict = {
+        k: apply_model_jit(discriminator, traj_dict[k]) for k in keys_to_use
+    }
 
-    # get trajectories
-    end_of_firt_traj_idx = np.argmax(learner_trajs["truncated"])
-    learner_traj = {k: learner_trajs[k][:end_of_firt_traj_idx] for k in observation_keys}
-    expert_traj = {k: gail_agent.expert_buffer_state.experience[k][0, :end_of_firt_traj_idx] for k in observation_keys}
-
-    # preprocess trjectories
-    for k in observation_keys:
-        learner_traj[k] = gail_agent._preprocess_observations(learner_traj[k])
-        expert_traj[k] = gail_agent._preprocess_expert_observations(expert_traj[k])
-
-    # get state pairs 
-    learner_state_pairs_embeddings = get_state_pairs(learner_traj)
-    expert_state_pairs_embeddings = get_state_pairs(expert_traj)
-
-    # get state pairs logits
-    policy_discriminator = gail_agent.policy_discriminator
-    policy_learner_logits = apply_model_jit(policy_discriminator, learner_state_pairs_embeddings)
-    policy_expert_logits = apply_model_jit(policy_discriminator, expert_state_pairs_embeddings)
+    # get accuracy
+    accuracy_dict = {}
+    for k, logits in logits_dict.items():
+        if k in DISCRIMINATOR_REAL_LABELS[discriminator_key]:
+            accuracy = (logits > 0).mean()
+        else:
+            accuracy = (logits < 0).mean()
+        accuracy_dict[f"{info_key_prefix}/{k}_accuracy"] = accuracy
 
     # plots
-    def logits_to_plot(logits):
-        figure = plt.figure(figsize=(5, 5))
-        plt.plot(logits, "bo")
-        plt.axhline(y=0., color='r', linestyle='-')
-        plt.close()
-        return figure
+    figure_dict = {}
+    for k, logits in logits_dict.items():
+        figure = get_discriminator_logits_plot(logits)
+        figure_dict[f"{info_key_prefix}/{k}_logits"] = figure
 
-    policy_learner_figure = logits_to_plot(policy_learner_logits)
-    policy_expert_figure = logits_to_plot(policy_expert_logits)
-
-    return policy_learner_figure, policy_expert_figure
+    return accuracy_dict, figure_dict

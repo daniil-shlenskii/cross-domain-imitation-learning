@@ -91,8 +91,8 @@ def get_trajectory_from_buffer(state: BufferState):
     traj = {k: trajs[k][0, :end_of_first_traj_idx] for k in trajs}
     return traj
 
-def get_trajectory_from_dict(trajs: Dict):
-    end_of_first_traj_idx = np.argmax(trajs["truncated"][0])
+def get_trajectory_from_dict(trajs: dict):
+    end_of_first_traj_idx = np.argmax(trajs["truncated"])
     assert end_of_first_traj_idx > 0
     traj = {k: trajs[k][:end_of_first_traj_idx] for k in trajs}
     return traj
@@ -103,7 +103,6 @@ def get_trajs_tsne_scatterplot(
     keys_to_use: Sequence,
     seed: int = 0,
 ):
-    assert set(keys_to_use) in TRAJECTORIES_SCATTER_PARAMS
     keys_to_use = list(keys_to_use)
     trajs_list = [traj_dict[k] for k in keys_to_use]
 
@@ -129,7 +128,7 @@ def get_trajs_tsne_scatterplot(
     tsne_traj_dict = {}
     start_idx = 0
     for k, traj in zip(keys_to_use, trajs_list):
-        end_idx = len(traj)
+        end_idx = start_idx + len(traj)
         tsne_traj_dict[k] = tsne_embs[start_idx: end_idx]
         start_idx = end_idx
 

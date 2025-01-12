@@ -1,3 +1,5 @@
+from typing import Optional
+
 import gymnasium as gym
 import jax
 import numpy as np
@@ -5,18 +7,17 @@ from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
 import wandb
-from agents.base_agent import Agent
 from agents.imitation_learning.base_imitation_agent import ImitationAgent
+from agents.imitation_learning.gail.utils import \
+    get_trajs_discriminator_logits_and_accuracy
 from agents.imitation_learning.utils import prepare_buffer
-from utils import convert_figure_to_array, sample_batch
-from utils.types import DataType
+from utils import convert_figure_to_array, sample_batch_jit
+from utils.custom_types import DataType
 
 from .gail_discriminator import GAILDiscriminator
-from .utils import get_policy_discriminator_logits_plots
 
 
 class GAILAgent(ImitationAgent):
-    agent: Agent
     policy_discriminator: GAILDiscriminator
 
     @classmethod
@@ -26,17 +27,15 @@ class GAILAgent(ImitationAgent):
         seed: int,
         observation_dim: gym.Space,
         action_dim: gym.Space,
-        low: np.ndarray[float],
-        high: np.ndarray[float],
-        #
-        expert_batch_size: int,
-        expert_buffer_state_path: str,
+        low: np.ndarray,
+        high: np.ndarray,
         #
         agent_config: DictConfig,
-        #
         policy_discriminator_config: DictConfig,
         #
-        expert_buffer_state_processor_config: DictConfig = None,
+        source_expert_buffer_state_path: str,
+        batch_size: Optional[int] = 1,
+        expert_buffer_state_processor_config: Optional[DictConfig] = None,
         **kwargs,
     ):
         # agent and policy_discriminator init
@@ -58,9 +57,9 @@ class GAILAgent(ImitationAgent):
         )
 
         # expert buffer init
-        expert_buffer, expert_buffer_state = prepare_buffer(
-            buffer_state_path=expert_buffer_state_path,
-            batch_size=expert_batch_size,
+        buffer, source_expert_buffer_state = prepare_buffer(
+            buffer_state_path=source_expert_buffer_state_path,
+            batch_size=batch_size,
             buffer_state_processor_config=expert_buffer_state_processor_config,
         )
 
@@ -72,8 +71,8 @@ class GAILAgent(ImitationAgent):
 
         return cls(
             rng=jax.random.key(seed),
-            expert_buffer=expert_buffer,
-            expert_buffer_state=expert_buffer_state,
+            buffer=buffer,
+            source_expert_buffer_state=source_expert_buffer_state,
             agent=agent,
             policy_discriminator=policy_discriminator,
             _save_attrs = _save_attrs,
@@ -86,22 +85,22 @@ class GAILAgent(ImitationAgent):
 
     def update(self, batch: DataType):
         new_gail_agent, info, stats_info = _update_jit(
-            gail_agent=self, learner_batch=batch
+            gail_agent=self, target_expert_batch=batch
         )
         return new_gail_agent, info, stats_info
 
-    def update_gail(
+    def update_with_expert_batch_given(
         self,
         *,
-        learner_batch: DataType,
-        expert_batch: DataType,
-        policy_discriminator_learner_batch: DataType,
+        target_expert_batch: DataType,
+        source_expert_batch: DataType,
+        policy_discriminator_target_expert_batch: DataType,
     ):
-        return _update_gail_jit(
+        return _update_with_expert_batch_given_jit(
             gail_agent=self,
-            learner_batch=learner_batch,
-            expert_batch=expert_batch,
-            policy_discriminator_learner_batch=policy_discriminator_learner_batch,
+            target_expert_batch=target_expert_batch,
+            source_expert_batch=source_expert_batch,
+            policy_discriminator_target_expert_batch=policy_discriminator_target_expert_batch,
         )
 
     def evaluate(
@@ -111,59 +110,66 @@ class GAILAgent(ImitationAgent):
         env: gym.Env,
         num_episodes: int,
         #
-        convert_to_wandb_type: bool = True,
-        #
         return_trajectories: bool = False,
+        #
+        return_traj_dict: bool = False,
+        convert_to_wandb_type: bool = True,
     ):
-        eval_info, trajs = super().evaluate(seed=seed, env=env, num_episodes=num_episodes, return_trajectories=True)
+        eval_info, traj_dict = super().evaluate(seed=seed, env=env, num_episodes=num_episodes, return_trajectories=False, return_traj_dict=True)
 
-        # policy discriminator logits plots
-        learner_logits_plot, expert_logits_plot = get_policy_discriminator_logits_plots(
-            gail_agent=self,
-            learner_trajs=trajs,
+        # get logits plot and accuracy of policy_discriminator
+        accuracy_dict, logits_figure_dict = get_trajs_discriminator_logits_and_accuracy(
+            discriminator=self.policy_discriminator,
+            traj_dict=traj_dict["state_pairs"],
+            keys_to_use=["TE", "SE"],
+            discriminator_key="policy",
         )
         if convert_to_wandb_type:
-            learner_logits_plot = wandb.Image(convert_figure_to_array(learner_logits_plot), caption="Policy Discriminator Learner logits")
-            expert_logits_plot = wandb.Image(convert_figure_to_array(expert_logits_plot), caption="Policy Discriminator Expert logits")
-        eval_info["policy_learner_logits_plot"] = learner_logits_plot
-        eval_info["policy_expert_logits_plot"] = expert_logits_plot
+            for k in logits_figure_dict:
+                logits_figure_dict[k] = wandb.Image(convert_figure_to_array(logits_figure_dict[k]), caption="")
+        eval_info.update(**accuracy_dict, **logits_figure_dict)
 
+        #
+        if return_traj_dict:
+            return eval_info, traj_dict
         if return_trajectories:
             return eval_info, trajs
         return eval_info
 
 @jax.jit
-def _update_jit(gail_agent: GAILAgent, learner_batch: DataType):
+def _update_jit(*,gail_agent: GAILAgent, target_expert_batch: DataType):
     # sample expert batch
-    new_rng, expert_batch = sample_batch(
-        gail_agent.rng, gail_agent.expert_buffer, gail_agent.expert_buffer_state
+    new_rng, source_expert_batch = sample_batch_jit(
+        gail_agent.rng, gail_agent.buffer, gail_agent.source_expert_buffer_state
     )
     new_gail_agent = gail_agent.replace(rng=new_rng)
 
     # update agent and policy policy_discriminator
-    new_gail_agent, info, stats_info = new_gail_agent.update_gail(
-        learner_batch=learner_batch,
-        expert_batch=expert_batch,
-        policy_discriminator_learner_batch=learner_batch,
+    new_gail_agent, info, stats_info = _update_with_expert_batch_given_jit(
+        gail_agent=new_gail_agent,
+        target_expert_batch=target_expert_batch,
+        source_expert_batch=source_expert_batch,
+        policy_discriminator_target_expert_batch=target_expert_batch,
     )
     return new_gail_agent, info, stats_info
 
 @jax.jit
-def _update_gail_jit(
+def _update_with_expert_batch_given_jit(
+    *,
     gail_agent: GAILAgent,
-    learner_batch: DataType,
-    expert_batch: DataType,
-    policy_discriminator_learner_batch: DataType,
+    target_expert_batch: DataType,
+    source_expert_batch: DataType,
+    policy_discriminator_target_expert_batch: DataType,
 ):
     # update policy discriminator
     new_disc, disc_info, disc_stats_info = gail_agent.policy_discriminator.update(
-        learner_batch=policy_discriminator_learner_batch,
-        expert_batch=expert_batch,
+        target_expert_batch=policy_discriminator_target_expert_batch,
+        source_expert_batch=source_expert_batch,
     )
 
     # update agent
-    learner_batch["rewards"] = new_disc.get_rewards(learner_batch)
-    new_agent, agent_info, agent_stats_info = gail_agent.agent.update(learner_batch)
+    target_expert_batch["rewards"] = new_disc.get_rewards(target_expert_batch)
+    new_agent, agent_info, agent_stats_info = gail_agent.agent.update(target_expert_batch)
 
     # update gail agent
     new_gail_agent = gail_agent.replace(

@@ -3,8 +3,9 @@ import jax.numpy as jnp
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
-from gan.discriminator import Discriminator
-from utils.types import DataType
+from agents.imitation_learning.utils import get_state_pairs
+from misc.gan.discriminator import Discriminator
+from utils.custom_types import DataType
 
 from .reward_transforms import BaseRewardTransform
 
@@ -30,50 +31,40 @@ class GAILDiscriminator(Discriminator):
             **discriminator_kwargs
         )
 
-    def update(self, *, expert_batch: DataType, learner_batch: DataType): 
+    def update(self, *, target_expert_batch: DataType, source_expert_batch: DataType, ): 
         new_gail_discriminator, info, stats_info = _update_jit(
-            expert_batch=expert_batch,
-            learner_batch=learner_batch,
+            target_expert_batch=target_expert_batch,
+            source_expert_batch=source_expert_batch,
             gail_discriminator=self,
         )
         return new_gail_discriminator, info, stats_info
 
-    def get_rewards(self, learner_batch: jnp.ndarray) -> jnp.ndarray:
-        learner_state_pairs = jnp.concatenate([
-            learner_batch["observations"],
-            learner_batch["observations_next"]
-        ], axis=1)
+    def get_rewards(self, target_expert_batch: jnp.ndarray) -> jnp.ndarray:
         return _get_rewards_jit(
             gail_discriminator=self,
-            learner_state_pairs=learner_state_pairs,
+            target_expert_state_pairs=get_state_pairs(target_expert_batch),
             reward_transform=self.reward_transform,
         )
 
 @jax.jit
 def _update_jit(
-    expert_batch: DataType,
-    learner_batch: DataType,
+    target_expert_batch: DataType,
+    source_expert_batch: DataType,
     gail_discriminator: GAILDiscriminator,
 ):
-    # prepare batches
-    expert_state_pairs = jnp.concatenate([
-        expert_batch["observations"],
-        expert_batch["observations_next"]
-    ], axis=1)
-    learner_state_pairs = jnp.concatenate([
-        learner_batch["observations"],
-        learner_batch["observations_next"]
-    ], axis=1)
+    # prepare state pairs
+    target_expert_state_pairs = get_state_pairs(target_expert_batch)
+    source_expert_state_pairs = get_state_pairs(source_expert_batch)
 
     # update discriminator
     new_gail_discr, gail_discr_info, gail_discr_stats_info = Discriminator.update(
         self=gail_discriminator,
-        real_batch=expert_state_pairs,
-        fake_batch=learner_state_pairs
+        fake_batch=target_expert_state_pairs,
+        real_batch=source_expert_state_pairs,
     )
 
     # update reward transform
-    base_rewards = _get_base_rewards(new_gail_discr, learner_state_pairs)
+    base_rewards = _get_base_rewards(new_gail_discr, target_expert_state_pairs)
     new_reward_transform, reward_transform_info = new_gail_discr.reward_transform.update(base_rewards)
 
     new_gail_discr = new_gail_discr.replace(reward_transform=new_reward_transform)
@@ -84,16 +75,15 @@ def _update_jit(
 @jax.jit
 def _get_rewards_jit(
     gail_discriminator: Discriminator,
-    learner_state_pairs: jnp.ndarray,
+    target_expert_state_pairs: jnp.ndarray,
     reward_transform: BaseRewardTransform,
 ):
-    base_rewards = _get_base_rewards(gail_discriminator, learner_state_pairs)
+    base_rewards = _get_base_rewards(gail_discriminator, target_expert_state_pairs)
     return reward_transform.transform(base_rewards)
 
 def _get_base_rewards(
     gail_discriminator: Discriminator,
-    learner_state_pairs: jnp.ndarray,
+    target_expert_state_pairs: jnp.ndarray,
 ):
-    learner_logits = gail_discriminator(learner_state_pairs)
-    base_rewards = learner_logits
-    return base_rewards
+    logits = gail_discriminator(target_expert_state_pairs)
+    return logits

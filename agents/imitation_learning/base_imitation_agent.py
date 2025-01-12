@@ -8,12 +8,12 @@ from agents.base_agent import Agent
 from utils import convert_figure_to_array
 from utils.custom_types import Buffer, BufferState
 
-from .utils import (get_state_and_policy_tsne_scatterplots, get_state_pairs,
-                    get_trajectory_from_buffer, get_trajectory_from_dict,
-                    get_trajs_tsne_scatterplot)
+from .utils import (get_state_pairs, get_trajectory_from_buffer,
+                    get_trajectory_from_dict, get_trajs_tsne_scatterplot)
 
 
 class ImitationAgent(Agent):
+    agent: Agent
     buffer: Buffer = struct.field(pytree_node=False)
     source_expert_buffer_state: BufferState = struct.field(pytree_node=False)
 
@@ -66,9 +66,8 @@ class ImitationAgent(Agent):
         eval_info["tsne_state_scatter"] = state_tsne_scatterplot
 
         #
-        to_return = [eval_info]
-        if return_trajectories:
-            to_return.append(trajs)
         if return_traj_dict:
-            to_return.append(traj_dict)
-        return to_return
+            return eval_info, traj_dict
+        if return_trajectories:
+            return eval_info, trajs
+        return eval_info
