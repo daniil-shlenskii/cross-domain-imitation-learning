@@ -5,11 +5,11 @@ import jax.numpy as jnp
 from flax import struct
 from flax.struct import PyTreeNode
 from hydra.utils import instantiate
+from nn.train_state import TrainState
 from omegaconf.dictconfig import DictConfig
 
-from nn.train_state import TrainState
 from utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
-from utils.types import PRNGKey
+from utils.custom_types import PRNGKey
 
 
 class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):

@@ -2,13 +2,14 @@ from typing import Callable
 
 import jax
 import jax.numpy as jnp
-
-from gan.base_losses import (d_logistic_loss, d_softplus_loss,
-                             g_nonsaturating_logistic_loss,
-                             g_nonsaturating_softplus_loss, gradient_penalty)
-from gan.discriminator import Discriminator
+from misc.gan.discriminator import Discriminator
 from nn.train_state import TrainState
-from utils.types import Params
+
+from utils.custom_types import Params
+
+from .base_losses import (d_logistic_loss, d_softplus_loss,
+                          g_nonsaturating_logistic_loss,
+                          g_nonsaturating_softplus_loss, gradient_penalty)
 
 #### gan losses (basic) ####
 

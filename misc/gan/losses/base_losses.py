@@ -4,7 +4,7 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 
-from utils.types import PRNGKey
+from utils.custom_types import PRNGKey
 
 ##### generator losses #####
 

@@ -11,6 +11,7 @@ class MLP(nn.Module):
     out_dim: int = None
     activation: Callable[[jnp.ndarray], jnp.ndarray] = nn.relu
     dropout_rate: Optional[float] = None
+    squeeze: bool = False
 
     @nn.compact
     def __call__(
@@ -25,5 +26,8 @@ class MLP(nn.Module):
                 )
         if self.out_dim is not None:
             x = nn.Dense(self.out_dim, kernel_init=default_init())(x)
+
+        if self.squeeze:
+            x = x.squeeze(-1)
 
         return x

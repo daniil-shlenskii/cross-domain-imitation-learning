@@ -1,17 +1,16 @@
 import distrax
 import jax
 import jax.numpy as jnp
+import wandb
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 from tqdm import tqdm
-
-import wandb
 
 
 def main():
     wandb.init(project="test_gan")
 
-    config = OmegaConf.load("_tests/gan/run_config.yaml")
+    config = OmegaConf.load("misc/_tests/gan/run_config.yaml")
 
     # reproducibility
     rng = jax.random.key(config.seed)
