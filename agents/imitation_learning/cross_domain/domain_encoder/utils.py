@@ -45,18 +45,18 @@ def get_discriminators_divergence_scores(*, domain_encoder: "BaseDomainEncoder",
     source_expert_policy_grad = flatten_fn(source_expert_policy_grad)
 
     # divergence score
-    def divergence_scores_fn(state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
-        projection = project_a_to_b(a=state_grad, b=policy_grad)
+    def divergence_scores_fn(*, to_be_projected: jnp.ndarray, project_to: jnp.ndarray):
+        projection = project_a_to_b(a=to_be_projected, b=project_to)
 
         projection_norm = jnp.linalg.norm(projection)
-        policy_grad_norm = jnp.linalg.norm(policy_grad)
+        project_to_norm = jnp.linalg.norm(project_to)
 
         if projection_norm == 0.:
             s = 1.
         else:
-            s = jnp.sign(cosine_similarity_fn(policy_grad, projection))
+            s = jnp.sign(cosine_similarity_fn(projection, project_to))
 
-        divergence_score = s * projection_norm / policy_grad_norm
+        divergence_score = s * projection_norm / project_to_norm
 
         return divergence_score
 
