@@ -2,11 +2,11 @@ import argparse
 import warnings
 from pathlib import Path
 
-from agents.utils import instantiate_agent
-from envs.collect_random_buffer import instantiate_environment
 from loguru import logger
 from omegaconf import OmegaConf
 
+from agents.utils import instantiate_agent
+from envs import instantiate_environment, register_envs
 from utils import buffer_init, get_state_from_dict, save_json, save_pickle
 
 from .base_agent import Agent
@@ -86,5 +86,7 @@ if __name__ == "__main__":
 
     if args.ignore_warnings:
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+    register_envs()
 
     main(args)
