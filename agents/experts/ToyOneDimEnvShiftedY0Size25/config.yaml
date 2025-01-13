@@ -1,7 +1,7 @@
 seed: &seed 0
 env_name: ToyOneDimEnvShiftedY0Size25
 
-n_iters_training: 1_000_000
+n_iters_training: 100_000
 batch_size: &batch_size 256
 
 precollect_buffer_size: &precollect_buffer_size 5_000
