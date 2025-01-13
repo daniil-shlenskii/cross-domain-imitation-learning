@@ -15,7 +15,7 @@ environment:
   max_episode_steps: 1000
   env: &env
     _target_: gymnasium.make
-    id: ToyOneDimEnvShifted
+    id: custom_envs/ToyOneDimEnvShifted
     size: 25.
     y: 0.
 

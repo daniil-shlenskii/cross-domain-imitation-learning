@@ -9,10 +9,11 @@ from loguru import logger
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
+import envs
 import wandb
 from agents.utils import instantiate_agent
 from envs import (collect_random_buffer, do_environment_step_and_update_buffer,
-                  instantiate_environment)
+                  instantiate_environment, register_envs)
 from utils import buffer_init, get_buffer_state_size, load_buffer, save_pickle
 from utils.common_paths import DEFAULT_RANDOM_BUFFER_STORAGE_DIR
 
@@ -188,5 +189,7 @@ if __name__ == "__main__":
 
     if args.ignore_warnings:
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+    register_envs()
 
     main(args)
