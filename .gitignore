@@ -21,6 +21,7 @@ tmp*
 # Configs
 *.yaml
 *.txt
+*.json
 
 # Non-files
 \b[^\.]+\b
