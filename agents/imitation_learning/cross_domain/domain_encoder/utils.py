@@ -61,10 +61,10 @@ def get_discriminators_divergence_scores(*, domain_encoder: "BaseDomainEncoder",
         return divergence_score
 
     divergence_scores[f"{info_key_prefix}/state_to_policy"] =\
-        divergence_scores_fn(state_grad=source_expert_state_grad, policy_grad=source_expert_policy_grad)
+        divergence_scores_fn(to_be_projected=source_expert_state_grad, project_to=source_expert_policy_grad)
 
     divergence_scores[f"{info_key_prefix}/policy_to_state"] =\
-        divergence_scores_fn(state_grad=source_expert_policy_grad, policy_grad=source_expert_state_grad)
+        divergence_scores_fn(to_be_projected=source_expert_policy_grad, project_to=source_expert_state_grad)
 
     return divergence_scores
 
