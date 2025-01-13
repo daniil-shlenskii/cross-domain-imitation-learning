@@ -58,6 +58,4 @@ evaluation:
   environment:
     _target_: gymnasium.wrappers.TimeLimit
     max_episode_steps: 1000
-    env:
-      _target_: gymnasium.make
-      id: *env_name
+    env: *env
