@@ -5,15 +5,14 @@ from pathlib import Path
 from typing import Dict
 
 import jax
-import wandb
-from agents.utils import instantiate_agent
-from envs.collect_random_buffer import (collect_random_buffer,
-                                        do_environment_step_and_update_buffer,
-                                        instantiate_environment)
 from loguru import logger
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
+import wandb
+from agents.utils import instantiate_agent
+from envs import (collect_random_buffer, do_environment_step_and_update_buffer,
+                  instantiate_environment)
 from utils import buffer_init, get_buffer_state_size, load_buffer, save_pickle
 from utils.common_paths import DEFAULT_RANDOM_BUFFER_STORAGE_DIR
 
