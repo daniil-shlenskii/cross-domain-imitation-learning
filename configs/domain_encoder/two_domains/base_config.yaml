@@ -17,7 +17,7 @@ model:
   #
   batch_size: *batch_size
   target_random_buffer_state_path: ._tmp_archive_dir/random_buffers/HalfCheetah-v5.pickle
-  source_expert_buffer_state_path: agents/experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
+  source_expert_buffer_state_path: agents/experts/HalfCheetah-v5/config/collected_rollouts/buffer_state.pickle
   #
   update_encoder_every: *update_encoder_every
   #
