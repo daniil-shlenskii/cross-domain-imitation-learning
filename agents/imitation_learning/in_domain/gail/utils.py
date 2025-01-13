@@ -32,12 +32,14 @@ def get_trajs_discriminator_logits_and_accuracy(
 
     # get accuracy
     accuracy_dict = {}
+    accuracy_dict[f"{info_key_prefix}/mean_accuracy"] = 0.
     for k, logits in logits_dict.items():
         if k in DISCRIMINATOR_REAL_LABELS[discriminator_key]:
             accuracy = (logits > 0).mean()
         else:
             accuracy = (logits < 0).mean()
         accuracy_dict[f"{info_key_prefix}/{k}_accuracy"] = accuracy
+        accuracy_dict[f"{info_key_prefix}/mean_accuracy"] += accuracy / len(logits_dict)
 
     # plots
     figure_dict = {}

@@ -115,7 +115,7 @@ class GAILAgent(ImitationAgent):
         return_traj_dict: bool = False,
         convert_to_wandb_type: bool = True,
     ):
-        eval_info, traj_dict = super().evaluate(seed=seed, env=env, num_episodes=num_episodes, return_trajectories=False, return_traj_dict=True)
+        eval_info, trajs, traj_dict = super().evaluate(seed=seed, env=env, num_episodes=num_episodes, return_trajectories=True, return_traj_dict=True)
 
         # get logits plot and accuracy of policy_discriminator
         accuracy_dict, logits_figure_dict = get_trajs_discriminator_logits_and_accuracy(
@@ -130,6 +130,8 @@ class GAILAgent(ImitationAgent):
         eval_info.update(**accuracy_dict, **logits_figure_dict)
 
         #
+        if return_trajectories and return_traj_dict:
+            return eval_info, trajs, traj_dict
         if return_traj_dict:
             return eval_info, traj_dict
         if return_trajectories:

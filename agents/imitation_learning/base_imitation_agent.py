@@ -66,6 +66,8 @@ class ImitationAgent(Agent):
         eval_info["tsne_state_scatter"] = state_tsne_scatterplot
 
         #
+        if return_trajectories and return_traj_dict:
+            return eval_info, trajs, traj_dict
         if return_traj_dict:
             return eval_info, traj_dict
         if return_trajectories:

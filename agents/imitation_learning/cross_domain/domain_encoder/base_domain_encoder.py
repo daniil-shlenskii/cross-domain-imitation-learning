@@ -12,12 +12,18 @@ from omegaconf import DictConfig, OmegaConf
 import wandb
 from agents.imitation_learning.cross_domain.domain_encoder.discriminators import \
     BaseDomainEncoderDiscriminators
+from agents.imitation_learning.in_domain.gail.utils import \
+    get_trajs_discriminator_logits_and_accuracy
 from agents.imitation_learning.utils import (
-    get_random_from_expert_buffer_state, prepare_buffer)
+    get_random_from_expert_buffer_state, get_state_pairs,
+    get_trajectory_from_buffer, get_trajectory_from_dict,
+    get_trajs_tsne_scatterplot, prepare_buffer)
 from misc.gan.generator import Generator
 from utils import (SaveLoadFrozenDataclassMixin, convert_figure_to_array,
                    sample_batch_jit)
 from utils.custom_types import Buffer, BufferState, DataType, PRNGKey
+
+from .utils import get_discriminators_divergence_scores, get_two_dim_data_plot
 
 
 class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
@@ -156,35 +162,128 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         pass
 
 
+    def pretrain_evaluate(
+        self,
+        *,
+        seed: int,
+        two_dim_data_plot_flag: bool = False,
+        convert_to_wandb_type: bool = True,
+    ):
+        eval_info = {}
+
+        # get trajectories for visualization
+        target_random_traj = get_trajectory_from_buffer(self.target_random_buffer_state)
+        source_random_traj = get_trajectory_from_buffer(self.source_random_buffer_state)
+        source_expert_traj = get_trajectory_from_buffer(self.source_expert_buffer_state)
+
+        # preprocess trajectories
+        for k in ["observations", "observations_next"]:
+            target_random_traj[k] = self.target_encoder(target_random_traj[k])
+            source_random_traj[k] = self.source_encoder(source_random_traj[k])
+            source_expert_traj[k] = self.source_encoder(source_expert_traj[k])
+
+        # traj_dict
+        traj_dict = {
+            "states": {
+                "TR": target_random_traj["observations"],
+                "SR": source_random_traj["observations"],
+                "SE": source_expert_traj["observations"],
+            },
+            "state_pairs": {
+                "TR": get_state_pairs(target_random_traj),
+                "SR": get_state_pairs(source_random_traj),
+                "SE": get_state_pairs(source_expert_traj),
+            },
+        }
+
+        # get tsne scatterplots
+        state_tsne_scatterplot = get_trajs_tsne_scatterplot(
+            traj_dict=traj_dict["states"],
+            keys_to_use=["TR", "SE"],
+            seed=seed,
+        )
+        policy_tsne_scatterplot = get_trajs_tsne_scatterplot(
+            traj_dict=traj_dict["state_pairs"],
+            keys_to_use=["TR", "SR", "SE"],
+            seed=seed,
+        )
+        if convert_to_wandb_type:
+            state_tsne_scatterplot = wandb.Image(convert_figure_to_array(state_tsne_scatterplot), caption="TSNE plot of state feautures")
+            policy_tsne_scatterplot = wandb.Image(convert_figure_to_array(policy_tsne_scatterplot), caption="TSNE plot of policy feautures")
+        eval_info["tsne_state_scatter"] = state_tsne_scatterplot
+        eval_info["tsne_policy_scatter"] = policy_tsne_scatterplot
+
+        #
+        eval_info_common_part = self._evaluate_common_part(
+            seed=seed,
+            traj_dict=traj_dict,
+            two_dim_data_plot_flag=two_dim_data_plot_flag,
+            convert_to_wandb_type=convert_to_wandb_type,
+        )
+        eval_info.update(eval_info_common_part)
+
+        return eval_info
+
     def evaluate(
         self,
+        *,
         seed: int,
-        convert_to_wandb_type: bool = True,
+        traj_dict: dict,
         two_dim_data_plot_flag: bool = False,
+        convert_to_wandb_type: bool = True,
     ):
-        return {}
-        # scores = get_discriminators_scores(domain_encoder=self, seed=seed)
-        # divergence_scores = get_policy_discriminator_divergence_score_params(domain_encoder=self, seed=seed)
-        # divergence_scores_embeddings = get_policy_discriminator_divergence_score_embeddings(domain_encoder=self, seed=seed)
-        #
-        # states_tsne_plots = get_states_tsne_scatterplots(domain_encoder=self, seed=seed)
-        # if convert_to_wandb_type:
-        #     states_tsne_plots = wandb.Image(convert_figure_to_array(states_tsne_plots), caption="TSNE plot of state feautures")
-        #
-        # eval_info = {
-        #     **scores,
-        #     **divergence_scores,
-        #     **divergence_scores_embeddings,
-        #     "domain_encoder/state_tsne_plots": states_tsne_plots,
-        # }
-        #
-        # if two_dim_data_plot_flag:
-        #     two_dim_data_figure = get_two_dim_data_plot(domain_encoder=self)
-        #     if convert_to_wandb_type:
-        #         two_dim_data_figure = wandb.Image(convert_figure_to_array(two_dim_data_figure), caption="Two Dim Data Plot")
-        #     eval_info["domain_encoder/two_dim_data_plot"] = two_dim_data_figure
-        #
-        # return eval_info
+        traj_dict = deepcopy(traj_dict)
+        traj_dict["TR"] = traj_dict.pop("TE")
+        ...
+
+    def _evaluate_common_part(
+        self,
+        seed: int,
+        traj_dict: dict,
+        two_dim_data_plot_flag: bool,
+        convert_to_wandb_type: bool,
+    ):
+        eval_info = {}
+
+        # get logits plot and accuracy of state_discriminator
+        accuracy_dict, logits_figure_dict = get_trajs_discriminator_logits_and_accuracy(
+            discriminator=self.state_discriminator,
+            traj_dict=traj_dict["states"],
+            keys_to_use=["TR", "SE"],
+            discriminator_key="state",
+        )
+        if convert_to_wandb_type:
+            for k in logits_figure_dict:
+                logits_figure_dict[k] = wandb.Image(convert_figure_to_array(logits_figure_dict[k]), caption="")
+        eval_info.update({**accuracy_dict, **logits_figure_dict})
+
+
+        # get logits plot and accuracy of policy_discriminator
+        accuracy_dict, logits_figure_dict = get_trajs_discriminator_logits_and_accuracy(
+            discriminator=self.policy_discriminator,
+            traj_dict=traj_dict["state_pairs"],
+            keys_to_use=["TR", "SR", "SE"],
+            discriminator_key="policy",
+        )
+        if convert_to_wandb_type:
+            for k in logits_figure_dict:
+                logits_figure_dict[k] = wandb.Image(convert_figure_to_array(logits_figure_dict[k]), caption="")
+        eval_info.update({**accuracy_dict, **logits_figure_dict})
+
+        # get divergence scores
+        divergence_scores = get_discriminators_divergence_scores(domain_encoder=self, seed=seed)
+        eval_info.update(divergence_scores)
+
+        # two dimensional data plot
+        if two_dim_data_plot_flag:
+            two_dim_data_figure = get_two_dim_data_plot(
+                traj_dict=traj_dict,
+                state_discriminator=self.state_discriminator,
+            )
+            if convert_to_wandb_type:
+                two_dim_data_figure = wandb.Image(convert_figure_to_array(two_dim_data_figure), caption="Two Dim Data Plot")
+            eval_info["domain_encoder/two_dim_data_plot"] = two_dim_data_figure
+        return eval_info
 
     @jax.jit
     def encode_target_state(self, state: jnp.ndarray):
