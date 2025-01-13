@@ -5,9 +5,9 @@ import jax.numpy as jnp
 from flax import struct
 from flax.struct import PyTreeNode
 from hydra.utils import instantiate
-from nn.train_state import TrainState
 from omegaconf.dictconfig import DictConfig
 
+from nn.train_state import TrainState
 from utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
 from utils.custom_types import PRNGKey
 
@@ -64,3 +64,10 @@ class Discriminator(PyTreeNode, SaveLoadFrozenDataclassMixin):
 
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
+
+class LoosyDiscriminator(Discriminator):
+    def update(self, *, return_logits: bool=False, **kwargs):
+        new_state, info, stats_info = self.state.update(**kwargs)
+        if not return_logits:
+            info.pop("real_logits"); info.pop("fake_logits")
+        return self.replace(state=new_state), info, stats_info
