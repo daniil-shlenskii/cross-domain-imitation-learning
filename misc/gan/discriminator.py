@@ -69,5 +69,5 @@ class LoosyDiscriminator(Discriminator):
     def update(self, *, return_logits: bool=False, **kwargs):
         new_state, info, stats_info = self.state.update(**kwargs)
         if not return_logits:
-            info.pop("real_logits"); info.pop("fake_logits")
+            info.pop("real_logits", None); info.pop("fake_logits", None)
         return self.replace(state=new_state), info, stats_info

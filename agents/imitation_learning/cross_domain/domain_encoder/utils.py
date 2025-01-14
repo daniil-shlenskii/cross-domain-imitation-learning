@@ -24,7 +24,7 @@ def get_discriminators_divergence_scores(*, domain_encoder: "BaseDomainEncoder",
         jax.tree.flatten(params_dict, is_leaf=lambda x: isinstance(x, jnp.ndarray))[0]
     ])
 
-    # source expert 
+    # source expert
     ## state grad
     source_expert_state_grad = jax.value_and_grad(loss_fn.source_state_loss, has_aux=True)(
         source_state.params,
@@ -47,6 +47,7 @@ def get_discriminators_divergence_scores(*, domain_encoder: "BaseDomainEncoder",
     # divergence score
     def divergence_scores_fn(*, to_be_projected: jnp.ndarray, project_to: jnp.ndarray):
         projection = project_a_to_b(a=to_be_projected, b=project_to)
+
 
         projection_norm = jnp.linalg.norm(projection)
         project_to_norm = jnp.linalg.norm(project_to)
