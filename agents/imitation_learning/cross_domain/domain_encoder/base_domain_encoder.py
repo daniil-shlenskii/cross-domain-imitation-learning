@@ -52,7 +52,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         source_expert_buffer_state_path,
         #
         update_encoder_every: int = 1,
-        source_buffer_state_processor_config: DictConfig = None,
+        sourse_buffer_processor_config: DictConfig = None,
         **kwargs,
     ):
         # target random buffer state init
@@ -65,7 +65,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         _, source_expert_buffer_state = prepare_buffer(
             buffer_state_path=source_expert_buffer_state_path,
             batch_size=batch_size,
-            buffer_state_processor_config=source_buffer_state_processor_config,
+            sourse_buffer_processor_config=sourse_buffer_processor_config,
         )
 
         # source random buffer state init

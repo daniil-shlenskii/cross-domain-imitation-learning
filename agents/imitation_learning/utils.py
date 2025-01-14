@@ -36,7 +36,7 @@ def get_random_from_expert_buffer_state(*, seed: int, expert_buffer_state: Buffe
 def prepare_buffer(
     buffer_state_path: str,
     batch_size: int,
-    buffer_state_processor_config: DictConfig = None,
+    sourse_buffer_processor_config: DictConfig = None,
 ):
     # load buffer state
     _buffer_state = load_pickle(buffer_state_path)
@@ -67,8 +67,8 @@ def prepare_buffer(
     )
 
     # process buffer state
-    if buffer_state_processor_config is not None:
-        buffer_state_processor = instantiate(buffer_state_processor_config)
+    if sourse_buffer_processor_config is not None:
+        buffer_state_processor = instantiate(sourse_buffer_processor_config)
         buffer_state = buffer_state_processor(buffer_state)
 
     return buffer, buffer_state
