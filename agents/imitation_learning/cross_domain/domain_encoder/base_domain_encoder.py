@@ -277,7 +277,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         # two dimensional data plot
         if two_dim_data_plot_flag:
             two_dim_data_figure = get_two_dim_data_plot(
-                traj_dict=traj_dict,
+                traj_dict=traj_dict["states"],
                 state_discriminator=self.state_discriminator,
             )
             if convert_to_wandb_type:

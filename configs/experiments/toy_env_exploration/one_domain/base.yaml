@@ -12,7 +12,7 @@ update_encoder_every: &update_encoder_every 1
 model:
   _target_: agents.imitation_learning.cross_domain.domain_encoder.OneDomainEncoder.create
   seed: *seed
-  encoding_dim: 16
+  encoding_dim: 2
   #
   batch_size: *batch_size
   target_random_buffer_state_path: ._tmp_archive_dir/random_buffers/ToyOneDimEnvShiftedY0Size25.pickle
@@ -23,8 +23,8 @@ model:
   target_encoder_config:
     _target_: misc.gan.generator.Generator.create
     module_config:
-      _target_: nn.networks.MLP
-      hidden_dims: [256, 256]
+      _target_: agents.imitation_learning.cross_domain.domain_encoder.networks.MLPSigmoidOnTop
+      hidden_dims: []
     optimizer_config:
       transforms:
         - _target_: optax.clip
@@ -40,8 +40,8 @@ model:
     state_discriminator_config:
       _target_: misc.gan.discriminator.LoosyDiscriminator.create
       module_config:
-        _target_: agents.imitation_learning.cross_domain.domain_encoder.networks.MLPSigmoidOnTop
-        hidden_dims: [256, 256]
+        _target_: nn.networks.MLP
+        hidden_dims: []
         out_dim: 1
         squeeze: True
       optimizer_config:
@@ -57,7 +57,7 @@ model:
       _target_: misc.gan.discriminator.LoosyDiscriminator.create
       module_config:
         _target_: nn.networks.MLP
-        hidden_dims: [256, 256]
+        hidden_dims: []
         out_dim: 1
         squeeze: True
       optimizer_config:
@@ -69,3 +69,6 @@ model:
       loss_config:
         _target_: misc.gan.losses.SoftplusLoss
         is_generator: False
+
+evaluate_extra_args:
+  two_dim_data_plot_flag: True

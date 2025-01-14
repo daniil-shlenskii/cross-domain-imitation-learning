@@ -99,7 +99,7 @@ def get_two_dim_data_plot(*, traj_dict: dict, state_discriminator: LoosyDiscrimi
     ), f"{(a * n).sum() = } and {(x0 * n).sum() = },and {b = }"
 
     ## project mean of trajectories to the hyperplane
-    traj_mean = np.concatenate([traj_dict["TE"], traj_dict["SE"]]).mean(0)
+    traj_mean = np.concatenate([traj_dict["TR"], traj_dict["SE"]]).mean(0)
     traj_mean_proj = project_a_to_b(traj_mean - x0, a)
     x0 = x0 + traj_mean_proj
 
@@ -111,8 +111,8 @@ def get_two_dim_data_plot(*, traj_dict: dict, state_discriminator: LoosyDiscrimi
     figsize=(5, 5)
     figure = plt.figure(figsize=figsize)
 
-    plt.plot(traj_dict["TR"][:, 0], traj_dict["TR"][:, 1], TRAJECTORIES_SCATTER_PARAMS["TR"])
-    plt.plot(traj_dict["SE"][:, 0], traj_dict["SE"][:, 1], TRAJECTORIES_SCATTER_PARAMS["SE"])
+    plt.scatter(traj_dict["TR"][:, 0], traj_dict["TR"][:, 1], **TRAJECTORIES_SCATTER_PARAMS["TR"])
+    plt.scatter(traj_dict["SE"][:, 0], traj_dict["SE"][:, 1], **TRAJECTORIES_SCATTER_PARAMS["SE"])
     plt.plot([h1[0], h2[0]], [h1[1], h2[1]], color="k")
     plt.close()
 
