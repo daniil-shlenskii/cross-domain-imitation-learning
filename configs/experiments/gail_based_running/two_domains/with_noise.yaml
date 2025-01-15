@@ -4,6 +4,10 @@ _constants:
   state_loss_scale: &state_loss_scale 0.5
   target_random_buffer_state_path: &target_random_buffer_path ._tmp_archive_dir/random_buffers/HalfCheetah-v5.pickle
   source_expert_buffer_state_path: &source_expert_buffer_path agents/experts/HalfCheetah-v5/config/collected_rollouts/buffer_state.pickle
+  sourse_buffer_processor_config: &sourse_buffer_processor_config
+    _target_: agents.imitation_learning.source_buffer_processors.GaussianTransform
+    mu: 0.
+    sigma: 0.1
 
 seed: &seed 0
 env_name: &env_name HalfCheetah-v5
@@ -38,10 +42,7 @@ agent:
   seed: *seed
   batch_size: *batch_size
   source_expert_buffer_state_path: *source_expert_buffer_path
-  sourse_buffer_processor_config:
-    _target_: agents.imitation_learning.source_buffer_processors.GaussianTransform
-    mu: 0.
-    sigma: 0.1
+  sourse_buffer_processor_config: *sourse_buffer_processor_config
   encoding_dim: *encoding_dim
   agent_config:
     _target_: agents.sac.SACAgent.create
@@ -87,6 +88,7 @@ agent:
     batch_size: *batch_size
     target_random_buffer_state_path: *target_random_buffer_path
     source_expert_buffer_state_path: *source_expert_buffer_path
+    sourse_buffer_processor_config: *sourse_buffer_processor_config
     #
     target_encoder_config:
       _target_: misc.gan.generator.Generator.create
