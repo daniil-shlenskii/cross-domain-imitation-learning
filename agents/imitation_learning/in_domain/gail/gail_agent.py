@@ -35,7 +35,7 @@ class GAILAgent(ImitationAgent):
         #
         source_expert_buffer_state_path: str,
         batch_size: Optional[int] = 1,
-        expert_buffer_state_processor_config: Optional[DictConfig] = None,
+        sourse_buffer_processor_config: Optional[DictConfig] = None,
         **kwargs,
     ):
         # agent and policy_discriminator init
@@ -60,7 +60,7 @@ class GAILAgent(ImitationAgent):
         buffer, source_expert_buffer_state = prepare_buffer(
             buffer_state_path=source_expert_buffer_state_path,
             batch_size=batch_size,
-            buffer_state_processor_config=expert_buffer_state_processor_config,
+            sourse_buffer_processor_config=sourse_buffer_processor_config,
         )
 
         # set attrs to save
