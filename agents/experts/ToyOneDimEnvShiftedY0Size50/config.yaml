@@ -57,5 +57,5 @@ evaluation:
   num_episodes: 25
   environment:
     _target_: gymnasium.wrappers.TimeLimit
-    max_episode_steps: 1000
+    max_episode_steps: 100
     env: *env
