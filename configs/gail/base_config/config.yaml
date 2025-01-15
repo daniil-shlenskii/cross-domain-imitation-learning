@@ -24,7 +24,7 @@ agent:
   _target_: agents.gail.GAILAgent.create
   seed: 0
   batch_size: 2048
-  source_expert_buffer_state_path: agents/experts/HalfCheetah-v5/archive/HalfCheetah-v5/collected_rollouts/buffer_state.pickle
+  source_expert_buffer_state_path: agents/experts/HalfCheetah-v5/config/collected_rollouts/buffer_state.pickle
   agent_config:
     _target_: agents.sac.SACAgent.create
     actor_module_config:
