@@ -75,17 +75,6 @@ def main(args: argparse.Namespace):
     env = instantiate_environment(config.environment)
     eval_env = instantiate_environment(config.evaluation.environment)
 
-    # agent init
-    agent = instantiate_agent(config.agent, env)
-
-    ## load agent params if exist
-    if not args.from_scratch and config_archive["agent_load_dir"].exists():
-        agent, loaded_keys = agent.load(config_archive["agent_load_dir"])
-        logger.info(
-            f"Agent is initialized with data under the path: {config_archive['agent_load_dir']}.\n" + \
-            f"Loaded keys:\n----------------\n{OmegaConf.to_yaml(loaded_keys)}"
-        )
-
     # buffer init
     buffer, state = buffer_init(config.replay_buffer, env)
 
@@ -126,6 +115,18 @@ def main(args: argparse.Namespace):
         logger.info(f"Random Buffer is stored under the following path: {config_archive['random_buffer_save_path']}.")
 
     logger.info(f"There are {get_buffer_state_size(state)} items in the Buffer.")
+
+    # agent init
+    agent = instantiate_agent(config.agent, env)
+
+    ## load agent params if exist
+    if not args.from_scratch and config_archive["agent_load_dir"].exists():
+        agent, loaded_keys = agent.load(config_archive["agent_load_dir"])
+        logger.info(
+            f"Agent is initialized with data under the path: {config_archive['agent_load_dir']}.\n" + \
+            f"Loaded keys:\n----------------\n{OmegaConf.to_yaml(loaded_keys)}"
+        )
+
 
     # training
     logger.info("Training..")
