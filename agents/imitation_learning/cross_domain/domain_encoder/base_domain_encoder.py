@@ -339,12 +339,13 @@ def _update_jit(domain_encoder: BaseDomainEncoder, target_expert_batch: DataType
     # turn target_expert_batch into target_random_batch
     target_random_batch = deepcopy(target_expert_batch)
 
-    new_rng, key = jax.random.split(new_rng)
-    target_random_batch["observations_next"] = jax.random.choice(
-        key,
-        target_expert_batch["observations_next"],
-        shape=target_random_batch["observations_next"].shape[0],
-    )
+    # TODO: 
+    # new_rng, key = jax.random.split(new_rng)
+    # target_random_batch["observations_next"] = jax.random.choice(
+    #     key,
+    #     target_expert_batch["observations_next"],
+    #     shape=target_random_batch["observations_next"].shape[0],
+    # )
 
     new_domain_encoder = domain_encoder.replace(rng=new_rng)
     return _common_update_part(

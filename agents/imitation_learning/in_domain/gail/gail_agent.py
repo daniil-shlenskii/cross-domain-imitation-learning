@@ -172,7 +172,7 @@ def _update_with_expert_batch_given_jit(
     )
 
     # update agent
-    target_expert_batch["rewards"] = new_disc.get_rewards(target_expert_batch)
+    target_expert_batch["rewards"] = new_disc.get_rewards(policy_discriminator_target_expert_batch)
     new_agent, agent_info, agent_stats_info = gail_agent.agent.update(target_expert_batch)
 
     # update gail agent
