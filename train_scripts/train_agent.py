@@ -190,6 +190,4 @@ if __name__ == "__main__":
     if args.ignore_warnings:
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-    register_envs()
-
     main(args)
