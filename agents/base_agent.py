@@ -6,8 +6,8 @@ import jax.numpy as jnp
 import numpy as np
 from flax import struct
 from flax.struct import PyTreeNode
-from nn.train_state import TrainState
 
+from nn.train_state import TrainState
 from utils import SaveLoadFrozenDataclassMixin
 from utils.custom_types import PRNGKey
 
@@ -19,12 +19,10 @@ class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     def sample_actions(self, key: PRNGKey, observations: np.ndarray) -> np.ndarray:
-        observations = self._preprocess_observations(observations)
         actions = _sample_actions_jit(key, self.actor, observations)
         return np.asarray(actions)
 
     def eval_actions(self, observations: np.ndarray,) -> np.ndarray:
-        observations = self._preprocess_observations(observations)
         actions = _eval_actions_jit(self.actor, observations)
         return np.asarray(actions)
 

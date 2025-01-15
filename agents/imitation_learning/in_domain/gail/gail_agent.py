@@ -36,6 +36,7 @@ class GAILAgent(ImitationAgent):
         source_expert_buffer_state_path: str,
         batch_size: Optional[int] = 1,
         sourse_buffer_processor_config: Optional[DictConfig] = None,
+        encoding_dim = None,
         **kwargs,
     ):
         # agent and policy_discriminator init
@@ -49,10 +50,11 @@ class GAILAgent(ImitationAgent):
             _recursive_=False,
         )
 
+        encoding_dim = encoding_dim if encoding_dim is not None else observation_dim
         policy_discriminator = instantiate(
             policy_discriminator_config,
             seed=seed,
-            input_dim=observation_dim * 2,
+            input_dim=encoding_dim * 2,
             _recursive_=False,
         )
 
