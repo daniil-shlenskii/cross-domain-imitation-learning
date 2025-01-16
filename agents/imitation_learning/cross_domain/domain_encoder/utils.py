@@ -7,78 +7,101 @@ from agents.imitation_learning.utils import TRAJECTORIES_SCATTER_PARAMS
 from misc.gan.discriminator import LoosyDiscriminator
 from utils import cosine_similarity_fn, project_a_to_b
 
+##### Divergence Scores #####
 
 def get_discriminators_divergence_scores(*, domain_encoder: "BaseDomainEncoder", seed: int=0):
-    divergence_scores = {}
-    info_key_prefix = "domain_encoder/divergence_score"
+    info_key_prefix = "domain_encoder"
 
     # sample batches
     rng = jax.random.key(seed)
     rng, target_random_batch, source_random_batch, source_expert_batch = domain_encoder.sample_batches(rng)
 
     #
-    source_state = domain_encoder.source_encoder.state
-    loss_fn = source_state.loss_fn
-    flatten_fn = lambda params_dict: jnp.concatenate([
+    state_discriminator = domain_encoder.discriminators.state_discriminator
+    policy_discriminator = domain_encoder.discriminators.policy_discriminator
+
+    # source expert
+    source_expert_divergence_scores = divergence_scores_dict(
+        state=domain_encoder.source_encoder.state,
+        state_discriminator=state_discriminator,
+        policy_discriminator=policy_discriminator,
+        batch=source_expert_batch,
+    )
+    source_expert_divergence_scores = {f"{info_key_prefix}/source_expert/{k}": v for k, v in source_expert_divergence_scores.items()}
+
+    divergence_scores = {**source_expert_divergence_scores}
+    return divergence_scores
+
+def flatten_fn(params_dict: dict):
+    return jnp.concatenate([
         jnp.ravel(x) for x in
         jax.tree.flatten(params_dict, is_leaf=lambda x: isinstance(x, jnp.ndarray))[0]
     ])
 
-    # source expert
-    ## state grad
-    source_expert_state_grad = jax.value_and_grad(loss_fn.source_state_loss, has_aux=True)(
-        source_state.params,
-        state=source_state,
-        discriminator=domain_encoder.state_discriminator,
-        states=source_expert_batch["observations"],
+def get_grad_wrt_params(
+    *, params, state, state_discriminator, policy_discriminator, batch
+):
+    # state grad
+    state_grad = jax.value_and_grad(state.loss_fn.source_state_loss, has_aux=True)(
+        params,
+        state=state,
+        discriminator=state_discriminator,
+        states=batch["observations"],
      )[1]
-    source_expert_state_grad = flatten_fn(source_expert_state_grad)
+    state_grad = flatten_fn(state_grad)
 
-    ## policy grad
-    source_expert_policy_grad = jax.value_and_grad(loss_fn.source_expert_policy_loss, has_aux=True)(
-        source_state.params,
-        state=source_state,
-        discriminator=domain_encoder.policy_discriminator,
-        states=source_expert_batch["observations"],
-        states_next=source_expert_batch["observations_next"],
+    # policy grad
+    policy_grad = jax.value_and_grad(state.loss_fn.source_expert_policy_loss, has_aux=True)(
+        params,
+        state=state,
+        discriminator=policy_discriminator,
+        states=batch["observations"],
+        states_next=batch["observations_next"],
     )[1]
-    source_expert_policy_grad = flatten_fn(source_expert_policy_grad)
+    policy_grad = flatten_fn(policy_grad)
 
-    # divergence score
-    def divergence_scores_fn(*, to_be_projected: jnp.ndarray, project_to: jnp.ndarray):
-        projection = project_a_to_b(a=to_be_projected, b=project_to)
+    return state_grad, policy_grad
 
+def divergence_scores_fn(*, to_be_projected: jnp.ndarray, project_to: jnp.ndarray):
+    projection = project_a_to_b(a=to_be_projected, b=project_to)
 
-        projection_norm = jnp.linalg.norm(projection)
-        project_to_norm = jnp.linalg.norm(project_to)
+    projection_norm = jnp.linalg.norm(projection)
+    project_to_norm = jnp.linalg.norm(project_to)
 
-        if projection_norm == 0.:
-            s = 1.
-        else:
-            s = jnp.sign(cosine_similarity_fn(projection, project_to))
+    if projection_norm == 0.:
+        s = 1.
+    else:
+        s = jnp.sign(cosine_similarity_fn(projection, project_to))
 
-        divergence_score = s * projection_norm / project_to_norm
+    divergence_score = s * projection_norm / project_to_norm
 
-        return divergence_score
+    return divergence_score
 
-    def normalized_divergence_scores_fn(*, to_be_projected: jnp.ndarray, project_to: jnp.ndarray):
-        to_be_projected /= jnp.linalg.norm(to_be_projected)
-        project_to /= jnp.linalg.norm(project_to)
-        return divergence_scores_fn(to_be_projected=to_be_projected, project_to=project_to)
+def divergence_scores_dict(
+    *, state, state_discriminator, policy_discriminator, batch
+):
+    divergence_scores = {}
 
-    divergence_scores[f"{info_key_prefix}/state_to_policy"] =\
-        divergence_scores_fn(to_be_projected=source_expert_state_grad, project_to=source_expert_policy_grad)
+    state_grad_wrt_params, policy_grad_wrt_params = get_grad_wrt_params(
+        params=state.params,
+        state=state,
+        state_discriminator=state_discriminator,
+        policy_discriminator=policy_discriminator,
+        batch=batch,
+    )
 
-    divergence_scores[f"{info_key_prefix}/policy_to_state"] =\
-        divergence_scores_fn(to_be_projected=source_expert_policy_grad, project_to=source_expert_state_grad)
+    divergence_scores["divergence_score_wrt_params/state_to_policy"] =\
+        divergence_scores_fn(to_be_projected=state_grad_wrt_params, project_to=policy_grad_wrt_params)
 
-    divergence_scores[f"{info_key_prefix}_normalized/state_to_policy"] =\
-        normalized_divergence_scores_fn(to_be_projected=source_expert_state_grad, project_to=source_expert_policy_grad)
+    divergence_scores["divergence_score_wrt_params/policy_to_state"] =\
+        divergence_scores_fn(to_be_projected=policy_grad_wrt_params, project_to=state_grad_wrt_params)
 
-    divergence_scores[f"{info_key_prefix}_normalized/policy_to_state"] =\
-        normalized_divergence_scores_fn(to_be_projected=source_expert_policy_grad, project_to=source_expert_state_grad)
+    divergence_scores["cos_sim_wrt_params/state_to_policy"] =\
+        cosine_similarity_fn(policy_grad_wrt_params, state_grad_wrt_params)
 
     return divergence_scores
+
+##### Two Dim Data Plot #####
 
 def get_two_dim_data_plot(*, traj_dict: dict, state_discriminator: LoosyDiscriminator):
     # get state discriminator hyperplane
