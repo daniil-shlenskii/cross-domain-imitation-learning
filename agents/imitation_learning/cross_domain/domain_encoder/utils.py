@@ -5,7 +5,8 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from agents.imitation_learning.utils import TRAJECTORIES_SCATTER_PARAMS
+from agents.imitation_learning.utils import (TRAJECTORIES_SCATTER_PARAMS,
+                                             get_state_pairs)
 from misc.gan.discriminator import LoosyDiscriminator
 from utils import cosine_similarity_fn, project_a_to_b
 
@@ -67,6 +68,22 @@ def get_grad_wrt_params(
 
     return state_grad, policy_grad, encoded_batch
 
+def get_grad_wrt_embs(
+    *, domain_encoder, encoded_batch, state_loss, policy_loss
+):
+    # state grad
+    state_discriminator = domain_encoder.discriminators.state_discriminator
+    state_loss_fn = lambda x: state_loss(state_discriminator(x))
+    state_grad = jax.grad(state_loss_fn)(encoded_batch["observations"]).mean(0)
+
+    # policy grad
+    policy_discriminator = domain_encoder.discriminators.policy_discriminator
+    policy_loss_fn = lambda x: policy_loss(policy_discriminator(x))
+    policy_grad = jax.grad(policy_loss_fn)(get_state_pairs(encoded_batch)).mean(0)
+    policy_grad = policy_grad.at[:state_grad.shape[-1]].get()
+
+    return state_grad, policy_grad
+
 def divergence_scores_fn(*, to_be_projected: jnp.ndarray, project_to: jnp.ndarray):
     projection = project_a_to_b(a=to_be_projected, b=project_to)
 
@@ -87,21 +104,28 @@ def get_divergence_scores_dict(
 ):
     divergence_scores = {}
 
+    # preparation
+
     if is_target:
         state = domain_encoder.target_encoder.state
-        state_loss = state.loss_fn.target_state_loss
-        policy_loss = state.loss_fn.target_random_policy_loss
+        params_state_loss = state.loss_fn.target_state_loss
+        params_policy_loss = state.loss_fn.target_random_policy_loss
+        embs_state_loss = state.loss_fn.fake_state_loss_fn
+        embs_policy_loss = state.loss_fn.fake_policy_loss_fn
     else:
         state = domain_encoder.source_encoder.state
-        state_loss = state.loss_fn.source_state_loss
-        policy_loss = state.loss_fn.source_expert_policy_loss
+        params_state_loss = state.loss_fn.source_state_loss
+        params_policy_loss = state.loss_fn.source_expert_policy_loss
+        embs_state_loss = state.loss_fn.real_state_loss_fn
+        embs_policy_loss = state.loss_fn.real_policy_loss_fn
 
+    # divergence scores wrt params
     state_grad_wrt_params, policy_grad_wrt_params, encoded_batch = get_grad_wrt_params(
         domain_encoder=domain_encoder,
         state=state,
         batch=batch,
-        state_loss=state_loss,
-        policy_loss=policy_loss,
+        state_loss=params_state_loss,
+        policy_loss=params_policy_loss,
     )
 
     divergence_scores["divergence_score_wrt_params/state_to_policy"] =\
@@ -112,6 +136,24 @@ def get_divergence_scores_dict(
 
     divergence_scores["cos_sim_wrt_params"] =\
         cosine_similarity_fn(policy_grad_wrt_params, state_grad_wrt_params)
+
+    # divergence scores wrt embs 
+
+    state_grad_wrt_embs, policy_grad_wrt_embs = get_grad_wrt_embs(
+        domain_encoder=domain_encoder,
+        encoded_batch=encoded_batch,
+        state_loss=embs_state_loss,
+        policy_loss=embs_policy_loss,
+    )
+
+    divergence_scores["divergence_score_wrt_embs/state_to_policy"] =\
+        divergence_scores_fn(to_be_projected=state_grad_wrt_embs, project_to=policy_grad_wrt_embs)
+
+    divergence_scores["divergence_score_wrt_embs/policy_to_state"] =\
+        divergence_scores_fn(to_be_projected=policy_grad_wrt_embs, project_to=state_grad_wrt_embs)
+
+    divergence_scores["cos_sim_wrt_embs"] =\
+        cosine_similarity_fn(policy_grad_wrt_embs, state_grad_wrt_embs)
 
     return divergence_scores
 
