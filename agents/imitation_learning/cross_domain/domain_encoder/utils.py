@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -21,11 +23,10 @@ def get_discriminators_divergence_scores(*, domain_encoder: "BaseDomainEncoder",
     policy_discriminator = domain_encoder.discriminators.policy_discriminator
 
     # source expert
-    source_expert_divergence_scores = divergence_scores_dict(
-        state=domain_encoder.source_encoder.state,
-        state_discriminator=state_discriminator,
-        policy_discriminator=policy_discriminator,
+    source_expert_divergence_scores = get_divergence_scores_dict(
+        domain_encoder=domain_encoder,
         batch=source_expert_batch,
+        is_target=False,
     )
     source_expert_divergence_scores = {f"{info_key_prefix}/source_expert/{k}": v for k, v in source_expert_divergence_scores.items()}
 
@@ -39,28 +40,32 @@ def flatten_fn(params_dict: dict):
     ])
 
 def get_grad_wrt_params(
-    *, params, state, state_discriminator, policy_discriminator, batch
+    *, domain_encoder, batch, state, state_loss, policy_loss, 
 ):
     # state grad
-    state_grad = jax.value_and_grad(state.loss_fn.source_state_loss, has_aux=True)(
-        params,
+    state_grad = jax.value_and_grad(state_loss, has_aux=True)(
+        state.params,
         state=state,
-        discriminator=state_discriminator,
+        discriminator=domain_encoder.discriminators.state_discriminator,
         states=batch["observations"],
      )[1]
     state_grad = flatten_fn(state_grad)
 
     # policy grad
-    policy_grad = jax.value_and_grad(state.loss_fn.source_expert_policy_loss, has_aux=True)(
-        params,
+    (_, info), policy_grad = jax.value_and_grad(policy_loss, has_aux=True)(
+        state.params,
         state=state,
-        discriminator=policy_discriminator,
+        discriminator=domain_encoder.discriminators.policy_discriminator,
         states=batch["observations"],
         states_next=batch["observations_next"],
-    )[1]
+    )
     policy_grad = flatten_fn(policy_grad)
 
-    return state_grad, policy_grad
+    encoded_batch = deepcopy(batch)
+    encoded_batch["observations"] = info["states"]
+    encoded_batch["observations_next"] = info["states_next"]
+
+    return state_grad, policy_grad, encoded_batch
 
 def divergence_scores_fn(*, to_be_projected: jnp.ndarray, project_to: jnp.ndarray):
     projection = project_a_to_b(a=to_be_projected, b=project_to)
@@ -77,17 +82,26 @@ def divergence_scores_fn(*, to_be_projected: jnp.ndarray, project_to: jnp.ndarra
 
     return divergence_score
 
-def divergence_scores_dict(
-    *, state, state_discriminator, policy_discriminator, batch
+def get_divergence_scores_dict(
+    *, batch, domain_encoder, is_target
 ):
     divergence_scores = {}
 
-    state_grad_wrt_params, policy_grad_wrt_params = get_grad_wrt_params(
-        params=state.params,
+    if is_target:
+        state = domain_encoder.target_encoder.state
+        state_loss = state.loss_fn.target_state_loss
+        policy_loss = state.loss_fn.target_random_policy_loss
+    else:
+        state = domain_encoder.source_encoder.state
+        state_loss = state.loss_fn.source_state_loss
+        policy_loss = state.loss_fn.source_expert_policy_loss
+
+    state_grad_wrt_params, policy_grad_wrt_params, encoded_batch = get_grad_wrt_params(
+        domain_encoder=domain_encoder,
         state=state,
-        state_discriminator=state_discriminator,
-        policy_discriminator=policy_discriminator,
         batch=batch,
+        state_loss=state_loss,
+        policy_loss=policy_loss,
     )
 
     divergence_scores["divergence_score_wrt_params/state_to_policy"] =\
@@ -96,7 +110,7 @@ def divergence_scores_dict(
     divergence_scores["divergence_score_wrt_params/policy_to_state"] =\
         divergence_scores_fn(to_be_projected=policy_grad_wrt_params, project_to=state_grad_wrt_params)
 
-    divergence_scores["cos_sim_wrt_params/state_to_policy"] =\
+    divergence_scores["cos_sim_wrt_params"] =\
         cosine_similarity_fn(policy_grad_wrt_params, state_grad_wrt_params)
 
     return divergence_scores
