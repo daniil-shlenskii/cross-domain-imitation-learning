@@ -232,15 +232,18 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         two_dim_data_plot_flag: bool = False,
         convert_to_wandb_type: bool = True,
     ):
-        traj_dict = deepcopy(traj_dict)
-        traj_dict["TR"] = traj_dict.pop("TE")
+        # Get Source Random Trajectory
+        source_random_traj = get_trajectory_from_buffer(self.source_random_buffer_state)
+        source_random_traj = self.encode_source_batch(source_random_traj)
+        traj_dict["states"]["SR"] = source_random_traj["observations"]
+        traj_dict["state_pairs"]["SR"] = get_state_pairs(source_random_traj)
 
-        #
         eval_info = self._evaluate_common_part(
             seed=seed,
             traj_dict=traj_dict,
             two_dim_data_plot_flag=two_dim_data_plot_flag,
             convert_to_wandb_type=convert_to_wandb_type,
+            TR_key="TE",
         )
         return eval_info
 
@@ -250,6 +253,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         traj_dict: dict,
         two_dim_data_plot_flag: bool,
         convert_to_wandb_type: bool,
+        TR_key: str = "TR",
     ):
         eval_info = {}
 
@@ -257,7 +261,7 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         accuracy_dict, logits_figure_dict = get_trajs_discriminator_logits_and_accuracy(
             discriminator=self.state_discriminator,
             traj_dict=traj_dict["states"],
-            keys_to_use=["TR", "SE"],
+            keys_to_use=[TR_key, "SE"],
             discriminator_key="state",
         )
         if convert_to_wandb_type:
@@ -265,12 +269,11 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
                 logits_figure_dict[k] = wandb.Image(convert_figure_to_array(logits_figure_dict[k]), caption="")
         eval_info.update({**accuracy_dict, **logits_figure_dict})
 
-
         # get logits plot and accuracy of policy_discriminator
         accuracy_dict, logits_figure_dict = get_trajs_discriminator_logits_and_accuracy(
             discriminator=self.policy_discriminator,
             traj_dict=traj_dict["state_pairs"],
-            keys_to_use=["TR", "SR", "SE"],
+            keys_to_use=[TR_key, "SR", "SE"],
             discriminator_key="policy",
         )
         if convert_to_wandb_type:
