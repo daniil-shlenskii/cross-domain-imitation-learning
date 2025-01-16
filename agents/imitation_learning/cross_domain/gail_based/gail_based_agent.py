@@ -72,6 +72,7 @@ class GAILBasedAgent(GAILAgent):
         convert_to_wandb_type: bool = True,
         return_trajectories: bool = False,
         return_traj_dict: bool = False,
+        two_dim_data_plot_flag: bool = False,
     ):
         eval_info, trajs, traj_dict = super().evaluate(
             seed=seed,
@@ -82,7 +83,13 @@ class GAILBasedAgent(GAILAgent):
             return_traj_dict=True,
         )
 
-        # TODO: domain encoder info
+        domain_encoder_eval_info = self.domain_encoder.evaluate(
+            seed=seed,
+            traj_dict=traj_dict,
+            two_dim_data_plot_flag=two_dim_data_plot_flag,
+            convert_to_wandb_type=convert_to_wandb_type,
+        )
+        eval_info.update(domain_encoder_eval_info)
 
         #
         if return_trajectories and return_traj_dict:

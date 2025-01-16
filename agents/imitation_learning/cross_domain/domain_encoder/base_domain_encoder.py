@@ -234,7 +234,15 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
     ):
         traj_dict = deepcopy(traj_dict)
         traj_dict["TR"] = traj_dict.pop("TE")
-        ...
+
+        #
+        eval_info = self._evaluate_common_part(
+            seed=seed,
+            traj_dict=traj_dict,
+            two_dim_data_plot_flag=two_dim_data_plot_flag,
+            convert_to_wandb_type=convert_to_wandb_type,
+        )
+        return eval_info
 
     def _evaluate_common_part(
         self,
