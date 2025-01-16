@@ -61,11 +61,22 @@ def get_discriminators_divergence_scores(*, domain_encoder: "BaseDomainEncoder",
 
         return divergence_score
 
+    def normalized_divergence_scores_fn(*, to_be_projected: jnp.ndarray, project_to: jnp.ndarray):
+        to_be_projected /= jnp.linalg.norm(to_be_projected)
+        project_to /= jnp.linalg.norm(project_to)
+        return divergence_scores_fn(to_be_projected=to_be_projected, project_to=project_to)
+
     divergence_scores[f"{info_key_prefix}/state_to_policy"] =\
         divergence_scores_fn(to_be_projected=source_expert_state_grad, project_to=source_expert_policy_grad)
 
     divergence_scores[f"{info_key_prefix}/policy_to_state"] =\
         divergence_scores_fn(to_be_projected=source_expert_policy_grad, project_to=source_expert_state_grad)
+
+    divergence_scores[f"{info_key_prefix}_normalized/state_to_policy"] =\
+        normalized_divergence_scores_fn(to_be_projected=source_expert_state_grad, project_to=source_expert_policy_grad)
+
+    divergence_scores[f"{info_key_prefix}_normalized/policy_to_state"] =\
+        normalized_divergence_scores_fn(to_be_projected=source_expert_policy_grad, project_to=source_expert_state_grad)
 
     return divergence_scores
 
