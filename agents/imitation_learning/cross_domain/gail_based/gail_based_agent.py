@@ -39,7 +39,7 @@ class GAILBasedAgent(GAILAgent):
         # set attrs to save
         _save_attrs = kwargs.pop(
             "_save_attrs",
-            ("gail_agent", "domain_encoder")
+            ("agent", "policy_discriminator", "domain_encoder")
         )
 
         return super().create(
@@ -47,6 +47,7 @@ class GAILBasedAgent(GAILAgent):
             domain_encoder=domain_encoder,
             freeze_domain_encoder=freeze_domain_encoder,
             encoding_dim=encoding_dim,
+            _save_attrs=_save_attrs,
             **kwargs,
         )
 
