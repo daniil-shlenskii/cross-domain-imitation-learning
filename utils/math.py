@@ -11,4 +11,4 @@ def norm_fn(a: np.ndarray):
     return scalar_product_fn(a, a)**0.5
 
 def scalar_product_fn(a: np.ndarray, b: np.ndarray):
-    return (a * b).sum(-1)
+    return (a * b).sum()

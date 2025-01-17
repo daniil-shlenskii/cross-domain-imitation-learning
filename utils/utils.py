@@ -16,6 +16,12 @@ from omegaconf.dictconfig import DictConfig
 def apply_model_jit(model: Callable, *args, **kwargs):
     return model(*args, **kwargs)
 
+def flatten_params_fn(params_dict: dict):
+    return jnp.concatenate([
+        jnp.ravel(x) for x in
+        jax.tree.flatten(params_dict, is_leaf=lambda x: isinstance(x, jnp.ndarray))[0]
+    ])
+
 def instantiate_optimizer(config: DictConfig):
     transforms = [
         instantiate(transform_config)
