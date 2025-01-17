@@ -93,7 +93,7 @@ agent:
           - _target_: optax.adamw
             learning_rate: 3e-4
       loss_config:
-        _target_: agents.imitation_learning.cross_domain.domain_encoder.OneDomainEncoderGradFn
+        _target_: agents.imitation_learning.cross_domain.domain_encoder.OneDomainEncoderProjectedGradPolicyToStateGradFn
         state_loss_scale: 0.2
     discriminators_config:
       _target_: agents.imitation_learning.cross_domain.domain_encoder.BaseDomainEncoderDiscriminators.create
