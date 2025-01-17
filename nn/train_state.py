@@ -19,9 +19,12 @@ class TrainState(FlaxTrainState, SaveLoadFrozenDataclassMixin):
     def create(
         cls, *, apply_fn, params, tx, loss_fn: Callable = None, grad_fn: Callable = None, **kwargs
     ):
+        if loss_fn is not None and hasattr(loss_fn, "is_grad_fn"): # TODO: temporal crutch
+            loss_fn, grad_fn = None, loss_fn
+
         if grad_fn is None:
             assert loss_fn is not None
-            def grad_fn(*, params, state, **loss_kwargs):
+            def grad_fn(params, state, **loss_kwargs):
                 grads, info = jax.grad(loss_fn, has_aux=True)(
                     params, state=state, **loss_kwargs
                 )
