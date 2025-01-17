@@ -11,6 +11,7 @@ from tqdm import tqdm
 from utils import buffer_init, save_buffer
 from utils.common_paths import DEFAULT_RANDOM_BUFFER_STORAGE_DIR
 from utils.custom_types import Buffer, BufferState
+from utils.fbx_buffer import get_buffer_state_size
 
 
 def do_environment_step_and_update_buffer(
@@ -107,7 +108,7 @@ def main():
     save_buffer(state, save_path)
 
     print(
-        f"Random Buffer is save under the following path: {save_path}"
+        f"Random Buffer with size {get_buffer_state_size(state)} is save under the following path: {save_path}"
     )
 
 if __name__ == "__main__":
