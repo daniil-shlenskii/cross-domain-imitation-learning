@@ -86,11 +86,14 @@ def main():
 
     # buffer init
     buffer_config = {
-        "_target_": "flashbax.make_item_buffer",
-        "max_length": args.n_iters,
-        "min_length": 1,
-        "sample_batch_size": 1,
-        "add_batches": False,
+        "_target_": "utils.instantiate_jitted_fbx_buffer",
+        "fbx_buffer_config": {
+            "_target_": "flashbax.make_item_buffer",
+            "max_length": args.n_iters,
+            "min_length": 1,
+            "sample_batch_size": 1,
+            "add_batches": False,
+        }
     }
     buffer, state = buffer_init(buffer_config, env)
 
