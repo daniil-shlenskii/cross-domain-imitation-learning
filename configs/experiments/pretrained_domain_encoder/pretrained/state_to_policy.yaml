@@ -23,9 +23,8 @@ model:
   target_encoder_config:
     _target_: misc.gan.generator.Generator.create
     module_config:
-      # _target_: nn.networks.MLP
       _target_: agents.imitation_learning.cross_domain.domain_encoder.networks.MLPSigmoidOnTop
-      hidden_dims: []
+      hidden_dims: [256, 256]
     optimizer_config:
       transforms:
         - _target_: optax.clip
