@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from flax import struct
 from flax.struct import PyTreeNode
 from hydra.utils import instantiate
+from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
 import wandb
@@ -20,7 +21,7 @@ from agents.imitation_learning.utils import (
     get_trajs_tsne_scatterplot, prepare_buffer)
 from misc.gan.generator import Generator
 from utils import (SaveLoadFrozenDataclassMixin, convert_figure_to_array,
-                   sample_batch_jit)
+                   get_buffer_state_size, sample_batch_jit)
 from utils.custom_types import Buffer, BufferState, DataType, PRNGKey
 
 from .utils import get_discriminators_divergence_scores, get_two_dim_data_plot
@@ -97,6 +98,10 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
             _recursive_=False,
         )
 
+        logger.info(
+            f"target_random_buffer.size = {get_buffer_state_size(target_random_buffer_state)}; " +\
+            f"source_expert_buffer.size = {get_buffer_state_size(source_expert_buffer_state)}"
+        )
         return cls(
             rng=jax.random.key(seed),
             target_encoder=target_encoder,
