@@ -7,7 +7,7 @@ log_every: 1_000
 eval_every: 5_000
 save_every: 5_000
 
-update_encoder_every: &update_encoder_every 3
+update_encoder_every: &update_encoder_every 1
 
 model:
   _target_: agents.imitation_learning.cross_domain.domain_encoder.OneDomainEncoder.create
@@ -33,7 +33,7 @@ model:
           learning_rate: 3e-4
     loss_config:
       _target_: agents.imitation_learning.cross_domain.domain_encoder.OneDomainEncoderProjectedGradStateToPolicyGradFn
-      state_loss_scale: 1.
+      state_loss_scale: 0.2
   discriminators_config:
     _target_: agents.imitation_learning.cross_domain.domain_encoder.BaseDomainEncoderDiscriminators.create
     update_policy_discriminator_every: *update_encoder_every
