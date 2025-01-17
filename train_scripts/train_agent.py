@@ -110,9 +110,9 @@ def main(args: argparse.Namespace):
 
             logger.info("Random Buffer is collected.")
 
-        # save random buffer
-        save_pickle(state, config_archive["random_buffer_save_path"])
-        logger.info(f"Random Buffer is stored under the following path: {config_archive['random_buffer_save_path']}.")
+            # save random buffer
+            save_pickle(state, config_archive["random_buffer_save_path"])
+            logger.info(f"Random Buffer is stored under the following path: {config_archive['random_buffer_save_path']}.")
 
     logger.info(f"There are {get_buffer_state_size(state)} items in the Buffer.")
 
