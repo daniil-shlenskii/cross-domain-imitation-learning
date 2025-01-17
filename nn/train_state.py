@@ -38,7 +38,7 @@ class TrainState(FlaxTrainState, SaveLoadFrozenDataclassMixin):
         )
 
     def __getattribute__(self, item: str):
-        if self.loss_fn is None and item == "loss_fn":
+        if item == "loss_fn" and self.__dict__["loss_fn"] is None:
             return self.grad_fn
         return super().__getattribute__(item)
 
@@ -46,7 +46,7 @@ class TrainState(FlaxTrainState, SaveLoadFrozenDataclassMixin):
         return self.apply_fn({"params": self.params}, *args, **kwargs)
 
     def update(self, **loss_kwargs):
-        grads, info = self.grad_fn(self.params, state, **loss_kwargs)
+        grads, info = self.grad_fn(params=self.params, state=self, **loss_kwargs)
 
         stats_info = {}
         stats_info[f"{self.info_key}/max_grad_norm"] = _compute_norms(grads)
