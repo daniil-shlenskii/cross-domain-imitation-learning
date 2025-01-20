@@ -42,8 +42,7 @@ class OrthogonalDiscriminatorLoss:
         policy_discr_downstream_loss, _ = policy_discriminator_state.loss_fn(
             policy_discriminator_params,
             state=policy_discriminator_state,
-            # fake_batch=jnp.concatenate([target_random_pairs, source_random_pairs]),
-            fake_batch=source_random_pairs,
+            fake_batch=jnp.concatenate([target_random_pairs, source_random_pairs]),
             real_batch=source_expert_pairs,
             train=True,
         )
