@@ -28,6 +28,7 @@ class BaseDomainEncoderDiscriminators(PyTreeNode, SaveLoadFrozenDataclassMixin):
         state_discriminator_config: DictConfig,
         policy_discriminator_config: DictConfig,
         update_policy_discriminator_every: int = 1,
+        **kwargs,
     ):
         state_discriminator = instantiate(
             state_discriminator_config,
@@ -47,7 +48,8 @@ class BaseDomainEncoderDiscriminators(PyTreeNode, SaveLoadFrozenDataclassMixin):
             state_discriminator=state_discriminator,
             policy_discriminator=policy_discriminator,
             update_policy_discriminator_every=update_policy_discriminator_every,
-            _save_attrs=("state_discriminator", "policy_discriminator")
+            _save_attrs=("state_discriminator", "policy_discriminator"),
+            **kwargs,
         )
 
     @override

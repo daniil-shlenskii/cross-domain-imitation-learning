@@ -9,6 +9,7 @@ from agents.imitation_learning.utils import (TRAJECTORIES_SCATTER_PARAMS,
                                              get_state_pairs)
 from misc.gan.discriminator import LoosyDiscriminator
 from utils import cosine_similarity_fn, project_a_to_b
+from utils.math import scalar_product_fn
 
 ##### Divergence Scores #####
 
@@ -165,6 +166,8 @@ def get_two_dim_data_plot(*, traj_dict: dict, state_discriminator: LoosyDiscrimi
     b, n = jax.tree.flatten(state_discr_params)[0][-2:]
     assert n.shape[-1] == 1, n.ndim == 2
     b, n = b.squeeze(-1), n.squeeze(-1)
+    b /= jnp.linalg.norm(n)
+    n /= jnp.linalg.norm(n)
 
     ## get a and x0
     def get_hyperplane_a_and_x0(n, b):
@@ -179,24 +182,28 @@ def get_two_dim_data_plot(*, traj_dict: dict, state_discriminator: LoosyDiscrimi
             c = -b / n[1]
             x0 = np.array([0., c])
 
-        a /= np.linalg.norm(a)
-
         return a, x0
 
     a, x0 = get_hyperplane_a_and_x0(n, b)
     assert (
-        np.isclose((a * n).sum(), 0., atol=1e-4) and
-        np.isclose((x0 * n).sum(), -b, atol=1e-4)
+        np.isclose((a * n).sum(), 0., atol=1e-7) and
+        np.isclose((x0 * n).sum(), -b, atol=1e-7)
     ), f"{(a * n).sum() = } and {(x0 * n).sum() = },and {b = }"
 
     ## project mean of trajectories to the hyperplane
     traj_mean = np.concatenate([traj_dict["TR"], traj_dict["SE"]]).mean(0)
     traj_mean_proj = project_a_to_b(traj_mean - x0, a)
-    x0 = x0 + traj_mean_proj
+    # x0 = x0 + traj_mean_proj
+    assert np.isclose(scalar_product_fn(n, x0) + b, 0, atol=1e-7), f"{scalar_product_fn(n, x0) + b = }"
 
     ## two line's points
-    h1 = x0 + a
-    h2 = x0 - a
+    span = jnp.abs(traj_dict["TR"].mean(0) - traj_dict["SE"].mean(0))
+    h1 = x0 + a * span * 0.5
+    h2 = x0 - a * span * 0.5
+
+    ## normal line's points
+    n1 = x0
+    n2 = x0 + n * span * 0.1
 
     # plot
     figsize=(5, 5)
@@ -205,6 +212,7 @@ def get_two_dim_data_plot(*, traj_dict: dict, state_discriminator: LoosyDiscrimi
     plt.scatter(traj_dict["TR"][:, 0], traj_dict["TR"][:, 1], **TRAJECTORIES_SCATTER_PARAMS["TR"])
     plt.scatter(traj_dict["SE"][:, 0], traj_dict["SE"][:, 1], **TRAJECTORIES_SCATTER_PARAMS["SE"])
     plt.plot([h1[0], h2[0]], [h1[1], h2[1]], color="k")
+    plt.plot([n1[0], n2[0]], [n1[1], n2[1]], color="k")
     plt.close()
 
     return figure

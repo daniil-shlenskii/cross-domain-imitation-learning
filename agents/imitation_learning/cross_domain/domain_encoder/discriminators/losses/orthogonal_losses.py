@@ -1,112 +1,103 @@
 import jax
 import jax.numpy as jnp
 
-from misc.gan.losses import SoftplusLoss
+from agents.imitation_learning.cross_domain.domain_encoder.discriminators.base_discriminators import \
+    BaseDomainEncoderDiscriminators
+from agents.imitation_learning.utils import get_state_pairs
+from misc.gan.discriminator import Discriminator
 from nn.train_state import TrainState
-from utils import cosine_similarity_fn
-from utils.custom_types import Params
+from utils.custom_types import DataType, Params
+from utils.math import cosine_similarity_fn
 
 
-def _get_orthogonal_losses(cls):
-    def _apply_fn_wrapper(apply_fn):
-        def wrapper(*args, **kwargs):
-            logits = apply_fn(*args, **kwargs)
-            return logits.mean(), logits
-        return wrapper
+class OrthogonalDiscriminatorLoss:
+    def __init__(self, target_reg_scale: float=1., source_reg_scale: float=1.):
+        self.target_reg_scale = target_reg_scale
+        self.source_reg_scale = source_reg_scale
 
-    class OrthogonalPolicyDiscriminatorLoss(cls):
-        def __init__(self, domain_reg_scale: float = 0., **kwargs):
-            self.domain_reg_scale = domain_reg_scale
-            super().__init__(**kwargs)
+    def __call__(
+        self,
+        state_discriminator_params: Params,
+        policy_discriminator_params: Params,
+        state_discriminator_state: TrainState, 
+        policy_discriminator_state: TrainState, 
+        target_random_batch: DataType,
+        source_random_batch: DataType,
+        source_expert_batch: DataType,
+    ):
+        # downstream losses
+        ## state discriminator
+        state_discr_downstream_loss, _ = state_discriminator_state.loss_fn(
+            state_discriminator_params,
+            state=state_discriminator_state,
+            fake_batch=target_random_batch["observations"],
+            real_batch=source_expert_batch["observations"],
+            train=True,
+        )
 
-        def discriminator_loss(
-            self,
-            params: Params,
-            state: TrainState,
-            target_random_state_pairs: jnp.ndarray,
-            source_random_state_pairs: jnp.ndarray,
-            source_expert_state_pairs: jnp.ndarray,
-            train: bool = True,
-        ):
-            # downstream loss
-            _apply_fn = _apply_fn_wrapper(state.apply_fn)
-            (_, source_expert_state_pairs_logits), source_expert_state_pairs_grad = jax.value_and_grad(_apply_fn, argnums=1, has_aux=True)(
-                {"params": params}, source_expert_state_pairs, train=train
-            )
-            (_, target_random_state_pairs_logits), target_random_state_pairs_grad = jax.value_and_grad(_apply_fn, argnums=1, has_aux=True)(
-                {"params": params}, target_random_state_pairs, train=train
-            )
-            source_random_state_pairs_logits = state.apply_fn(
-                {"params": params}, source_random_state_pairs, train=train
-            )
-            downstream_loss = self.discriminator_loss_fn(
-                real_logits=source_expert_state_pairs_logits,
-                fake_logits=jnp.concatenate([target_random_state_pairs_logits, source_random_state_pairs_logits])
-            )
+        ## policy discriminator
+        target_random_pairs = get_state_pairs(target_random_batch)
+        source_random_pairs = get_state_pairs(source_random_batch)
+        source_expert_pairs = get_state_pairs(source_expert_batch)
+        policy_discr_downstream_loss, _ = policy_discriminator_state.loss_fn(
+            policy_discriminator_params,
+            state=policy_discriminator_state,
+            # fake_batch=jnp.concatenate([target_random_pairs, source_random_pairs]),
+            fake_batch=source_random_pairs,
+            real_batch=source_expert_pairs,
+            train=True,
+        )
 
-            # domain regularization term
-            # domain_reg_loss = jnp.abs(source_random_state_pairs_logits).mean()
-            domain_reg_loss = self.discriminator_loss_fn(
-                real_logits=target_random_state_pairs_logits,
-                fake_logits=source_random_state_pairs_logits,
-            )
+        # orthogonal regularization
+        dim = target_random_batch["observations"].shape[-1]
 
-            loss = downstream_loss + domain_reg_loss * self.domain_reg_scale
+        ## state grads
+        def target_random_state_gen_loss_fn(x: jnp.ndarray):
+            logits = state_discriminator_state.apply_fn({"params": state_discriminator_params}, x)
+            return state_discriminator_state.loss_fn.generator_loss_fn(logits)
+        target_random_state_grad = jax.grad(target_random_state_gen_loss_fn)(target_random_batch["observations"])
 
-            info = {
-                f"{state.info_key}_loss": loss,
-                f"{state.info_key}_downstream_loss": downstream_loss,
-                f"{state.info_key}_domain_reg_loss": domain_reg_loss,
-                "target_random_state_pairs_grad": target_random_state_pairs_grad,
-                "source_expert_state_pairs_grad": source_expert_state_pairs_grad,
-            }
-            return loss, info
+        def source_expert_state_gen_loss_fn(x: jnp.ndarray):
+            logits = state_discriminator_state.apply_fn({"params": state_discriminator_params}, x)
+            return state_discriminator_state.loss_fn.generator_loss_fn(-logits)
+        source_expert_state_grad = jax.grad(source_expert_state_gen_loss_fn)(source_expert_batch["observations"])
 
-    class OrthogonalStateDiscriminatorLoss(cls):
-        def __init__(self, orthogonality_reg_scale: float = 1., **kwargs):
-            self.orthogonality_reg_scale = orthogonality_reg_scale
-            super().__init__(**kwargs)
+        ## policy grads
+        def target_random_policy_gen_loss_fn(x: jnp.ndarray):
+            logits = policy_discriminator_state.apply_fn({"params": policy_discriminator_params}, x)
+            return policy_discriminator_state.loss_fn.generator_loss_fn(-logits)
+        target_random_policy_grad = jax.grad(target_random_policy_gen_loss_fn)(target_random_pairs)
+        target_random_policy_grad = target_random_policy_grad.at[:, :dim].get()
 
-        def discriminator_loss(
-            self,
-            params: Params,
-            state: TrainState,
-            target_random_states: jnp.ndarray,
-            source_expert_states: jnp.ndarray,
-            target_random_states_policy_grad: jnp.ndarray,
-            source_expert_states_policy_grad: jnp.ndarray,
-            train: bool = True,
-        ):
-            _apply_fn = _apply_fn_wrapper(state.apply_fn)
+        def source_expert_policy_gen_loss_fn(x: jnp.ndarray):
+            logits = policy_discriminator_state.apply_fn({"params": policy_discriminator_params}, x)
+            return policy_discriminator_state.loss_fn.generator_loss_fn(logits)
+        source_expert_policy_grad = jax.grad(source_expert_policy_gen_loss_fn)(source_expert_pairs)
+        source_expert_policy_grad = source_expert_policy_grad.at[:, :dim].get()
 
-            # downstream loss
-            (_, target_random_states_logits), target_random_states_grad = jax.value_and_grad(_apply_fn, argnums=1, has_aux=True)(
-                {"params": params}, target_random_states, train=train
-            )
-            (_, source_expert_states_logits), source_expert_states_grad = jax.value_and_grad(_apply_fn, argnums=1, has_aux=True)(
-                {"params": params}, source_expert_states, train=train
-            )
-            downstream_loss = self.discriminator_loss_fn(
-                fake_logits=target_random_states_logits,
-                real_logits=source_expert_states_logits,
-            )
+        ## regularization
+        target_random_cossim = jax.vmap(cosine_similarity_fn)(target_random_state_grad, target_random_policy_grad)
+        source_expert_cossim = jax.vmap(cosine_similarity_fn)(source_expert_state_grad, source_expert_policy_grad)
 
-            # regularization term
-            dim = target_random_states.shape[-1]
-            ff = (cosine_similarity_fn(target_random_states_grad, target_random_states_policy_grad)**2).mean() * dim**0.5
-            rr = (cosine_similarity_fn(source_expert_states_grad, source_expert_states_policy_grad)**2).mean() * dim**0.5
-            orthogonality_reg_loss = rr + ff
+        target_random_cossim_scaled = target_random_cossim * dim**0.5
+        source_expert_cossim_scaled = source_expert_cossim * dim**0.5
 
-            loss = downstream_loss + orthogonality_reg_loss * self.orthogonality_reg_scale
+        cossim_term = (jnp.abs(target_random_cossim_scaled) * self.target_reg_scale + jnp.abs(source_expert_cossim_scaled) * self.source_reg_scale).mean()
 
-            info = {
-                f"{state.info_key}_loss": loss,
-                f"{state.info_key}_downstream_loss": downstream_loss,
-                f"{state.info_key}_reg_loss": orthogonality_reg_loss,
-                f"{state.info_key}_rr": rr,
-                f"{state.info_key}_ff": ff,
-            }
-            return loss, info
-    return OrthogonalStateDiscriminatorLoss, OrthogonalPolicyDiscriminatorLoss
+        #
+        loss = (
+            state_discr_downstream_loss +\
+            policy_discr_downstream_loss +\
+            cossim_term
+        )
 
-OrthogonalStateDiscriminatorSoftplusLoss, OrthogonalPolicyDiscriminatorSoftplusLoss = _get_orthogonal_losses(SoftplusLoss)
+        return loss, {
+            "discriminators/loss": loss,
+            "discriminators/cossim_term": cossim_term,
+            f"{state_discriminator_state.info_key}_downstream_loss": state_discr_downstream_loss,
+            f"{policy_discriminator_state.info_key}_downstream_loss": policy_discr_downstream_loss,
+            "discriminators/target_random_cossim": target_random_cossim.mean(),
+            "discriminators/target_random_cossim_scaled": target_random_cossim_scaled.mean(),
+            "discriminators/source_expert_cossim": source_expert_cossim.mean(),
+            "discriminators/source_expert_cossim_scaled": source_expert_cossim_scaled.mean(),
+        }
