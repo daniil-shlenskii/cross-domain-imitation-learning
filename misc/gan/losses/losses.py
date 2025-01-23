@@ -180,11 +180,11 @@ class CGAILReguluarizationDecorator:
         real_logits, fake_logits = info["real_logits"], info["fake_logits"]
         reg = ((real_logits**2 + fake_logits**2) * 0.5).mean()
 
-        loss_with_cgail_reg = d_loss + self.reg_scale * reg 
+        loss_with_cgail_reg = d_loss + self.reg_scale * reg
 
         info.update({
             f"{state.info_key}_loss_with_cgail_reg": loss_with_cgail_reg,
-            f"{state.info_key}_cgail_reg": reg 
+            f"{state.info_key}_cgail_reg": reg
         })
 
         return loss_with_cgail_reg, info
