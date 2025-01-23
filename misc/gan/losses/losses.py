@@ -2,9 +2,9 @@ from typing import Callable
 
 import jax
 import jax.numpy as jnp
+
 from misc.gan.discriminator import Discriminator
 from nn.train_state import TrainState
-
 from utils.custom_types import Params
 
 from .base_losses import (d_logistic_loss, d_softplus_loss,
@@ -102,7 +102,7 @@ class GradientPenaltyDecorator:
     def __init__(
         self,
         d_loss_fn: Callable,
-        gradient_penalty_coef: float
+        gradient_penalty_coef: float = 10.,
     ):
         self.d_loss_fn = d_loss_fn
         self.penalty_coef = gradient_penalty_coef
@@ -137,7 +137,7 @@ class GradientPenaltyDecorator:
 
 def _gan_loss_with_gradient_penalty_decorator(cls: GANLoss):
     class GANLossGP(cls):
-        def __init__(self, *, gradient_penalty_coef: float, **kwargs):
+        def __init__(self, *, gradient_penalty_coef: float=10., **kwargs):
             self.discriminator_loss = GradientPenaltyDecorator(
                 d_loss_fn=self.discriminator_loss,
                 gradient_penalty_coef=gradient_penalty_coef
@@ -148,3 +148,57 @@ def _gan_loss_with_gradient_penalty_decorator(cls: GANLoss):
 LogisticLossGP = _gan_loss_with_gradient_penalty_decorator(LogisticLoss)
 
 SoftplusLossGP = _gan_loss_with_gradient_penalty_decorator(SoftplusLoss)
+
+
+#### gan losses with c-gail regularization ####
+
+class CGAILReguluarizationDecorator:
+    def __init__(
+        self,
+        d_loss_fn: Callable,
+        reg_scale: float = 1.,
+    ):
+        self.d_loss_fn = d_loss_fn
+        self.reg_scale = reg_scale
+
+    def __call__(
+        self,
+        params: Params,
+        state: TrainState,
+        real_batch: jnp.ndarray,
+        fake_batch: jnp.ndarray,
+        **kwargs,
+    ):
+        d_loss, info = self.d_loss_fn(
+            params=params,
+            state=state,
+            real_batch=real_batch,
+            fake_batch=fake_batch,
+            **kwargs
+        )
+
+        real_logits, fake_logits = info["real_logits"], info["fake_logits"]
+        reg = ((real_logits**2 + fake_logits**2) * 0.5).mean()
+
+        loss_with_cgail_reg = d_loss + self.reg_scale * reg 
+
+        info.update({
+            f"{state.info_key}_loss_with_cgail_reg": loss_with_cgail_reg,
+            f"{state.info_key}_cgail_reg": reg 
+        })
+
+        return loss_with_cgail_reg, info
+
+def _gan_loss_with_cgail_reg(cls: GANLoss):
+    class GANLossCGAILReg(cls):
+        def __init__(self, *, reg_scale: float=1., **kwargs):
+            self.discriminator_loss = CGAILReguluarizationDecorator(
+                d_loss_fn=self.discriminator_loss,
+                reg_scale=reg_scale,
+            )
+            super().__init__(**kwargs)
+    return GANLossCGAILReg
+
+LogisticLossCGAILReg = _gan_loss_with_cgail_reg(LogisticLoss)
+
+SoftplusLossCGAILReg = _gan_loss_with_cgail_reg(SoftplusLoss)
