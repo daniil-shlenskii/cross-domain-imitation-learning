@@ -13,12 +13,18 @@ class DomainEncoderLossMixin:
         self,
         policy_loss: GANLoss,
         state_loss: GANLoss,
-        state_loss_scale: float = 1.,
+        target_state_loss_scale: float = 1.,
+        target_policy_loss_scale: float = 1.,
+        source_state_loss_scale: float = 1.,
+        source_policy_loss_scale: float = 1.,
     ):
         self._set_policy_loss_fns(policy_loss)
         self._set_state_loss_fns(state_loss)
 
-        self.state_loss_scale = state_loss_scale
+        self.target_state_loss_scale = target_state_loss_scale
+        self.target_policy_loss_scale = target_policy_loss_scale
+        self.source_state_loss_scale = source_state_loss_scale
+        self.source_policy_loss_scale = source_policy_loss_scale
 
     def _set_state_loss_fns(self, state_loss: GANLoss):
         """For discriminator deceiving."""

@@ -96,8 +96,9 @@ agent:
           - _target_: optax.adamw
             learning_rate: 3e-4
       loss_config:
-        _target_: agents.imitation_learning.cross_domain.domain_encoder.OneDomainEncoderLoss
-        state_loss_scale: *state_loss_scale
+        _target_: agents.imitation_learning.cross_domain.domain_encoder.BaseOneDomainEncoderLoss
+        target_state_loss_scale: *state_loss_scale
+        source_state_loss_scale: *state_loss_scale
     discriminators_config:
       _target_: agents.imitation_learning.cross_domain.domain_encoder.BaseDomainEncoderDiscriminators.create
       update_policy_discriminator_every: *update_encoder_every

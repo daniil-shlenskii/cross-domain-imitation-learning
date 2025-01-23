@@ -1,1 +1,1 @@
-from .base_loss import OneDomainEncoderLoss
+from .base_loss import BaseOneDomainEncoderLoss
