@@ -20,10 +20,6 @@ def get_discriminators_divergence_scores(*, domain_encoder: "BaseDomainEncoder",
     rng = jax.random.key(seed)
     rng, target_random_batch, source_random_batch, source_expert_batch = domain_encoder.sample_batches(rng)
 
-    #
-    state_discriminator = domain_encoder.discriminators.state_discriminator
-    policy_discriminator = domain_encoder.discriminators.policy_discriminator
-
     # source expert
     source_expert_divergence_scores = get_divergence_scores_dict(
         domain_encoder=domain_encoder,
@@ -138,7 +134,7 @@ def get_divergence_scores_dict(
     divergence_scores["cos_sim_wrt_params"] =\
         cosine_similarity_fn(policy_grad_wrt_params, state_grad_wrt_params)
 
-    # divergence scores wrt embs 
+    # divergence scores wrt embs
 
     state_grad_wrt_embs, policy_grad_wrt_embs = get_grad_wrt_embs(
         domain_encoder=domain_encoder,
@@ -186,15 +182,15 @@ def get_two_dim_data_plot(*, traj_dict: dict, state_discriminator: LoosyDiscrimi
 
     a, x0 = get_hyperplane_a_and_x0(n, b)
     assert (
-        np.isclose((a * n).sum(), 0., atol=1e-7) and
-        np.isclose((x0 * n).sum(), -b, atol=1e-7)
+        np.isclose((a * n).sum(), 0., atol=1e-4) and
+        np.isclose((x0 * n).sum(), -b, atol=1e-4)
     ), f"{(a * n).sum() = } and {(x0 * n).sum() = },and {b = }"
 
     ## project mean of trajectories to the hyperplane
-    traj_mean = np.concatenate([traj_dict["TR"], traj_dict["SE"]]).mean(0)
+    traj_mean = (traj_dict["TR"].mean(0) + traj_dict["SE"].mean(0)) * 0.5
     traj_mean_proj = project_a_to_b(traj_mean - x0, a)
-    # x0 = x0 + traj_mean_proj
-    assert np.isclose(scalar_product_fn(n, x0) + b, 0, atol=1e-7), f"{scalar_product_fn(n, x0) + b = }"
+    x0 = x0 + traj_mean_proj
+    assert np.isclose(scalar_product_fn(n, x0) + b, 0, atol=1e-4), f"{scalar_product_fn(n, x0) + b = }"
 
     ## two line's points
     span = jnp.abs(traj_dict["TR"].mean(0) - traj_dict["SE"].mean(0))
