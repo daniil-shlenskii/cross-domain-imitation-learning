@@ -48,10 +48,10 @@ class DomainEncoderGradFnMixin(DomainEncoderLossMixin):
 
         # get resulting grad
         policy_grad = random_policy_grad
-        grad = jax.tree.map(lambda x, y: x + y * self.state_loss_scale, policy_grad, state_grad)
+        grad = jax.tree.map(lambda x, y: x * self.target_policy_loss_scale + y * self.target_state_loss_scale, policy_grad, state_grad)
 
         policy_loss = random_policy_loss
-        loss = policy_loss + state_loss * self.state_loss_scale
+        loss = policy_loss * self.target_policy_loss_scale + state_loss * self.target_state_loss_scale
 
         return grad, loss, {"target_random_batch": random_batch}
 
@@ -101,10 +101,10 @@ class DomainEncoderGradFnMixin(DomainEncoderLossMixin):
 
         # get resulting grad
         policy_grad = jax.tree.map(lambda x, y: x + y, random_policy_grad, expert_policy_grad)
-        grad = jax.tree.map(lambda x, y: x + y * self.state_loss_scale, policy_grad, state_grad)
+        grad = jax.tree.map(lambda x, y: x * self.source_policy_loss_scale + y * self.source_state_loss_scale, policy_grad, state_grad)
 
         policy_loss = random_policy_loss + expert_policy_loss
-        loss = policy_loss + state_loss * self.state_loss_scale
+        loss = policy_loss * self.source_policy_loss_scale + state_loss * self.source_state_loss_scale
 
         return grad, loss, {"source_random_batch": random_batch, "source_expert_batch": expert_batch}
 
