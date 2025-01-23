@@ -32,7 +32,6 @@ class BaseDomainEncoderDiscriminators(PyTreeNode, SaveLoadFrozenDataclassMixin):
         use_target_random_batch_for_policy_discrminator: bool = True,
         **kwargs,
     ):
-        use_target_random_batch_for_policy_discrminator = False
         state_discriminator = instantiate(
             state_discriminator_config,
             seed=seed,
