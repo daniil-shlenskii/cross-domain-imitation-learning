@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Callable, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -17,6 +17,7 @@ from utils.custom_types import DataType
 class BaseDomainEncoderDiscriminators(PyTreeNode, SaveLoadFrozenDataclassMixin):
     state_discriminator: LoosyDiscriminator
     policy_discriminator: LoosyDiscriminator
+    get_fake_policy_batch: Callable = struct.field(pytree_node=False)
     update_policy_discriminator_every: str = struct.field(pytree_node=False)
     _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
@@ -28,8 +29,10 @@ class BaseDomainEncoderDiscriminators(PyTreeNode, SaveLoadFrozenDataclassMixin):
         state_discriminator_config: DictConfig,
         policy_discriminator_config: DictConfig,
         update_policy_discriminator_every: int = 1,
+        use_target_random_batch_for_policy_discrminator: bool = True,
         **kwargs,
     ):
+        use_target_random_batch_for_policy_discrminator = False
         state_discriminator = instantiate(
             state_discriminator_config,
             seed=seed,
@@ -44,9 +47,17 @@ class BaseDomainEncoderDiscriminators(PyTreeNode, SaveLoadFrozenDataclassMixin):
             info_key="domain_encoder/policy_discriminator",
             _recursive_=False,
         )
+        if use_target_random_batch_for_policy_discrminator:
+            def get_fake_policy_batch(target_random_batch, source_random_batch):
+                return jnp.concatenate([target_random_batch, source_random_batch])
+        else:
+            def get_fake_policy_batch(target_random_batch, source_random_batch):
+                return source_random_batch
+
         return cls(
             state_discriminator=state_discriminator,
             policy_discriminator=policy_discriminator,
+            get_fake_policy_batch=get_fake_policy_batch,
             update_policy_discriminator_every=update_policy_discriminator_every,
             _save_attrs=("state_discriminator", "policy_discriminator"),
             **kwargs,
@@ -87,7 +98,7 @@ def _update_jit(
 
     ## update
     new_policy_disc, policy_disc_info, policy_disc_stats_info = discriminators.policy_discriminator.update(
-        fake_batch=jnp.concatenate([target_random_pairs, source_random_pairs]),
+        fake_batch=discriminators.get_fake_policy_batch(target_random_pairs, source_random_pairs),
         real_batch=source_expert_pairs,
     )
     new_policy_disc = jax.lax.cond(

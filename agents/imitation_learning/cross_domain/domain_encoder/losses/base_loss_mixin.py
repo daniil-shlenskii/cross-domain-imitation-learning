@@ -37,7 +37,7 @@ class BaseDomainEncoderLossMixin(DomainEncoderLossMixin):
 
         # final loss
         loss = (
-            trp_loss * self.target_policy_loss_scale +
+            trp_loss * self.target_policy_loss_scale * self.update_target_encoder_with_policy_discrminator +
             ts_loss * self.target_state_loss_scale
         )
 
