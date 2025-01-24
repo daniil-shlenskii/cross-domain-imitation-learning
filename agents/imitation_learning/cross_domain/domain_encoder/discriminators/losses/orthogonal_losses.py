@@ -1,10 +1,8 @@
 import jax
 import jax.numpy as jnp
+from typing_extensions import override
 
-from agents.imitation_learning.cross_domain.domain_encoder.discriminators.base_discriminators import \
-    BaseDomainEncoderDiscriminators
 from agents.imitation_learning.utils import get_state_pairs
-from misc.gan.discriminator import Discriminator
 from nn.train_state import TrainState
 from utils.custom_types import DataType, Params
 from utils.math import cosine_similarity_fn
@@ -75,6 +73,9 @@ class OrthogonalDiscriminatorLoss:
         source_expert_policy_grad = source_expert_policy_grad.at[:, :dim].get()
 
         ## regularization
+        target_random_state_grad, target_random_policy_grad = self.preprocess_grads(state_grad=target_random_state_grad, policy_grad=target_random_policy_grad) 
+        source_expert_state_grad, source_expert_policy_grad = self.preprocess_grads(state_grad=source_expert_state_grad, policy_grad=source_expert_policy_grad) 
+
         target_random_cossim = jax.vmap(cosine_similarity_fn)(target_random_state_grad, target_random_policy_grad)
         source_expert_cossim = jax.vmap(cosine_similarity_fn)(source_expert_state_grad, source_expert_policy_grad)
 
@@ -100,3 +101,15 @@ class OrthogonalDiscriminatorLoss:
             "discriminators/source_expert_cossim": source_expert_cossim.mean(),
             "discriminators/source_expert_cossim_scaled": source_expert_cossim_scaled.mean(),
         }
+
+    @override
+    def preprocess_grads(self, *, state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
+        return state_grad, policy_grad
+
+class OrthogonalStateToPolicyDiscriminatorLoss(OrthogonalDiscriminatorLoss):
+    def preprocess_grads(self, *, state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
+        return state_grad, jax.lax.stop_gradient(policy_grad)
+
+class OrthogonalPolicyToStateDiscriminatorLoss(OrthogonalDiscriminatorLoss):
+    def preprocess_grads(self, *, state_grad: jnp.ndarray, policy_grad: jnp.ndarray):
+        return jax.lax.stop_gradient(state_grad), policy_grad

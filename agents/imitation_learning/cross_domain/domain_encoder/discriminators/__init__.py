@@ -1,5 +1,3 @@
 from .base_discriminators import BaseDomainEncoderDiscriminators
 from .losses import *
 from .orthogonal_discriminators import OrthogonalDomainEncoderDiscriminators
-
-# from .orthogonal_discriminators import OrthogonalDomainEncoderDiscriminators

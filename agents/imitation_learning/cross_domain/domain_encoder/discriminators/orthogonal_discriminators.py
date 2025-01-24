@@ -1,19 +1,13 @@
-from typing import Callable, Tuple
+from typing import Callable
 
 import jax
-import jax.numpy as jnp
 from flax import struct
-from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf import DictConfig
-from typing_extensions import override
 
 from agents.imitation_learning.cross_domain.domain_encoder.discriminators.base_discriminators import \
     BaseDomainEncoderDiscriminators
-from agents.imitation_learning.utils import get_state_pairs
-from misc.gan.discriminator import LoosyDiscriminator
 from nn.train_state import _compute_norms
-from utils import SaveLoadFrozenDataclassMixin
 from utils.custom_types import DataType
 
 
@@ -79,11 +73,11 @@ def _update_jit(
     # update
     new_state_discr_state = state_discr_state.apply_gradients(grads=state_discr_grad)
     new_policy_discr_state = policy_discr_state.apply_gradients(grads=policy_discr_grad)
-    # new_policy_discr_state = jax.lax.cond(
-    #     (discriminators.state_discriminator.state.step + 1) % discriminators.update_policy_discriminator_every == 0,
-    #     lambda: policy_discr_state.apply_gradients(grads=policy_discr_grad),
-    #     lambda: policy_discr_state,
-    # )
+    new_policy_discr_state = jax.lax.cond(
+        (discriminators.state_discriminator.state.step + 1) % discriminators.update_policy_discriminator_every == 0,
+        lambda: policy_discr_state.apply_gradients(grads=policy_discr_grad),
+        lambda: policy_discr_state,
+    )
 
     new_state_discr = discriminators.state_discriminator.replace(state=new_state_discr_state)
     new_policy_discr = discriminators.policy_discriminator.replace(state=new_policy_discr_state)

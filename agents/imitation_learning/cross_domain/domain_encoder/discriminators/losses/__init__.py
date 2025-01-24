@@ -1,3 +1,3 @@
-# from .orthogonal_losses import (OrthogonalPolicyDiscriminatorSoftplusLoss,
-#                                 OrthogonalStateDiscriminatorSoftplusLoss)
-from .orthogonal_losses import OrthogonalDiscriminatorLoss
+from .orthogonal_losses import (OrthogonalDiscriminatorLoss,
+                                OrthogonalPolicyToStateDiscriminatorLoss,
+                                OrthogonalStateToPolicyDiscriminatorLoss)
