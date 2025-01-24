@@ -355,41 +355,22 @@ def _update_jit(domain_encoder: BaseDomainEncoder, target_expert_batch: DataType
     # turn target_expert_batch into target_random_batch
     target_random_batch = deepcopy(target_expert_batch)
 
-    new_rng, key = jax.random.split(new_rng)
-    choice_idx = jax.random.choice(
-        key,
-        target_random_batch["observations_next"].shape[0],
-        shape=(target_random_batch["observations_next"].shape[0],),
-    )
-    target_random_batch["observations_next"] = target_random_batch["observations_next"].at[choice_idx].get()
-    new_domain_encoder = domain_encoder.replace(rng=new_rng)
+    # TODO: 
+    # new_rng, key = jax.random.split(new_rng)
+    # target_random_batch["observations_next"] = jax.random.choice(
+    #     key,
+    #     target_expert_batch["observations_next"],
+    #     shape=target_random_batch["observations_next"].shape[0],
+    # )
 
-    # update encoder
-    (
-        new_domain_encoder,
-        target_random_batch,
-        source_random_batch,
-        source_expert_batch,
-        info,
-        stats_info,
-    ) = _common_update_part(
+    new_domain_encoder = domain_encoder.replace(rng=new_rng)
+    return _common_update_part(
         domain_encoder=new_domain_encoder,
         target_random_batch=target_random_batch,
         source_random_batch=source_random_batch,
         source_expert_batch=source_expert_batch,
     )
 
-    # encode target_expert_batch
-    target_expert_batch = domain_encoder.encode_target_batch(target_expert_batch)
-
-    return (
-        new_domain_encoder,
-        target_random_batch,
-        source_random_batch,
-        source_expert_batch,
-        info,
-        stats_info,
-    )
 def _common_update_part(
     domain_encoder: BaseDomainEncoder,
     target_random_batch: DataType,
