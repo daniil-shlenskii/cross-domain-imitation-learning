@@ -96,7 +96,7 @@ agent:
           - _target_: optax.adamw
             learning_rate: 3e-4
       loss_config:
-        _target_: agents.imitation_learning.cross_domain.domain_encoder.OneDomainEncoderProjectedGradPolicyToStateGradFn
+        _target_: agents.imitation_learning.cross_domain.domain_encoder.OneDomainEncoderProjectedGradStateToPolicyGradFn
         target_state_loss_scale: *state_loss_scale
         source_state_loss_scale: *state_loss_scale
     discriminators_config:
@@ -145,3 +145,5 @@ evaluation:
     env:
       _target_: gymnasium.make
       id: *env_name
+
+

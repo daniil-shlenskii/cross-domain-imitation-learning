@@ -1,12 +1,12 @@
 _constants:
-  encoding_dim: &encoding_dim 16
+  encoding_dim: &encoding_dim 10
   update_encoder_every: &update_encoder_every 5
   state_loss_scale: &state_loss_scale 0.5
-  target_random_buffer_state_path: &target_random_buffer_path ._tmp_archive_dir/random_buffers/HalfCheetah-v5.pickle
-  source_expert_buffer_state_path: &source_expert_buffer_path agents/experts/HalfCheetah-v5/config/collected_rollouts/buffer_state.pickle
+  target_random_buffer_state_path: &target_random_buffer_path ._tmp_archive_dir/random_buffers/Hopper-v5.pickle
+  source_expert_buffer_state_path: &source_expert_buffer_path agents/experts/Hopper-v5/config/collected_rollouts/buffer_state.pickle
 
 seed: &seed 0
-env_name: &env_name HalfCheetah-v5
+env_name: &env_name Hopper-v5
 
 n_iters_training: 1_000_000
 
@@ -96,7 +96,7 @@ agent:
           - _target_: optax.adamw
             learning_rate: 3e-4
       loss_config:
-        _target_: agents.imitation_learning.cross_domain.domain_encoder.OneDomainEncoderProjectedGradPolicyToStateGradFn
+        _target_: agents.imitation_learning.cross_domain.domain_encoder.OneDomainEncoderProjectedGradStateToPolicyGradFn
         target_state_loss_scale: *state_loss_scale
         source_state_loss_scale: *state_loss_scale
     discriminators_config:
@@ -145,3 +145,5 @@ evaluation:
     env:
       _target_: gymnasium.make
       id: *env_name
+
+

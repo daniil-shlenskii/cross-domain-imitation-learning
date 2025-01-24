@@ -1,12 +1,12 @@
 _constants:
-  encoding_dim: &encoding_dim 16
+  encoding_dim: &encoding_dim 2
   update_encoder_every: &update_encoder_every 5
   state_loss_scale: &state_loss_scale 0.5
-  target_random_buffer_state_path: &target_random_buffer_path ._tmp_archive_dir/random_buffers/HalfCheetah-v5.pickle
-  source_expert_buffer_state_path: &source_expert_buffer_path agents/experts/HalfCheetah-v5/config/collected_rollouts/buffer_state.pickle
+  target_random_buffer_state_path: &target_random_buffer_path ._tmp_archive_dir/random_buffers/ToyOneDimEnvShiftedY0Size25.pickle
+  source_expert_buffer_state_path: &source_expert_buffer_path agents/experts/ToyOneDimEnvShiftedY0Size25/config/collected_rollouts/buffer_state.pickle
 
 seed: &seed 0
-env_name: &env_name HalfCheetah-v5
+env_name: &env_name ToyOneDimEnvShiftedY0Size25
 
 n_iters_training: 1_000_000
 
@@ -20,9 +20,11 @@ save_every: 5_000
 environment:
   _target_: gymnasium.wrappers.TimeLimit
   max_episode_steps: 1000
-  env:
+  env: &env
     _target_: gymnasium.make
-    id: *env_name
+    id: custom_envs/ToyOneDimEnvShifted
+    size: 25.
+    y: 0.
 
 replay_buffer:
   _target_: utils.instantiate_jitted_fbx_buffer
@@ -135,13 +137,10 @@ agent:
           _target_: misc.gan.losses.SoftplusLoss
           is_generator: False
 
-
 evaluation:
   seed: 42
   num_episodes: 25
   environment:
     _target_: gymnasium.wrappers.TimeLimit
     max_episode_steps: 1000
-    env:
-      _target_: gymnasium.make
-      id: *env_name
+    env: *env
