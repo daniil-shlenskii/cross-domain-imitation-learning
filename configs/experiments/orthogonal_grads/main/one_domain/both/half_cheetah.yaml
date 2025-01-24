@@ -1,0 +1,153 @@
+_constants:
+  encoding_dim: &encoding_dim 16
+  update_encoder_every: &update_encoder_every 5
+  state_loss_scale: &state_loss_scale 0.5
+  target_random_buffer_state_path: &target_random_buffer_path ._tmp_archive_dir/random_buffers/HalfCheetah-v5.pickle
+  source_expert_buffer_state_path: &source_expert_buffer_path agents/experts/HalfCheetah-v5/config/collected_rollouts/buffer_state.pickle
+
+seed: &seed 0
+env_name: &env_name HalfCheetah-v5
+
+n_iters_training: 1_000_000
+
+batch_size: &batch_size 2048
+precollect_buffer_size: &precollect_buffer_size 3_000
+
+log_every: 1_000
+eval_every: 5_000
+save_every: 5_000
+
+environment:
+  _target_: gymnasium.wrappers.TimeLimit
+  max_episode_steps: 1000
+  env:
+    _target_: gymnasium.make
+    id: *env_name
+
+replay_buffer:
+  _target_: utils.instantiate_jitted_fbx_buffer
+  fbx_buffer_config:
+    _target_: flashbax.make_item_buffer
+    max_length: 1_000_000
+    min_length: *precollect_buffer_size
+    sample_batch_size: *batch_size
+    add_batches: False
+
+agent:
+  _target_: agents.gail_based.GAILBasedAgent.create
+  seed: *seed
+  batch_size: *batch_size
+  source_expert_buffer_state_path: *source_expert_buffer_path
+  encoding_dim: *encoding_dim
+  agent_config:
+    _target_: agents.sac.SACAgent.create
+    actor_module_config:
+      _target_: agents.sac.networks.NormalTanhPolicy
+      hidden_dims: [256, 256]
+    critic_module_config:
+      _target_: agents.sac.networks.Critic
+      hidden_dims: [256, 256]
+    temperature_module_config:
+      _target_: agents.sac.networks.Temperature
+      initial_temperature: 0.2
+    actor_optimizer_config: &optimizer_config
+      transforms:
+        - _target_: optax.clip
+          max_delta: 1.0
+        - _target_: optax.adam
+          learning_rate: 3e-4
+    critic_optimizer_config: *optimizer_config
+    temperature_optimizer_config:
+      transforms:
+        - _target_: optax.sgd
+          learning_rate: 0.
+  policy_discriminator_config:
+    _target_: agents.gail.GAILDiscriminator.create
+    module_config:
+      _target_: nn.networks.MLP
+      hidden_dims: [256, 256]
+      out_dim: 1
+      squeeze: True
+    optimizer_config: *optimizer_config
+    loss_config:
+      _target_: misc.gan.losses.SoftplusLoss
+      is_generator: False
+    reward_transform_config:
+      _target_: agents.gail.reward_transforms.RewardStandartization.create
+  domain_encoder_config:
+    _target_: agents.imitation_learning.cross_domain.domain_encoder.OneDomainEncoder.create
+    seed: *seed
+    encoding_dim: *encoding_dim
+    update_encoder_every: *update_encoder_every
+    #
+    batch_size: *batch_size
+    target_random_buffer_state_path: *target_random_buffer_path
+    source_expert_buffer_state_path: *source_expert_buffer_path
+    #
+    target_encoder_config:
+      _target_: misc.gan.generator.Generator.create
+      module_config:
+        _target_: nn.networks.MLP
+        hidden_dims: [256, 256]
+      optimizer_config:
+        transforms:
+          - _target_: optax.clip
+            max_delta: 1.0
+          - _target_: optax.adamw
+            learning_rate: 3e-4
+      loss_config:
+        _target_: agents.imitation_learning.cross_domain.domain_encoder.BaseOneDomainEncoderLoss
+        target_state_loss_scale: *state_loss_scale
+        source_state_loss_scale: *state_loss_scale
+    discriminators_config:
+      _target_: agents.imitation_learning.cross_domain.domain_encoder.OrthogonalDomainEncoderDiscriminators.create
+      update_policy_discriminator_every: *update_encoder_every
+      loss_fn_config:
+        _target_: agents.imitation_learning.cross_domain.domain_encoder.discriminators.losses.OrthogonalDiscriminatorLoss
+        target_reg_scale: 1.
+        source_reg_scale: 1.
+      state_discriminator_config:
+        _target_: misc.gan.discriminator.LoosyDiscriminator.create
+        module_config:
+          _target_: nn.networks.MLP
+          hidden_dims: [256, 256]
+          out_dim: 1
+          squeeze: True
+        optimizer_config:
+          transforms:
+            - _target_: optax.clip
+              max_delta: 1.0
+            - _target_: optax.adamw
+              learning_rate: 3e-4
+        loss_config:
+          _target_: misc.gan.losses.SoftplusLoss
+          is_generator: False
+      policy_discriminator_config:
+        _target_: misc.gan.discriminator.LoosyDiscriminator.create
+        module_config:
+          _target_: nn.networks.MLP
+          hidden_dims: [256, 256]
+          out_dim: 1
+          squeeze: True
+        optimizer_config:
+          transforms:
+            - _target_: optax.clip
+              max_delta: 1.0
+            - _target_: optax.adamw
+              learning_rate: 3e-4
+        loss_config:
+          _target_: misc.gan.losses.SoftplusLoss
+          is_generator: False
+
+
+evaluation:
+  seed: 42
+  num_episodes: 25
+  environment:
+    _target_: gymnasium.wrappers.TimeLimit
+    max_episode_steps: 1000
+    env:
+      _target_: gymnasium.make
+      id: *env_name
+
+
