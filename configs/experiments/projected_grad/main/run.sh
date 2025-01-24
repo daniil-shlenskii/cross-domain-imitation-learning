@@ -8,7 +8,7 @@ do
         for CONFIG_NAME in half_cheetah hopper
         do
             CONFIG_PATH=${EXP_DIR}/${N_DOMAINS}/${PROJ_DIRECTION}/${CONFIG_NAME}.yaml
-            python -m train_scripts.train_agent --config $CONFIG_PATH -w --from_scratch
+            python -m train_scripts.train_agent --config $CONFIG_PATH -w --from_scratch --wandb_project ProjectedGrad
         done
     done
 done
