@@ -52,7 +52,10 @@ def main(config: DictConfig, output: str):
         value = function(OmegaConf.create(raw_config))
         return value
 
-    study = optuna.create_study(direction="maximize")
+    study = optuna.create_study(
+        direction="maximize",
+        sampler=optuna.samplers.TPESampler(seed=config.seed),
+    )
     study.optimize(objective, n_trials=config.n_trials)
 
 if __name__ == "__main__":
