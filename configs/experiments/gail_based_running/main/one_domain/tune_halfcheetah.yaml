@@ -4,13 +4,13 @@ function: src.train_agent.optuna_function
 
 space:
   _constants:
-    encoding_dim: &encoding_dim 10
+    encoding_dim: &encoding_dim 16
     update_encoder_every: &update_encoder_every 1
-    target_random_buffer_state_path: &target_random_buffer_path ._tmp_archive_dir/random_buffers/Hopper-v5.pickle
-    source_expert_buffer_state_path: &source_expert_buffer_path agents/experts/Hopper-v5/config/collected_rollouts/buffer_state.pickle
+    target_random_buffer_state_path: &target_random_buffer_path ._tmp_archive_dir/random_buffers/HalfCheetah-v5.pickle
+    source_expert_buffer_state_path: &source_expert_buffer_path agents/experts/HalfCheetah-v5/config/collected_rollouts/buffer_state.pickle
 
   seed: *seed
-  env_name: &env_name Hopper-v5
+  env_name: &env_name HalfCheetah-v5
 
   n_iters_training: 350_000
 
