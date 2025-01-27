@@ -4,6 +4,7 @@ import warnings
 from typing import Dict
 
 import jax
+import numpy as np
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
@@ -111,6 +112,7 @@ def main(
 
     # training
     logger.info("Training..")
+    returns_history = []
 
     observation, _  = env.reset(seed=config.seed)
     for i in tqdm(range(config.n_iters_training)):
@@ -127,6 +129,7 @@ def main(
             )
             for k, v in eval_info.items():
                 wandb.log({f"evaluation/{k}": v}, step=i)
+            returns_history = eval_info["return"]
 
         # sample actions
         action = agent.sample_actions(agent_sample_key, observation)
@@ -159,6 +162,12 @@ def main(
 
     logger.info(f"Agent is stored under the path: {config.archive.agent_save_dir}")
     env.close()
+
+    return returns_history
+
+def optuna_function(config: DictConfig):
+    returns_history = main(config)
+    return np.mean(returns_history)
 
 
 if __name__ == "__main__":
