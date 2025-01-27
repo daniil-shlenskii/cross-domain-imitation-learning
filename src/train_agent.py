@@ -132,7 +132,7 @@ def main(
             )
             for k, v in eval_info.items():
                 wandb_run.log({f"evaluation/{k}": v}, step=i)
-            returns_history = eval_info["return"]
+            returns_history.append(eval_info["return"])
 
         # sample actions
         action = agent.sample_actions(agent_sample_key, observation)
