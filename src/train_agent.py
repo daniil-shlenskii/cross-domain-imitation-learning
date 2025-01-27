@@ -1,21 +1,20 @@
 import argparse
+import os
 import warnings
-from copy import deepcopy
-from pathlib import Path
 from typing import Dict
 
 import jax
 from loguru import logger
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
-import envs
 import wandb
 from agents.utils import instantiate_agent
 from envs import (collect_random_buffer, do_environment_step_and_update_buffer,
-                  instantiate_environment, register_envs)
+                  instantiate_environment)
 from utils import buffer_init, get_buffer_state_size, load_buffer, save_pickle
-from utils.common_paths import DEFAULT_RANDOM_BUFFER_STORAGE_DIR
+from utils.common_paths import (DEFAULT_RANDOM_BUFFER_STORAGE_DIR,
+                                DEFAULT_WANDB_PROJECT)
 
 
 def init() -> argparse.Namespace:
@@ -29,44 +28,37 @@ def init() -> argparse.Namespace:
 
     return parser.parse_args()
 
-def get_config_archive(config: Dict, config_path: str):
-    config_archive = deepcopy(config.get("archive", {}))
-
+def process_archivation_paths(config: Dict, config_path: str):
     default_agent_storage_dir = config_path[:-len(".yaml")]
 
-    config_archive["agent_load_dir"] = config_archive.get("agent_load_dir", default_agent_storage_dir)
-    config_archive["agent_save_dir"] = config_archive.get("agent_save_dir", default_agent_storage_dir)
-    config_archive["agent_buffer_load_dir"] = config_archive.get("agent_buffer_load_dir", default_agent_storage_dir)
-    config_archive["agent_buffer_save_dir"] = config_archive.get("agent_buffer_save_dir", default_agent_storage_dir)
-    config_archive["random_buffer_load_dir"] = config_archive.get("random_buffer_load_dir", DEFAULT_RANDOM_BUFFER_STORAGE_DIR)
-    config_archive["random_buffer_save_dir"] = config_archive.get("random_buffer_save_dir", DEFAULT_RANDOM_BUFFER_STORAGE_DIR)
+    config.archive = config.get("archive", {})
 
-    for k, v in config_archive.items():
-        dir_path = Path(v)
-        dir_path.mkdir(exist_ok=True, parents=True)
-        config_archive[k] = dir_path
+    config.archive.agent_load_dir = config.archive.get("agent_load_dir", default_agent_storage_dir)
+    config.archive.agent_save_dir = config.archive.get("agent_save_dir", default_agent_storage_dir)
+    config.archive.agent_buffer_load_dir = config.archive.get("agent_buffer_load_dir", default_agent_storage_dir)
+    config.archive.agent_buffer_save_dir = config.archive.get("agent_buffer_save_dir", default_agent_storage_dir)
+    config.archive.random_buffer_load_dir = config.archive.get("random_buffer_load_dir", DEFAULT_RANDOM_BUFFER_STORAGE_DIR)
+    config.archive.random_buffer_save_dir = config.archive.get("random_buffer_save_dir", DEFAULT_RANDOM_BUFFER_STORAGE_DIR)
 
-    config_archive["agent_buffer_load_path"] = config_archive["agent_buffer_load_dir"] / "buffer.pickle"
-    config_archive["agent_buffer_save_path"] = config_archive["agent_buffer_save_dir"] / "buffer.pickle"
-    config_archive["random_buffer_load_path"] = config_archive["random_buffer_load_dir"] / f"{config.env_name}.pickle"
-    config_archive["random_buffer_save_path"] = config_archive["random_buffer_save_dir"] / f"{config.env_name}.pickle"
+    for path in config.archive.values():
+        if not (os.path.exists(path) and os.path.isdir(path)):
+            os.mkdir(path)
 
-    return config_archive
+    config.archive.agent_buffer_load_path = os.path.join(config.archive.agent_buffer_load_dir, "buffer.pickle")
+    config.archive.agent_buffer_save_path = os.path.join(config.archive.agent_buffer_save_dir, "buffer.pickle")
+    config.archive.random_buffer_load_path = os.path.join(config.archive.random_buffer_load_dir, f"{config.env_name}.pickle")
+    config.archive.random_buffer_save_path = os.path.join(config.archive.random_buffer_save_dir, f"{config.env_name}.pickle")
 
-def main(args: argparse.Namespace):
-    # config init
-    config = OmegaConf.load(args.config)
+    return config
 
-    ## process config part for saving/loading model
-    config_archive = get_config_archive(config=config, config_path=args.config)
-
-    ## save config into agent dir
-    OmegaConf.save(config, config_archive["agent_save_dir"] / "config.yaml")
-
+def main(
+    config: DictConfig,
+    *,
+    from_scratch: bool = True,
+    wandb_project: str = DEFAULT_WANDB_PROJECT,
+):
     # wandb logging init
-    wandb.init(project=args.wandb_project, dir=config_archive["agent_save_dir"])
-
-    logger.info(f"\nCONFIG:\n-------\n{OmegaConf.to_yaml(config)}")
+    wandb.init(project=wandb_project, dir=config.archive.agent_save_dir)
 
     # reprodicibility
     rng = jax.random.PRNGKey(config.seed)
@@ -79,27 +71,20 @@ def main(args: argparse.Namespace):
     buffer, state = buffer_init(config.replay_buffer, env)
 
     # load precollected agent buffer or collect random buffer
-    if not args.from_scratch and config_archive["agent_buffer_load_path"].exists():
-        # load precollected agent buffer
-        state = load_buffer(state, config_archive["agent_buffer_load_path"])
-        logger.info(f"Loading precollected Agent Buffer from {config_archive['agent_buffer_load_path']}.")
+    if not from_scratch and os.path.exists(config.archive.agent_buffer_load_path):
+        state = load_buffer(state, config.archive.agent_buffer_load_path)
+        logger.info(f"Loading precollected Agent Buffer from {config.archive.agent_buffer_load_path}.")
     else:
-        # collect random buffer
-        ## download random buffer if given
-        n_iters_collect_buffer = config.precollect_buffer_size
+        # download random buffer if given
+        if os.path.exists(config.archive.random_buffer_load_path):
+            state = load_buffer(state, config.archive.random_buffer_load_path, size=config.precollect_buffer_size)
+            logger.info(f"Loading Random Buffer from {config.archive.random_buffer_load_path}.")
+            logger.info(f"{get_buffer_state_size(state)} samples are loaded.")
 
-        if config_archive["random_buffer_load_path"].exists():
-            state = load_buffer(state, config_archive["random_buffer_load_path"], size=config.precollect_buffer_size)
-            n_iters_collect_buffer -= state.current_index
-            n_iters_collect_buffer = max(0, n_iters_collect_buffer)
-
-            logger.info(f"Loading Random Buffer from {config_archive['random_buffer_load_path']}.")
-            logger.info(f"{state.current_index} samples already collected. {n_iters_collect_buffer} are left.")
-
-        ## collect the rest amount of the data
+        # collect the rest amount of the data
+        n_iters_collect_buffer = max(0, config.precollect_buffer_size - get_buffer_state_size(state))
         if n_iters_collect_buffer > 0:
             logger.info("Random Buffer collecting..")
-
             state = collect_random_buffer(
                 n_iters=n_iters_collect_buffer,
                 env=env,
@@ -107,23 +92,19 @@ def main(args: argparse.Namespace):
                 state=state,
                 seed=config.seed,
             )
-
-            logger.info("Random Buffer is collected.")
-
             # save random buffer
-            save_pickle(state, config_archive["random_buffer_save_path"])
-            logger.info(f"Random Buffer is stored under the following path: {config_archive['random_buffer_save_path']}.")
-
+            save_pickle(state, config.archive.random_buffer_save_path)
+            logger.info(f"Random Buffer is stored under the following path: {config.archive.random_buffer_save_path}.")
     logger.info(f"There are {get_buffer_state_size(state)} items in the Buffer.")
 
     # agent init
     agent = instantiate_agent(config.agent, env)
 
     ## load agent params if exist
-    if not args.from_scratch and config_archive["agent_load_dir"].exists():
-        agent, loaded_keys = agent.load(config_archive["agent_load_dir"])
+    if not from_scratch and os.path.exists(config.archive.agent_load_dir):
+        agent, loaded_keys = agent.load(config.archive.agent_load_dir)
         logger.info(
-            f"Agent is initialized with data under the path: {config_archive['agent_load_dir']}.\n" + \
+            f"Agent is initialized with data under the path: {config.archive.agent_load_dir}.\n" + \
             f"Loaded keys:\n----------------\n{OmegaConf.to_yaml(loaded_keys)}"
         )
 
@@ -142,17 +123,13 @@ def main(args: argparse.Namespace):
                 seed=config.evaluation.seed,
                 env=eval_env,
                 num_episodes=config.evaluation.num_episodes,
-                #
                 **config.evaluation.get("extra_args", {})
             )
             for k, v in eval_info.items():
                 wandb.log({f"evaluation/{k}": v}, step=i)
 
         # sample actions
-        if i < config.get("agent_starts_sampling_after", 0):
-            action = env.action_space.sample()
-        else:
-            action = agent.sample_actions(agent_sample_key, observation[None])[0]
+        action = agent.sample_actions(agent_sample_key, observation)
 
         # do step in the environment
         env, observation, state = do_environment_step_and_update_buffer(
@@ -164,7 +141,7 @@ def main(args: argparse.Namespace):
             seed=config.seed+i,
         )
 
-        # do RL optimization step
+        # update agent
         batch = buffer.sample(state, buffer_sample_key).experience
         agent, update_info, stats_info = agent.update(batch)
 
@@ -177,18 +154,32 @@ def main(args: argparse.Namespace):
 
         # save model
         if (i + 1) % config.save_every == 0:
-            agent.save(config_archive["agent_save_dir"])
-            save_pickle(state, config_archive["agent_buffer_save_path"])
+            agent.save(config.archive.agent_save_dir)
+            save_pickle(state, config.archive.agent_buffer_save_path)
 
-    logger.info(f"Agent is stored under the path: {config_archive['agent_save_dir']}")
-
+    logger.info(f"Agent is stored under the path: {config.archive.agent_save_dir}")
     env.close()
 
 
 if __name__ == "__main__":
+    # parse command line
     args = init()
 
     if args.ignore_warnings:
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-    main(args)
+    # load config
+    config = OmegaConf.load(args.config)
+    config = process_archivation_paths(config=config, config_path=args.config)
+
+    # save config into agent archive dir
+    OmegaConf.save(config, os.path.join(config.archive.agent_save_dir, "config.yaml"))
+
+    # print config
+    logger.info(f"\nCONFIG:\n-------\n{OmegaConf.to_yaml(config)}")
+
+    main(
+        config,
+        from_scratch=args.from_scratch,
+        wandb_project=args.wandb_project,
+    )
