@@ -29,9 +29,7 @@ def init() -> argparse.Namespace:
 
     return parser.parse_args()
 
-def process_archivation_paths(config: Dict, config_path: str):
-    default_agent_storage_dir = config_path[:-len(".yaml")]
-
+def process_archivation_paths(config: Dict, default_agent_storage_dir: str):
     config.archive = config.get("archive", {})
 
     config.archive.agent_load_dir = config.archive.get("agent_load_dir", default_agent_storage_dir)
@@ -55,9 +53,14 @@ def process_archivation_paths(config: Dict, config_path: str):
 def main(
     config: DictConfig,
     *,
+    default_agent_storage_dir="._default_agent_storage_dir",
     from_scratch: bool = True,
     wandb_project: str = DEFAULT_WANDB_PROJECT,
 ):
+    # set missing paths for logging and save config
+    config = process_archivation_paths(config=config, default_agent_storage_dir=default_agent_storage_dir)
+    OmegaConf.save(config, os.path.join(config.archive.agent_save_dir, "config.yaml"))
+
     # wandb logging init
     wandb.init(project=wandb_project, dir=config.archive.agent_save_dir)
 
@@ -179,16 +182,11 @@ if __name__ == "__main__":
 
     # load config
     config = OmegaConf.load(args.config)
-    config = process_archivation_paths(config=config, config_path=args.config)
-
-    # save config into agent archive dir
-    OmegaConf.save(config, os.path.join(config.archive.agent_save_dir, "config.yaml"))
-
-    # print config
     logger.info(f"\nCONFIG:\n-------\n{OmegaConf.to_yaml(config)}")
 
     main(
         config,
+        default_agent_storage_dir=args.config[:-len(".yaml")],
         from_scratch=args.from_scratch,
         wandb_project=args.wandb_project,
     )
