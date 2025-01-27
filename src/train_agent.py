@@ -62,7 +62,7 @@ def main(
     OmegaConf.save(config, os.path.join(config.archive.agent_save_dir, "config.yaml"))
 
     # wandb logging init
-    wandb.init(project=wandb_project, dir=config.archive.agent_save_dir)
+    wandb_run = wandb.init(project=wandb_project, dir=config.archive.agent_save_dir)
 
     # reprodicibility
     rng = jax.random.PRNGKey(config.seed)
@@ -131,7 +131,7 @@ def main(
                 **config.evaluation.get("extra_args", {})
             )
             for k, v in eval_info.items():
-                wandb.log({f"evaluation/{k}": v}, step=i)
+                wandb_run.log({f"evaluation/{k}": v}, step=i)
             returns_history = eval_info["return"]
 
         # sample actions
@@ -154,9 +154,9 @@ def main(
         # logging
         if (i + 1) % config.log_every == 0:
             for k, v in update_info.items():
-                wandb.log({f"training/{k}": v}, step=i)
+                wandb_run.log({f"training/{k}": v}, step=i)
             for k, v in stats_info.items():
-                wandb.log({f"training_stats/{k}": v}, step=i)
+                wandb_run.log({f"training_stats/{k}": v}, step=i)
 
         # save model
         if (i + 1) % config.save_every == 0:
@@ -165,10 +165,12 @@ def main(
 
     logger.info(f"Agent is stored under the path: {config.archive.agent_save_dir}")
     env.close()
+    wandb_run.finish(quiet=True)
 
     return returns_history
 
 def optuna_function(config: DictConfig):
+    print("call") 
     returns_history = main(config)
     return np.max(returns_history)
 

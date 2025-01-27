@@ -52,7 +52,7 @@ def main(config: DictConfig, output: str):
         value = function(OmegaConf.create(raw_config))
         return value
 
-    study = optuna.create_study()
+    study = optuna.create_study(direction="maximize")
     study.optimize(objective, n_trials=100)
 
     print(f"{study.best_params = }")
