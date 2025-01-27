@@ -167,7 +167,7 @@ def main(
 
 def optuna_function(config: DictConfig):
     returns_history = main(config)
-    return np.mean(returns_history)
+    return np.max(returns_history)
 
 
 if __name__ == "__main__":
