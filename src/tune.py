@@ -53,10 +53,7 @@ def main(config: DictConfig, output: str):
         return value
 
     study = optuna.create_study(direction="maximize")
-    study.optimize(objective, n_trials=100)
-
-    print(f"{study.best_params = }")
-
+    study.optimize(objective, n_trials=config.n_trials)
 
 if __name__ == "__main__":
     args = init()
