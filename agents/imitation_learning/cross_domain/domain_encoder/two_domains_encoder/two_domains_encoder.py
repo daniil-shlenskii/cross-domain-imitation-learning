@@ -1,3 +1,5 @@
+import jax
+from flax import struct
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 from omegaconf.omegaconf import OmegaConf
@@ -10,6 +12,8 @@ from utils.custom_types import DataType
 
 class TwoDomainsEncoder(BaseDomainEncoder):
     source_encoder: Generator
+    freeze_target_encoder: bool = struct.field(pytree_node=False)
+    freeze_source_encoder: bool = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -18,6 +22,8 @@ class TwoDomainsEncoder(BaseDomainEncoder):
         seed: int,
         encoding_dim: int,
         source_encoder_config: DictConfig,
+        freeze_target_encoder: bool = False,
+        freeze_source_encoder: bool = False,
         **kwargs,
     ):
         # base domain encoder init
@@ -25,6 +31,8 @@ class TwoDomainsEncoder(BaseDomainEncoder):
             seed=seed,
             encoding_dim=encoding_dim,
             source_encoder=None,
+            freeze_target_encoder=freeze_target_encoder,
+            freeze_source_encoder=freeze_source_encoder,
             **kwargs,
         )
 
@@ -64,12 +72,24 @@ class TwoDomainsEncoder(BaseDomainEncoder):
             policy_discriminator=self.policy_discriminator,
             state_discriminator=self.state_discriminator,
         )
+        new_target_encoder = jax.lax.cond(
+            self.freeze_target_encoder,
+            lambda: self.target_encoder,
+            lambda: new_target_encoder,
+        )
+
         new_source_encoder, source_info, source_stats_info = self.source_encoder.update(
             source_random_batch=source_random_batch,
             source_expert_batch=source_expert_batch,
             policy_discriminator=self.policy_discriminator,
             state_discriminator=self.state_discriminator,
         )
+        new_source_encoder = jax.lax.cond(
+            self.freeze_source_encoder,
+            lambda: self.source_encoder,
+            lambda: new_source_encoder,
+        )
+
         new_encoder = self.replace(
             target_encoder=new_target_encoder,
             source_encoder=new_source_encoder
