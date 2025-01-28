@@ -19,7 +19,7 @@ class BaseDomainEncoderLossMixin(DomainEncoderLossMixin):
         target_random_batch = deepcopy(target_random_batch)
 
         # state loss
-        ts_loss, _ = self.target_state_loss(
+        ts_loss, _ = self.state_fake_loss(
             params=params,
             state=state,
             discriminator=state_discriminator,
@@ -27,7 +27,7 @@ class BaseDomainEncoderLossMixin(DomainEncoderLossMixin):
         )
 
         # policy loss
-        trp_loss, trp_info = self.target_random_policy_loss(
+        trp_loss, trp_info = self.policy_fake_loss(
             params=params,
             state=state,
             discriminator=policy_discriminator,
@@ -60,7 +60,7 @@ class BaseDomainEncoderLossMixin(DomainEncoderLossMixin):
         source_expert_batch = deepcopy(source_expert_batch)
 
         # state loss
-        ss_loss, _ = self.source_state_loss(
+        ss_loss, _ = self.state_real_loss(
             params=params,
             state=state,
             discriminator=state_discriminator,
@@ -68,14 +68,14 @@ class BaseDomainEncoderLossMixin(DomainEncoderLossMixin):
         )
 
         # policy losses
-        srp_loss, srp_info = self.source_random_policy_loss(
+        srp_loss, srp_info = self.policy_fake_loss(
             params=params,
             state=state,
             discriminator=policy_discriminator,
             states=source_random_batch["observations"],
             states_next=source_random_batch["observations_next"],
         )
-        sep_loss, sep_info = self.source_expert_policy_loss(
+        sep_loss, sep_info = self.policy_real_loss(
             params=params,
             state=state,
             discriminator=policy_discriminator,

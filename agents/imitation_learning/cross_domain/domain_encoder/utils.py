@@ -105,14 +105,14 @@ def get_divergence_scores_dict(
 
     if is_target:
         state = domain_encoder.target_encoder.state
-        params_state_loss = state.loss_fn.target_state_loss
-        params_policy_loss = state.loss_fn.target_random_policy_loss
+        params_state_loss = state.loss_fn.state_fake_loss
+        params_policy_loss = state.loss_fn.policy_fake_loss
         embs_state_loss = state.loss_fn.fake_state_loss_fn
         embs_policy_loss = state.loss_fn.fake_policy_loss_fn
     else:
         state = domain_encoder.source_encoder.state
-        params_state_loss = state.loss_fn.source_state_loss
-        params_policy_loss = state.loss_fn.source_expert_policy_loss
+        params_state_loss = state.loss_fn.state_real_loss
+        params_policy_loss = state.loss_fn.policy_real_loss
         embs_state_loss = state.loss_fn.real_state_loss_fn
         embs_policy_loss = state.loss_fn.real_policy_loss_fn
 
