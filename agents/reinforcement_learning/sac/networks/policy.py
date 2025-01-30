@@ -1,9 +1,10 @@
-from typing import Optional, Sequence
+from typing import Optional
 
 import distrax
 import flax.linen as nn
 import jax.numpy as jnp
-from nn.networks import MLP, default_init
+
+from nn.networks import default_init, networks_mapping
 
 LOG_STD_MIN = -10.0
 LOG_STD_MAX = 2.0
@@ -15,25 +16,30 @@ def _rescale_from_tanh(x: jnp.ndarray, low: float, high: float) -> jnp.ndarray:
 
 
 class NormalTanhPolicy(nn.Module):
-    hidden_dims: Sequence[int]
+    model_type: str
+    n_blocks: int
+    hidden_dim: int
     action_dim: int
-    dropout_rate: Optional[float] = None
     low: Optional[float] = None
     high: Optional[float] = None
 
-    @nn.compact
+    def setup(self):
+        self.backbone = networks_mapping[self.model_type](
+            n_blocks=self.n_blocks, hidden_dim=self.hidden_dim
+        )
+        self.mean_head = nn.Dense(self.action_dim, kernel_init=default_init())
+        self.log_std_head = nn.Dense(self.action_dim, kernel_init=default_init())
+
     def __call__(
         self,
         observations: jnp.ndarray,
         train: bool = False,
     ) -> distrax.Distribution:
-        features = MLP(
-            self.hidden_dims, dropout_rate=self.dropout_rate
-        )(observations, train=train)
+        features = self.backbone(observations) 
 
-        means = nn.Dense(self.action_dim, kernel_init=default_init())(features)
+        means = self.mean_head(features)
 
-        log_stds = nn.Dense(self.action_dim, kernel_init=default_init())(features)
+        log_stds = self.log_std_head(features)
         log_stds = jnp.clip(log_stds, LOG_STD_MIN, LOG_STD_MAX)
 
         return TanhMultivariateNormalDiag(

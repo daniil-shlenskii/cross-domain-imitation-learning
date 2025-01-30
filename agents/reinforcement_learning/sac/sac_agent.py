@@ -5,12 +5,12 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
-from agents.base_agent import Agent
 from flax import struct
 from hydra.utils import instantiate
-from nn.train_state import TrainState
 from omegaconf.dictconfig import DictConfig
 
+from agents.base_agent import Agent
+from nn.train_state import TrainState
 from utils import instantiate_optimizer
 from utils.custom_types import DataType, Params
 

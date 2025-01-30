@@ -31,10 +31,14 @@ agent:
   seed: *seed
   actor_module_config:
     _target_: agents.sac.networks.NormalTanhPolicy
-    hidden_dims: [256, 256]
+    model_type: ResNet 
+    n_blocks: 1
+    hidden_dim: 256
   critic_module_config:
     _target_: agents.sac.networks.Critic
-    hidden_dims: [256, 256]
+    model_type: ResNet
+    n_blocks: 1
+    hidden_dim: 256
   temperature_module_config:
     _target_: agents.sac.networks.Temperature
     initial_temperature: 1.0
