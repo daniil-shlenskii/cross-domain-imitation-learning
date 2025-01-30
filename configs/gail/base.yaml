@@ -35,13 +35,13 @@ agent:
     _target_: agents.sac.SACAgent.create
     actor_module_config:
       _target_: agents.sac.networks.NormalTanhPolicy
-      model_type: ResNet 
-      n_blocks: 1
+      model_type: MLP 
+      n_blocks: 2
       hidden_dim: 256
     critic_module_config:
       _target_: agents.sac.networks.Critic
-      model_type: ResNet
-      n_blocks: 1
+      model_type: MLP
+      n_blocks: 2
       hidden_dim: 256
     temperature_module_config:
       _target_: agents.sac.networks.Temperature
@@ -60,8 +60,8 @@ agent:
   policy_discriminator_config:
     _target_: agents.gail.GAILDiscriminator.create
     module_config:
-      _target_: nn.networks.ResNet
-      n_blocks: 1
+      _target_: nn.networks.MLP
+      n_blocks: 2
       hidden_dim: 256
       out_dim: 1
       squeeze: True
