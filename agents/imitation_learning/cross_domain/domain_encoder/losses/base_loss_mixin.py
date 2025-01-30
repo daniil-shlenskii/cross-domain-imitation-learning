@@ -1,5 +1,5 @@
 from agents.imitation_learning.cross_domain.domain_encoder.utils import \
-    encode_batch_observations_given_params
+    encode_states_given_params
 from misc.gan.discriminator import Discriminator
 from nn.train_state import TrainState
 from utils.custom_types import DataType, Params
@@ -16,7 +16,9 @@ class BaseDomainEncoderLossMixin(DomainEncoderLossMixin):
         policy_discriminator: Discriminator,
         target_random_batch: DataType,
     ):
-        states, states_next = encode_batch_observations_given_params(params, state, target_random_batch)
+        states, states_next = encode_states_given_params(
+            params, state, target_random_batch["observations"], target_random_batch["observations_next"]
+        )
 
         ts_loss = self.state_real_loss(
             states=states,
@@ -49,8 +51,12 @@ class BaseDomainEncoderLossMixin(DomainEncoderLossMixin):
         source_random_batch: DataType,
         source_expert_batch: DataType,
     ):
-        sr_states, sr_states_next = encode_batch_observations_given_params(params, state, source_random_batch)
-        se_states, se_states_next = encode_batch_observations_given_params(params, state, source_expert_batch)
+        sr_states, sr_states_next = encode_states_given_params(
+            params, state, source_random_batch["observations"], source_random_batch["observations_next"]
+        )
+        se_states, se_states_next = encode_states_given_params(
+            params, state, source_expert_batch["observations"], source_expert_batch["observations_next"]
+        )
 
         ss_loss = self.state_fake_loss(
             states=sr_states,

@@ -17,14 +17,14 @@ from agents.imitation_learning.in_domain.gail.utils import \
     get_trajs_discriminator_logits_and_accuracy
 from agents.imitation_learning.utils import (
     get_random_from_expert_buffer_state, get_state_pairs,
-    get_trajectory_from_buffer, get_trajectory_from_dict,
-    get_trajs_tsne_scatterplot, prepare_buffer)
+    get_trajectory_from_buffer, get_trajs_tsne_scatterplot, prepare_buffer)
 from misc.gan.generator import Generator
 from utils import (SaveLoadFrozenDataclassMixin, convert_figure_to_array,
                    get_buffer_state_size, sample_batch_jit)
 from utils.custom_types import Buffer, BufferState, DataType, PRNGKey
 
-from .utils import get_discriminators_divergence_scores, get_two_dim_data_plot
+from .utils import (encode_batch, get_discriminators_divergence_scores,
+                    get_two_dim_data_plot)
 
 
 class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
@@ -316,16 +316,10 @@ class BaseDomainEncoder(PyTreeNode, SaveLoadFrozenDataclassMixin, ABC):
         return new_rng, target_random_batch, source_random_batch, source_expert_batch
 
     def encode_target_batch(self, batch):
-        batch = deepcopy(batch)
-        batch["observations"] = self.encode_target_state(batch["observations"])
-        batch["observations_next"] = self.encode_target_state(batch["observations_next"])
-        return batch
+        return encode_batch(self.target_encoder.state, batch)
 
     def encode_source_batch(self, batch):
-        batch = deepcopy(batch)
-        batch["observations"] = self.encode_source_state(batch["observations"])
-        batch["observations_next"] = self.encode_source_state(batch["observations_next"])
-        return batch
+        return encode_batch(self.source_encoder.state, batch)
 
     def sample_encoded_batches(self, rng: PRNGKey):
         new_rng, target_random_batch, source_random_batch, source_expert_batch = self.sample_batches(rng)

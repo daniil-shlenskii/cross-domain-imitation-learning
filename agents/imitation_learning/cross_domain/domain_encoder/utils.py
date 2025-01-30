@@ -15,11 +15,19 @@ from utils.math import scalar_product_fn
 
 
 @jax.jit
-def encode_batch_observations_given_params(params: Params, state: TrainState, batch: DataType):
-    batch_size = batch["observations"].shape[0]
-    observations = jnp.concatenate([batch["observations"], batch["observations_next"]])
+def encode_batch(encoder_state: TrainState, batch: DataType):
+    batch["observations"], batch["observations_next"] = encode_states_given_params(
+        encoder_state.params, encoder_state, batch["observations"], batch["observations_next"]
+    ) 
+    return batch
+
+@jax.jit
+def encode_states_given_params(params: Params, state: TrainState, states: jnp.ndarray, states_next: jnp.ndarray):
+    batch_size = states.shape[0]
+    observations = jnp.concatenate([states, states_next])
     encoded_observations = state.apply_fn({"params": params}, observations)
     return encoded_observations.at[:batch_size].get(), encoded_observations.at[batch_size:].get()
+
 
 ##### Divergence Scores #####
 
