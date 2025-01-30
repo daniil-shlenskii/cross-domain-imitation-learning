@@ -18,7 +18,7 @@ from utils.math import scalar_product_fn
 def encode_batch(encoder_state: TrainState, batch: DataType):
     batch["observations"], batch["observations_next"] = encode_states_given_params(
         encoder_state.params, encoder_state, batch["observations"], batch["observations_next"]
-    ) 
+    )
     return batch
 
 @jax.jit
@@ -87,15 +87,17 @@ def get_grad_wrt_embs(
     *, domain_encoder, encoded_batch, state_loss, policy_loss
 ):
     # state grad
-    state_discriminator = domain_encoder.discriminators.state_discriminator
-    state_loss_fn = lambda x: state_loss(state_discriminator(x))
-    state_grad = jax.grad(state_loss_fn)(encoded_batch["observations"]).mean(0)
+    state_grad = jax.grad(state_loss)(
+        encoded_batch["observations"],
+        discriminator=domain_encoder.discriminators.state_discriminator
+    ).mean(0)
 
     # policy grad
-    policy_discriminator = domain_encoder.discriminators.policy_discriminator
-    policy_loss_fn = lambda x: policy_loss(policy_discriminator(x))
-    policy_grad = jax.grad(policy_loss_fn)(get_state_pairs(encoded_batch)).mean(0)
-    policy_grad = policy_grad.at[:state_grad.shape[-1]].get()
+    policy_grad = jax.grad(policy_loss)(
+        encoded_batch["observations"],
+        states_next=encoded_batch["observations_next"],
+        discriminator=domain_encoder.discriminators.policy_discriminator
+    ).mean(0)
 
     return state_grad, policy_grad
 
@@ -123,16 +125,16 @@ def get_divergence_scores_dict(
 
     if is_target:
         state = domain_encoder.target_encoder.state
-        params_state_loss = state.loss_fn.state_fake_loss
-        params_policy_loss = state.loss_fn.policy_fake_loss
-        embs_state_loss = state.loss_fn.fake_state_loss_fn
-        embs_policy_loss = state.loss_fn.fake_policy_loss_fn
+        params_state_loss = state.loss_fn.state_real_loss_given_params
+        params_policy_loss = state.loss_fn.policy_fake_loss_given_params
+        embs_state_loss = state.loss_fn.state_real_loss
+        embs_policy_loss = state.loss_fn.policy_fake_loss
     else:
         state = domain_encoder.source_encoder.state
-        params_state_loss = state.loss_fn.state_real_loss
-        params_policy_loss = state.loss_fn.policy_real_loss
-        embs_state_loss = state.loss_fn.real_state_loss_fn
-        embs_policy_loss = state.loss_fn.real_policy_loss_fn
+        params_state_loss = state.loss_fn.state_fake_loss_given_params
+        params_policy_loss = state.loss_fn.policy_real_loss_given_params
+        embs_state_loss = state.loss_fn.state_fake_loss
+        embs_policy_loss = state.loss_fn.policy_real_loss
 
     # divergence scores wrt params
     state_grad_wrt_params, policy_grad_wrt_params, encoded_batch = get_grad_wrt_params(
