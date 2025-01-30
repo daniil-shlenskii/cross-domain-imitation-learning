@@ -11,7 +11,7 @@ class ResidualBlock(nn.Module):
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
         res = x
         x = nn.LayerNorm()(x)
-        x = nn.Dense(self.hidden_dim, kernel_init=he_normal_init())(x)
+        x = nn.Dense(self.hidden_dim * 4, kernel_init=he_normal_init())(x)
         x = nn.relu(x)
         x = nn.Dense(self.hidden_dim, kernel_init=he_normal_init())(x)
         return res + x
