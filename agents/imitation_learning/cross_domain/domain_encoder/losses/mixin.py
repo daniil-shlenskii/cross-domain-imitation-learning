@@ -21,8 +21,8 @@ class DomainEncoderLossMixin:
         policy_loss_scale: float = None,
         update_target_encoder_with_policy_discrminator: bool = True,
     ):
-        self._set_policy_loss_fns(policy_loss)
-        self._set_state_loss_fns(state_loss)
+        self.state_fake_loss_fn, self.state_real_loss_fn = self._get_fake_and_real_generator_loss_fns(state_loss)
+        self.policy_fake_loss_fn, self.policy_real_loss_fn = self._get_fake_and_real_generator_loss_fns(policy_loss)
 
         self.target_state_loss_scale = target_state_loss_scale if state_loss_scale is None else state_loss_scale
         self.target_policy_loss_scale = target_policy_loss_scale if policy_loss_scale is None else policy_loss_scale
@@ -30,57 +30,35 @@ class DomainEncoderLossMixin:
         self.source_policy_loss_scale = source_policy_loss_scale if policy_loss_scale is None else policy_loss_scale
         self.update_target_encoder_with_policy_discrminator = float(update_target_encoder_with_policy_discrminator)
 
-    def _set_state_loss_fns(self, state_loss: GANLoss):
-        """For discriminator deceiving."""
-        loss_fn = state_loss.generator_loss_fn
-        fake_loss_fn = lambda logits: loss_fn(logits)
-        real_loss_fn = lambda logits: loss_fn(-logits)
-        self.fake_state_loss_fn = fake_loss_fn
-        self.real_state_loss_fn = real_loss_fn
-
-    def _set_policy_loss_fns(self, policy_loss: GANLoss):
-        """Helps discriminator to discriminate better."""
-        loss_fn = policy_loss.generator_loss_fn
+    def _get_fake_and_real_generator_loss_fns(self, loss: GANLoss):
+        loss_fn = loss.generator_loss_fn
         fake_loss_fn = lambda logits: loss_fn(-logits)
         real_loss_fn = lambda logits: loss_fn(logits)
-        self.fake_policy_loss_fn = fake_loss_fn
-        self.real_policy_loss_fn = real_loss_fn
+        return fake_loss_fn, real_loss_fn
 
     # losses templates
 
     def _state_loss(
         self,
-        params: Params,
-        state: TrainState,
-        discriminator: Discriminator,
+        *,
         states: jnp.ndarray,
-        #
+        discriminator: Discriminator,
         state_loss_fn: Callable,
     ):
-        states = state.apply_fn({"params": params}, states)
         logits = discriminator(states)
-        return state_loss_fn(logits).mean(), {
-            "states": states
-        }
+        return state_loss_fn(logits).mean()
 
     def _policy_loss(
         self,
-        params: Params,
-        state: TrainState,
-        discriminator: Discriminator,
+        *,
         states: jnp.ndarray,
         states_next: jnp.ndarray,
-        #
+        discriminator: Discriminator,
         policy_loss_fn: Callable,
     ):
-        states = state.apply_fn({"params": params}, states)
-        states_next = state.apply_fn({"params": params}, states_next)
         state_pairs = jnp.concatenate([states, states_next], axis=1)
         logits = discriminator(state_pairs)
-        return policy_loss_fn(logits).mean(), {
-            "states": states,
-            "states_next": states_next,
-        }
+        return policy_loss_fn(logits).mean()
 
    # losses
 
@@ -88,26 +66,26 @@ class DomainEncoderLossMixin:
         return self._state_loss(
             *args,
             **kwargs,
-            state_loss_fn=self.fake_state_loss_fn,
+            state_loss_fn=self.state_fake_loss_fn,
         )
 
     def state_real_loss(self, *args, **kwargs):
         return self._state_loss(
             *args,
             **kwargs,
-            state_loss_fn=self.real_state_loss_fn,
+            state_loss_fn=self.state_real_loss_fn,
         )
 
     def policy_fake_loss(self, *args, **kwargs):
         return self._policy_loss(
             *args,
             **kwargs,
-            policy_loss_fn=self.fake_policy_loss_fn,
+            policy_loss_fn=self.policy_fake_loss_fn,
         )
 
     def policy_real_loss(self, *args, **kwargs):
         return self._policy_loss(
             *args,
             **kwargs,
-            policy_loss_fn=self.real_policy_loss_fn,
+            policy_loss_fn=self.policy_real_loss_fn,
         )

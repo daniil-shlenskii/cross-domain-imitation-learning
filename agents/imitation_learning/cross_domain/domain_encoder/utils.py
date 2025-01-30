@@ -8,8 +8,18 @@ import numpy as np
 from agents.imitation_learning.utils import (TRAJECTORIES_SCATTER_PARAMS,
                                              get_state_pairs)
 from misc.gan.discriminator import LoosyDiscriminator
+from nn.train_state import TrainState
 from utils import cosine_similarity_fn, project_a_to_b
+from utils.custom_types import DataType, Params
 from utils.math import scalar_product_fn
+
+
+@jax.jit
+def encode_batch_observations_given_params(params: Params, state: TrainState, batch: DataType):
+    batch_size = batch["observations"].shape[0]
+    observations = jnp.concatenate([batch["observations"], batch["observations_next"]])
+    encoded_observations = state.apply_fn({"params": params}, observations)
+    return encoded_observations.at[:batch_size].get(), encoded_observations.at[batch_size:].get()
 
 ##### Divergence Scores #####
 
