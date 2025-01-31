@@ -10,7 +10,7 @@ class ResidualBlock(nn.Module):
     @nn.compact
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
         res = x
-        x = nn.LayerNorm()(x)
+        x = nn.RMSNorm()(x)
         x = nn.Dense(self.hidden_dim * 4, kernel_init=he_normal_init())(x)
         x = nn.relu(x)
         x = nn.Dense(self.hidden_dim, kernel_init=he_normal_init())(x)
@@ -28,7 +28,7 @@ class ResNet(nn.Module):
         x = nn.Dense(self.hidden_dim, kernel_init=default_init())(x)
         for _ in range(self.n_blocks):
             x = ResidualBlock(self.hidden_dim)(x)
-        x = nn.LayerNorm()(x)
+        x = nn.RMSNorm()(x)
 
         if self.out_dim is not None:
             x = nn.Dense(self.out_dim, kernel_init=default_init())(x)
