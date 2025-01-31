@@ -2,6 +2,8 @@ from typing import Callable
 
 import jax.numpy as jnp
 
+from agents.imitation_learning.cross_domain.domain_encoder.utils import \
+    encode_states_given_params
 from misc.gan.discriminator import Discriminator
 from misc.gan.losses import GANLoss
 from nn.train_state import TrainState
@@ -93,8 +95,7 @@ class DomainEncoderLossMixin:
         discriminator: Discriminator,
         policy_loss_fn: Callable,
     ):
-        states = state.apply_fn({"params": params}, states) # TODO: optimize with batching
-        states_next = state.apply_fn({"params": params}, states_next)
+        states, states_next = encode_states_given_params(params, state, states, states_next)
         loss = self._policy_loss(
             states=states,
             states_next=states_next,
