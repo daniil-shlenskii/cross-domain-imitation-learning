@@ -1,1 +1,2 @@
-from .mixin import BaseDomainEncoderGradFnMixin
+from .base_grad_fn_mixin import BaseDomainEncoderGradFnMixin
+from .projected_grad_fn_mixin import DomainEncoderProjectedGradFnMixin
