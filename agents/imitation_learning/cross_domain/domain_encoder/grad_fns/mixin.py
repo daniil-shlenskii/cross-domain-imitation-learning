@@ -11,7 +11,7 @@ from nn.train_state import TrainState
 from utils.custom_types import Params
 
 
-class DomainEncoderGradFnMixin(DomainEncoderLossMixin):
+class BaseDomainEncoderGradFnMixin(DomainEncoderLossMixin):
     is_grad_fn: bool = True # TODO: temporal crutch
 
     def target_grad(
@@ -22,35 +22,33 @@ class DomainEncoderGradFnMixin(DomainEncoderLossMixin):
         policy_discriminator: Discriminator,
         random_batch: jnp.ndarray,
     ):
-        random_batch = deepcopy(random_batch)
-
         # get state and policy grads
-        (state_loss, _), state_grad =  jax.value_and_grad(self.target_state_loss, has_aux=True)(
+        (ts_loss, _), ts_grad =  jax.value_and_grad(self.state_real_loss_given_params, has_aux=True)(
             params,
             state=state,
-            discriminator=state_discriminator,
             states=random_batch["observations"],
+            discriminator=state_discriminator,
         )
-        (random_policy_loss, random_states), random_policy_grad =  jax.value_and_grad(self.target_random_policy_loss, has_aux=True)(
+        (trp_loss, random_states), trp_grad =  jax.value_and_grad(self.policy_fake_loss_given_params, has_aux=True)(
             params,
             state=state,
-            discriminator=policy_discriminator,
             states=random_batch["observations"],
             states_next=random_batch["observations_next"],
+            discriminator=policy_discriminator,
         )
         random_batch["observations"] = random_states["states"]
         random_batch["observations_next"] = random_states["states_next"]
 
         # process grads
-        state_grad, random_policy_grad = self.process_target_grads(
-            state_grad=state_grad, random_policy_grad=random_policy_grad
+        ts_grad, trp_grad = self.process_target_grads(
+            state_grad=ts_grad, random_policy_grad=trp_grad
         )
 
         # get resulting grad
-        policy_grad = random_policy_grad
+        state_grad, policy_grad = ts_grad, trp_grad
         grad = jax.tree.map(lambda x, y: x * self.target_policy_loss_scale + y * self.target_state_loss_scale, policy_grad, state_grad)
 
-        policy_loss = random_policy_loss
+        state_loss, policy_loss = ts_loss, trp_loss
         loss = policy_loss * self.target_policy_loss_scale + state_loss * self.target_state_loss_scale
 
         return grad, loss, {"target_random_batch": random_batch}
@@ -64,46 +62,44 @@ class DomainEncoderGradFnMixin(DomainEncoderLossMixin):
         random_batch: jnp.ndarray,
         expert_batch: jnp.ndarray,
     ):
-        random_batch = deepcopy(random_batch)
-        expert_batch = deepcopy(expert_batch)
-
         # get state and policy grads
-        (state_loss, _), state_grad =  jax.value_and_grad(self.source_state_loss, has_aux=True)(
+        (ss_loss, _), ss_grad =  jax.value_and_grad(self.state_fake_loss_given_params, has_aux=True)(
             params,
             state=state,
-            discriminator=state_discriminator,
             states=expert_batch["observations"],
+            discriminator=state_discriminator,
         )
-        (random_policy_loss, random_states), random_policy_grad =  jax.value_and_grad(self.source_random_policy_loss, has_aux=True)(
+        (srp_loss, random_states), srp_grad =  jax.value_and_grad(self.policy_fake_loss_given_params, has_aux=True)(
             params,
             state=state,
-            discriminator=policy_discriminator,
             states=random_batch["observations"],
             states_next=random_batch["observations_next"],
+            discriminator=policy_discriminator,
         )
         random_batch["observations"] = random_states["states"]
         random_batch["observations_next"] = random_states["states_next"]
 
-        (expert_policy_loss, expert_states), expert_policy_grad =  jax.value_and_grad(self.source_expert_policy_loss, has_aux=True)(
+        (sep_loss, expert_states), sep_grad =  jax.value_and_grad(self.policy_real_loss_given_params, has_aux=True)(
             params,
             state=state,
-            discriminator=policy_discriminator,
             states=expert_batch["observations"],
             states_next=expert_batch["observations_next"],
+            discriminator=policy_discriminator,
         )
         expert_batch["observations"] = expert_states["states"]
         expert_batch["observations_next"] = expert_states["states_next"]
 
         # process grads
-        state_grad, random_policy_grad, expert_policy_grad = self.process_source_grads(
-            state_grad=state_grad, random_policy_grad=random_policy_grad, expert_policy_grad=expert_policy_grad
+        ss_grad, srp_grad, sep_grad = self.process_source_grads(
+            state_grad=ss_grad, random_policy_grad=srp_grad, expert_policy_grad=sep_grad,
         )
 
         # get resulting grad
-        policy_grad = jax.tree.map(lambda x, y: x + y, random_policy_grad, expert_policy_grad)
+        state_grad = ss_grad
+        policy_grad = jax.tree.map(lambda x, y: x + y, sep_grad, srp_grad)
         grad = jax.tree.map(lambda x, y: x * self.source_policy_loss_scale + y * self.source_state_loss_scale, policy_grad, state_grad)
 
-        policy_loss = random_policy_loss + expert_policy_loss
+        state_loss, policy_loss = ss_loss, srp_loss + sep_loss
         loss = policy_loss * self.source_policy_loss_scale + state_loss * self.source_state_loss_scale
 
         return grad, loss, {"source_random_batch": random_batch, "source_expert_batch": expert_batch}

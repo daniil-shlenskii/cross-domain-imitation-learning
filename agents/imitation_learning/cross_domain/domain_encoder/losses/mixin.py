@@ -93,7 +93,7 @@ class DomainEncoderLossMixin:
         discriminator: Discriminator,
         policy_loss_fn: Callable,
     ):
-        states = state.apply_fn({"params": params}, states)
+        states = state.apply_fn({"params": params}, states) # TODO: optimize with batching
         states_next = state.apply_fn({"params": params}, states_next)
         loss = self._policy_loss(
             states=states,

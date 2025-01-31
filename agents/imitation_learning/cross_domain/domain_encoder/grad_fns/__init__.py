@@ -1,1 +1,1 @@
-from .mixin import DomainEncoderGradFnMixin
+from .mixin import BaseDomainEncoderGradFnMixin

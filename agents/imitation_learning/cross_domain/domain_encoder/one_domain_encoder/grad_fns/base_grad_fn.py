@@ -1,13 +1,13 @@
 import jax
 
 from agents.imitation_learning.cross_domain.domain_encoder.grad_fns import \
-    DomainEncoderGradFnMixin
+    BaseDomainEncoderGradFnMixin
 from misc.gan.discriminator import Discriminator
 from nn.train_state import TrainState
 from utils.custom_types import DataType, Params
 
 
-class OneDomainEncoderGradFn(DomainEncoderGradFnMixin):
+class BaseOneDomainEncoderGradFn(BaseDomainEncoderGradFnMixin):
     def __call__(
         self,
         params: Params,
