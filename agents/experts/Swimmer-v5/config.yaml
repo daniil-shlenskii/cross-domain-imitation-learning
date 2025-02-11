@@ -1,0 +1,65 @@
+seed: &seed 0
+env_name: &env_name Swimmer-v5
+
+n_iters_training: 1_000_000
+batch_size: &batch_size 256
+
+precollect_buffer_size: &precollect_buffer_size 5_000
+
+log_every: 1_000
+eval_every: 5_000
+save_every: 5_000
+
+environment:
+  _target_: gymnasium.wrappers.TimeLimit
+  max_episode_steps: 1000
+  env:
+    _target_: gymnasium.make
+    id: *env_name
+
+replay_buffer:
+  _target_: utils.instantiate_jitted_fbx_buffer
+  fbx_buffer_config:
+    _target_: flashbax.make_item_buffer
+    max_length: 1_000_000
+    min_length: *precollect_buffer_size
+    sample_batch_size: *batch_size
+    add_batches: False
+
+agent:
+  _target_: agents.sac.SACAgent.create
+  seed: *seed
+  actor_module_config:
+    _target_: agents.sac.networks.NormalTanhPolicy
+    model_type: MLP 
+    n_blocks: 2
+    hidden_dim: 256
+  critic_module_config:
+    _target_: agents.sac.networks.Critic
+    model_type: MLP
+    n_blocks: 2
+    hidden_dim: 256
+  temperature_module_config:
+    _target_: agents.sac.networks.Temperature
+    initial_temperature: 1.0
+  actor_optimizer_config: &optimizer_config
+    transforms:
+      - _target_: optax.clip
+        max_delta: 1.0
+      - _target_: optax.adam
+        learning_rate: 3e-4
+  critic_optimizer_config: *optimizer_config
+  temperature_optimizer_config:
+    transforms:
+      - _target_: optax.sgd
+        learning_rate: 1e-5
+
+evaluation:
+  seed: 42
+  num_episodes: 25
+  environment:
+    _target_: gymnasium.wrappers.TimeLimit
+    max_episode_steps: 1000
+    env:
+      _target_: gymnasium.make
+      id: *env_name
