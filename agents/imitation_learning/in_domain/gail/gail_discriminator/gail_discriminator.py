@@ -24,14 +24,17 @@ class GAILDiscriminator(Discriminator):
             reward_transform = instantiate(reward_transform_config)
         else:
             reward_transform = BaseRewardTransform.create()
+            
+        _save_attrs = discriminator_kwargs.pop("_save_attrs", ("state", "reward_transform"))
+
         return super().create(
             reward_transform=reward_transform,
             info_key="policy_discriminator",
-            _save_attrs=("state", "reward_transform"),
+            _save_attrs=_save_attrs,
             **discriminator_kwargs
         )
 
-    def update(self, *, target_expert_batch: DataType, source_expert_batch: DataType): 
+    def update(self, *, target_expert_batch: DataType, source_expert_batch: DataType, ): 
         new_gail_discriminator, info, stats_info = _update_jit(
             target_expert_batch=target_expert_batch,
             source_expert_batch=source_expert_batch,
@@ -39,7 +42,7 @@ class GAILDiscriminator(Discriminator):
         )
         return new_gail_discriminator, info, stats_info
 
-    def get_rewards(self, target_expert_batch: DataType) -> jnp.ndarray:
+    def get_rewards(self, target_expert_batch: jnp.ndarray) -> jnp.ndarray:
         return _get_rewards_jit(
             gail_discriminator=self,
             target_expert_state_pairs=get_state_pairs(target_expert_batch),

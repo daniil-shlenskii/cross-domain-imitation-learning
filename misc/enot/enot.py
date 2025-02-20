@@ -11,13 +11,13 @@ from omegaconf import DictConfig
 from ott.geometry import costs
 
 from nn.train_state import TrainState
-from utils import instantiate_optimizer
+from utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
 from utils.custom_types import DataType, PRNGKey
 
 DType = Union[jnp.ndarray, DataType]
 
 
-class ENOT(PyTreeNode):
+class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     rng: PRNGKey
     transport: TrainState 
     g_potential: TrainState 
@@ -25,6 +25,7 @@ class ENOT(PyTreeNode):
     expectile: float = struct.field(pytree_node=False)
     expectile_loss_coef: float = struct.field(pytree_node=False)
     target_weight: float = struct.field(pytree_node=False)
+    _save_attrs: Tuple[str] = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -38,6 +39,7 @@ class ENOT(PyTreeNode):
         g_potential_optimizer_config: DictConfig,
         g_potential_loss_fn_config: DictConfig,
         cost_fn_config: DictConfig = None,
+        batchify_cost_fn: bool = True,
         expectile: float = 0.99,
         expectile_loss_coef: float = 1.0,
         target_weight: float = 1.0
@@ -66,7 +68,8 @@ class ENOT(PyTreeNode):
         )
 
         cost_fn = instantiate(cost_fn_config) if cost_fn_config is not None else costs.SqEuclidean()
-        cost_fn = jax.vmap(cost_fn)
+        if batchify_cost_fn:
+            cost_fn = jax.vmap(cost_fn)
 
         return cls(
             rng=rng,
@@ -76,6 +79,7 @@ class ENOT(PyTreeNode):
             expectile=expectile,
             expectile_loss_coef=expectile_loss_coef,
             target_weight=target_weight,
+            _save_attrs=("transport", "g_potential"),
         )
 
     @jax.jit

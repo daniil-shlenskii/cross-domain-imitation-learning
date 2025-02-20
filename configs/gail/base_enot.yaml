@@ -58,7 +58,7 @@ agent:
         - _target_: optax.sgd
           learning_rate: 0.
   policy_discriminator_config:
-    _target_: agents.gail.GAILDiscriminator.create
+    _target_: agents.gail.GAILDiscriminatorWithENOT.create
     module_config:
       _target_: nn.networks.MLP
       n_blocks: 2
@@ -71,6 +71,30 @@ agent:
       is_generator: False
     reward_transform_config:
       _target_: agents.gail.gail_discriminator.reward_transforms.RewardStandartization.create
+    enot_config:
+      _target_: misc.enot.enot.ENOT.create
+      seed: *seed
+      transport_module_config:
+        _target_: nn.networks.MLP
+        n_blocks: 4
+        hidden_dim: 128
+      transport_optimizer_config: *optimizer_config
+      transport_loss_fn_config:
+        _target_: hydra.utils.get_method
+        path: agents.imitation_learning.in_domain.gail.gail_discriminator.enot_losses.transport_loss
+      g_potential_module_config:
+        _target_: nn.networks.MLP
+        n_blocks: 4
+        hidden_dim: 128
+      g_potential_optimizer_config: *optimizer_config
+      g_potential_loss_fn_config:
+        _target_: hydra.utils.get_method
+        path: agents.imitation_learning.in_domain.gail.gail_discriminator.enot_losses.g_potential_loss
+      cost_fn_config:
+        _target_: hydra.utils.get_method
+        path: agents.imitation_learning.in_domain.gail.gail_discriminator.enot_costs.gwil_cost
+      batchify_cost_fn: True
+
 
 evaluation:
   seed: 42
@@ -81,3 +105,4 @@ evaluation:
     env:
       _target_: gymnasium.make
       id: *env_name
+
