@@ -6,12 +6,9 @@ import numpy as np
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
-import wandb
 from agents.imitation_learning.base_imitation_agent import ImitationAgent
-from agents.imitation_learning.in_domain.gail.utils import \
-    get_trajs_discriminator_logits_and_accuracy
 from agents.imitation_learning.utils import prepare_buffer
-from utils import convert_figure_to_array, sample_batch_jit
+from utils import sample_batch_jit
 from utils.custom_types import DataType
 
 from .gail_discriminator import GAILDiscriminator
@@ -87,6 +84,12 @@ class GAILAgent(ImitationAgent):
 
     def update(self, batch: DataType):
         new_gail_agent, info, stats_info = _update_jit(
+            gail_agent=self, target_expert_batch=batch
+        )
+        return new_gail_agent, info, stats_info
+
+    def pretrain_update(self, batch: DataType):
+        new_gail_agent, info, stats_info = _pretrain_update_jit(
             gail_agent=self, target_expert_batch=batch
         )
         return new_gail_agent, info, stats_info
@@ -176,3 +179,19 @@ def _update_with_expert_batch_given_jit(
     info = {**disc_info, **agent_info}
     stats_info = {**disc_stats_info, **agent_stats_info}
     return new_gail_agent, info, stats_info
+
+@jax.jit
+def _pretrain_update_jit(*,gail_agent: GAILAgent, target_expert_batch: DataType):
+    # sample expert batch
+    new_rng, source_expert_batch = sample_batch_jit(
+        gail_agent.rng, gail_agent.buffer, gail_agent.source_expert_buffer_state
+    )
+
+    # update policy discriminator
+    new_disc, disc_info, disc_stats_info = gail_agent.policy_discriminator.update(
+        target_expert_batch=target_expert_batch,
+        source_expert_batch=source_expert_batch,
+    )
+
+    new_gail_agent = gail_agent.replace(rng=new_rng, policy_discriminator=new_disc)
+    return new_gail_agent, disc_info, disc_stats_info

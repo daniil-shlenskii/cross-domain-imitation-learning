@@ -6,10 +6,11 @@ import jax.numpy as jnp
 import numpy as np
 from flax import struct
 from flax.struct import PyTreeNode
+from typing_extensions import override
 
 from nn.train_state import TrainState
 from utils import SaveLoadFrozenDataclassMixin
-from utils.custom_types import PRNGKey
+from utils.custom_types import DataType, PRNGKey
 
 from .utils import evaluate
 
@@ -32,6 +33,14 @@ class Agent(PyTreeNode, SaveLoadFrozenDataclassMixin):
 
     def _preprocess_observations(self, observations: np.ndarray) -> np.ndarray:
         return observations
+
+    @override
+    def update(self, batch: DataType):
+        return self, {}, {}
+
+    @override
+    def pretrain_update(self, batch: DataType):
+        return self, {}, {}
 
     def evaluate(self, *, seed: int, env: gym.Env, num_episodes: int, return_trajectories: bool=False, **kwargs) -> Dict[str, float]:
         return evaluate(

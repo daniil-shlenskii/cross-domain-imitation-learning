@@ -112,6 +112,38 @@ def main(
             f"Loaded keys:\n----------------\n{OmegaConf.to_yaml(loaded_keys)}"
         )
 
+    # pre-training
+    logger.info("Pre-Training..")
+    for i in tqdm(range(config.get("n_iters_pretraining", 0))):
+        # reproducibility
+        rng, buffer_sample_key = jax.random.split(rng, 2)
+
+        # evaluate model
+        if i == 0 or (i + 1) % config.eval_every == 0:
+            eval_info = agent.evaluate(
+                seed=config.evaluation.seed,
+                env=eval_env,
+                num_episodes=config.evaluation.num_episodes,
+                **config.evaluation.get("extra_args", {})
+            )
+            for k, v in eval_info.items():
+                wandb_run.log({f"evaluation/{k}": v}, step=i)
+
+        # update agent
+        batch = buffer.sample(state, buffer_sample_key).experience
+        agent, update_info, stats_info = agent.pretrain_update(batch)
+
+        # logging
+        if (i + 1) % config.log_every == 0:
+            for k, v in update_info.items():
+                wandb_run.log({f"training/{k}": v}, step=i)
+            for k, v in stats_info.items():
+                wandb_run.log({f"training_stats/{k}": v}, step=i)
+
+        # save model
+        if (i + 1) % config.save_every == 0:
+            agent.save(config.archive.agent_save_dir)
+            save_pickle(state, config.archive.agent_buffer_save_path)
 
     # training
     logger.info("Training..")
@@ -170,7 +202,6 @@ def main(
     return returns_history
 
 def optuna_function(config: DictConfig):
-    print("call") 
     returns_history = main(config)
     return np.max(returns_history)
 
