@@ -7,6 +7,7 @@ from omegaconf import OmegaConf
 from tqdm import tqdm
 
 import wandb
+from misc.enot.utils import mapping_scatter
 
 SOURCE_MU = jnp.array([0., 0.])
 TARGET_MU1 = jnp.array([5., 5.])
@@ -32,19 +33,7 @@ def loader_generator(sample_size, seed=0):
 def evaluate(enot, source, target):
     target_hat = enot(source)
 
-    # scatterplot
-    fig = plt.figure(figsize=(8, 6))
-
-    plt.scatter(source[:, 0], source[:, 1], color='pink', label='Source')
-    plt.scatter(target[:, 0], target[:, 1], color='black', label='Target')
-    plt.scatter(target_hat[:, 0], target_hat[:, 1], color='red', label='Target_hat')
-
-    for i in range(len(source)):
-        plt.plot([source[i, 0], target_hat[i, 0]], [source[i, 1], target_hat[i, 1]], color='blue')
-
-    plt.legend()
-    plt.grid(True)
-    plt.close()
+    fig = mapping_scatter(source, target_hat, target)
     fig = wandb.log({"scatterplot": wandb.Image(fig)})
 
     return {

@@ -3,8 +3,11 @@ import jax.numpy as jnp
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
+import wandb
 from misc.enot import ENOT
+from misc.enot.utils import mapping_scatter
 from utils.custom_types import DataType
+from utils.utils import convert_figure_to_array
 
 from .gail_discriminator import GAILDiscriminator
 
@@ -53,3 +56,17 @@ class GAILDiscriminatorWithENOT(GAILDiscriminator):
         target_expert_batch["observations"] = self.enot(target_expert_batch["observations"])
         target_expert_batch["observations_next"] = self.enot(target_expert_batch["observations_next"])
         return super().get_rewards(target_expert_batch=target_expert_batch)
+
+    def evaluate(self, traj_dict: dict, convert_to_wandb_type: bool=True):
+        eval_info = super().evaluate(traj_dict=traj_dict, convert_to_wandb_type=convert_to_wandb_type)
+
+        # enot visualization
+        source = traj_dict["states"]["TE"]
+        target_hat = self.enot(source)
+        target = traj_dict["states"]["SE"]
+        fig = mapping_scatter(source, target_hat, target)
+        if convert_to_wandb_type:
+            fig = wandb.Image(convert_figure_to_array(fig))
+        eval_info[f"{self.state.info_key}/enot_mapping_scatter"] = fig
+
+        return eval_info

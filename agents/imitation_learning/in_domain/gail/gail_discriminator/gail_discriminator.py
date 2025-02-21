@@ -2,9 +2,14 @@ import jax
 import jax.numpy as jnp
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
+from typing_extensions import override
 
-from agents.imitation_learning.utils import get_state_pairs
+import wandb
+from agents.imitation_learning.in_domain.gail.utils import \
+    get_trajs_discriminator_logits_and_accuracy
+from agents.imitation_learning.utils import get_state_pairs, prepare_buffer
 from misc.gan.discriminator import Discriminator
+from utils import convert_figure_to_array
 from utils.custom_types import DataType
 
 from .reward_transforms import BaseRewardTransform
@@ -42,12 +47,30 @@ class GAILDiscriminator(Discriminator):
         )
         return new_gail_discriminator, info, stats_info
 
-    def get_rewards(self, target_expert_batch: jnp.ndarray) -> jnp.ndarray:
+    def get_rewards(self, target_expert_batch: DataType) -> jnp.ndarray:
         return _get_rewards_jit(
             gail_discriminator=self,
             target_expert_state_pairs=get_state_pairs(target_expert_batch),
             reward_transform=self.reward_transform,
         )
+
+    @override
+    def evaluate(self, traj_dict: dict, convert_to_wandb_type: bool=True):
+        eval_info = {}
+
+        # get logits plot and accuracy of policy_discriminator
+        accuracy_dict, logits_figure_dict = get_trajs_discriminator_logits_and_accuracy(
+            discriminator=self,
+            traj_dict=traj_dict["state_pairs"],
+            keys_to_use=["TE", "SE"],
+            discriminator_key="policy",
+        )
+        if convert_to_wandb_type:
+            for k in logits_figure_dict:
+                logits_figure_dict[k] = wandb.Image(convert_figure_to_array(logits_figure_dict[k]), caption="")
+        eval_info.update(**accuracy_dict, **logits_figure_dict)
+
+        return eval_info
 
 @jax.jit
 def _update_jit(
