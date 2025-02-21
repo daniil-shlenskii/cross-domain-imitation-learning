@@ -31,12 +31,12 @@ def g_potential_loss(
 ):
     g_values = state.apply_fn({"params": params}, target)
     g_hat_values = state.apply_fn({"params": params}, target_hat)
-    downstream_loss = (g_hat_values - g_values).mean()
+    downstream_loss = (g_hat_values - g_values * enot.target_weight).mean()
     reg_loss = expectile_loss(
         diff=(
             enot.cost_fn(source, target_hat) -
             enot.cost_fn(source, target) +
-            g_values -
+            g_values * enot.target_weight -
             g_hat_values
         ),
         expectile=enot.expectile,

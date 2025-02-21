@@ -3,11 +3,12 @@ log_every: 1_000
 
 batch_size: 256
 
-n_training_iters: 10_000
+n_training_iters: 20_000
 
 enot:
   _target_: misc.enot.enot.ENOT.create
   seed: *seed
+  target_weight: 5.
   transport_module_config:
     _target_: nn.networks.MLP
     n_blocks: 4
