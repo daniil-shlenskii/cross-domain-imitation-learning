@@ -88,7 +88,7 @@ class ToyOneDimEnv(BaseToyOneDimEnv):
         return observation_space
 
     def _get_observation_with_x_coord(self, x_coord: np.ndarray):
-        return np.asarray([x_coord])
+        return np.asarray([x_coord], dtype=np.float32)
 
 class ToyOneDimEnvShifted(BaseToyOneDimEnv):
     def __init__(self, y: float = 0., **kwargs):
@@ -101,4 +101,4 @@ class ToyOneDimEnvShifted(BaseToyOneDimEnv):
         return observation_space
 
     def _get_observation_with_x_coord(self, x_coord: np.ndarray):
-        return np.asarray([x_coord, self.y])
+        return np.asarray([x_coord, self.y], dtype=np.float32)

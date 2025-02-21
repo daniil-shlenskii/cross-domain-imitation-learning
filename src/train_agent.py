@@ -127,7 +127,7 @@ def main(
                 **config.evaluation.get("extra_args", {})
             )
             for k, v in eval_info.items():
-                wandb_run.log({f"evaluation/{k}": v}, step=i)
+                wandb_run.log({f"pretraining/evaluation/{k}": v}, step=i)
 
         # update agent
         batch = buffer.sample(state, buffer_sample_key).experience
@@ -136,9 +136,9 @@ def main(
         # logging
         if (i + 1) % config.log_every == 0:
             for k, v in update_info.items():
-                wandb_run.log({f"training/{k}": v}, step=i)
+                wandb_run.log({f"pretraining/{k}": v}, step=i)
             for k, v in stats_info.items():
-                wandb_run.log({f"training_stats/{k}": v}, step=i)
+                wandb_run.log({f"pretraining_stats/{k}": v}, step=i)
 
         # save model
         if (i + 1) % config.save_every == 0:
