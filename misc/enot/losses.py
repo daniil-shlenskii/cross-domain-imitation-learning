@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 
 from nn.train_state import TrainState
@@ -14,8 +15,10 @@ def transport_loss(
     source: jnp.ndarray,
     enot,
 ):
+    cost_fn = jax.vmap(enot.cost_fn)
+
     target_hat = state.apply_fn({"params": params}, source)
-    loss = (enot.cost_fn(source, target_hat) - enot.g_potential(target_hat)).mean()
+    loss = (cost_fn(source, target_hat) - enot.g_potential(target_hat)).mean()
     return loss, {
         f"{state.info_key}/loss": loss,
         "target_hat": target_hat,
@@ -29,13 +32,15 @@ def g_potential_loss(
     target_hat: jnp.ndarray,
     enot,
 ):
+    cost_fn = jax.vmap(enot.cost_fn)
+
     g_values = state.apply_fn({"params": params}, target)
     g_hat_values = state.apply_fn({"params": params}, target_hat)
     downstream_loss = (g_hat_values - g_values * enot.target_weight).mean()
     reg_loss = expectile_loss(
         diff=(
-            enot.cost_fn(source, target_hat) -
-            enot.cost_fn(source, target) +
+            cost_fn(source, target_hat) -
+            cost_fn(source, target) +
             g_values * enot.target_weight -
             g_hat_values
         ),

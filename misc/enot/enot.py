@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -11,16 +11,14 @@ from ott.geometry import costs
 
 from nn.train_state import TrainState
 from utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
-from utils.custom_types import DataType, PRNGKey
-
-DType = Union[jnp.ndarray, DataType]
+from utils.custom_types import PRNGKey
 
 
 class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     rng: PRNGKey
     transport: TrainState 
     g_potential: TrainState 
-    cost_fn: costs.CostFn = struct.field(pytree_node=False)
+    cost_fn: costs.CostFn
     expectile: float = struct.field(pytree_node=False)
     expectile_loss_coef: float = struct.field(pytree_node=False)
     target_weight: float = struct.field(pytree_node=False)
@@ -39,7 +37,6 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         g_potential_optimizer_config: DictConfig,
         g_potential_loss_fn_config: DictConfig,
         cost_fn_config: DictConfig = None,
-        batchify_cost_fn: bool = True,
         expectile: float = 0.99,
         expectile_loss_coef: float = 1.0,
         target_weight: float = 1.0,
@@ -69,8 +66,6 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         )
 
         cost_fn = instantiate(cost_fn_config, _recursive_=False) if cost_fn_config is not None else costs.SqEuclidean()
-        if batchify_cost_fn:
-            cost_fn = jax.vmap(cost_fn)
 
         return cls(
             rng=rng,
@@ -88,7 +83,7 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def __call__(self, source: jnp.ndarray):
         return self.transport(source)
 
-    def update(self, target: DType, source: DType):
+    def update(self, target: jnp.ndarray, source: jnp.ndarray):
         enot, info, stats_info = _update_jit(
             enot=self,
             target=target,
@@ -99,8 +94,8 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
 @jax.jit
 def _update_jit(
     enot: ENOT,
-    target: DType,
-    source: DType,
+    target: jnp.ndarray,
+    source: jnp.ndarray,
 ) -> Tuple[ENOT, Dict[str, Any], Dict[str, Any]]:
     new_transport, new_transport_info, new_transport_stats_info = enot.transport.update(
         source=source,

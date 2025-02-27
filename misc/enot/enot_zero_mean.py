@@ -3,11 +3,10 @@ from typing import Callable
 import jax
 import jax.numpy as jnp
 from flax import struct
-from typing_extensions import override
 
 from utils.custom_types import DataType
 
-from .enot import ENOT, DType
+from .enot import ENOT
 
 
 class ENOTZeroMean(ENOT):
@@ -52,7 +51,7 @@ class ENOTZeroMean(ENOT):
         return self.transport(source - self.source_mean) + self.target_mean
 
     @jax.jit
-    def update(self, target: DType, source: DType):
+    def update(self, target: jnp.ndarray, source: jnp.ndarray):
         target, new_target_mean = self.batch_preprocessor(target, self.target_mean)
         source, new_source_mean = self.batch_preprocessor(source, self.source_mean)
 
