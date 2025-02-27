@@ -6,9 +6,8 @@ batch_size: 256
 n_training_iters: 20_000
 
 enot:
-  _target_: misc.enot.enot.ENOT.create
+  _target_: misc.enot.ENOTZeroMean.create
   seed: *seed
-  target_weight: 5.
   transport_module_config:
     _target_: nn.networks.MLP
     n_blocks: 4
@@ -30,3 +29,4 @@ enot:
   g_potential_loss_fn_config:
     _target_: hydra.utils.get_method
     path: misc.enot.losses.g_potential_loss
+  batchify_cost_fn: True 

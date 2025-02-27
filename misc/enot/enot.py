@@ -1,5 +1,4 @@
-from typing import (Any, Callable, Dict, Iterator, List, Literal, Optional,
-                    Sequence, Tuple, Union)
+from typing import Any, Dict, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -31,7 +30,8 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def create(
         cls,
         seed: int,
-        data_dim: int,
+        source_dim: int,
+        target_dim: int,
         transport_module_config: DictConfig,
         transport_optimizer_config: DictConfig,
         transport_loss_fn_config: DictConfig,
@@ -42,13 +42,14 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         batchify_cost_fn: bool = True,
         expectile: float = 0.99,
         expectile_loss_coef: float = 1.0,
-        target_weight: float = 1.0
+        target_weight: float = 1.0,
+        **kwargs,
     ):
         rng = jax.random.key(seed)
         rng, transport_key, g_potential_key = jax.random.split(rng, 3)
 
-        transport_module = instantiate(transport_module_config, out_dim=data_dim)
-        transport_params = transport_module.init(transport_key, np.ones(data_dim))["params"]
+        transport_module = instantiate(transport_module_config, out_dim=target_dim)
+        transport_params = transport_module.init(transport_key, np.ones(source_dim))["params"]
         transport = TrainState.create(
             loss_fn=instantiate(transport_loss_fn_config),
             apply_fn=transport_module.apply,
@@ -58,7 +59,7 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         )
 
         g_potential_module = instantiate(g_potential_module_config, out_dim=1, squeeze=True)
-        g_potential_params = g_potential_module.init(g_potential_key, np.ones(data_dim))["params"]
+        g_potential_params = g_potential_module.init(g_potential_key, np.ones(target_dim))["params"]
         g_potential = TrainState.create(
             loss_fn=instantiate(g_potential_loss_fn_config),
             apply_fn=g_potential_module.apply,
@@ -67,7 +68,7 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             info_key="g_potential",
         )
 
-        cost_fn = instantiate(cost_fn_config) if cost_fn_config is not None else costs.SqEuclidean()
+        cost_fn = instantiate(cost_fn_config, _recursive_=False) if cost_fn_config is not None else costs.SqEuclidean()
         if batchify_cost_fn:
             cost_fn = jax.vmap(cost_fn)
 
@@ -80,10 +81,11 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             expectile_loss_coef=expectile_loss_coef,
             target_weight=target_weight,
             _save_attrs=("transport", "g_potential"),
+            **kwargs,
         )
 
     @jax.jit
-    def __call__(self, source: DType):
+    def __call__(self, source: jnp.ndarray):
         return self.transport(source)
 
     def update(self, target: DType, source: DType):

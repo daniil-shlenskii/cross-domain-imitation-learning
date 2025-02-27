@@ -6,7 +6,7 @@ from loguru import logger
 from omegaconf import OmegaConf
 
 from agents.utils import instantiate_agent
-from envs import instantiate_environment, register_envs
+from envs import instantiate_environment
 from utils import buffer_init, get_state_from_dict, save_json, save_pickle
 
 from .base_agent import Agent

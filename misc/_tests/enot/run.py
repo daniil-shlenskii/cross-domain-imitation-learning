@@ -45,7 +45,7 @@ def main():
     wandb.init(project="test_enot")
 
     config = OmegaConf.load("misc/_tests/enot/run_config.yaml")
-    enot = instantiate(config.enot, data_dim=len(SIGMA), _recursive_=False)
+    enot = instantiate(config.enot, source_dim=len(SIGMA), target_dim=len(SIGMA), _recursive_=False)
 
     loader = loader_generator(sample_size=config.batch_size)
     for i, (source_sample, target_sample) in tqdm(enumerate(loader)):
