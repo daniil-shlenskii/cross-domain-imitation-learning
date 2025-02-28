@@ -1,10 +1,7 @@
-from typing import Callable
 
 import jax
 import jax.numpy as jnp
 from flax import struct
-
-from utils.custom_types import DataType
 
 from .enot import ENOT
 

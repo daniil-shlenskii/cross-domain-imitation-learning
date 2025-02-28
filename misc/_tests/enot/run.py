@@ -9,26 +9,66 @@ from tqdm import tqdm
 import wandb
 from misc.enot.utils import mapping_scatter
 
+DATA_DIM = 2
+
 SOURCE_MU = jnp.array([0., 0.])
 TARGET_MU1 = jnp.array([5., 5.])
 TARGET_MU2 = jnp.array([-5., -5.])
 SIGMA = jnp.array([.5, .5])
 
 
-def loader_generator(sample_size, seed=0):
-    sample_size = sample_size
-    source_distr = distrax.MultivariateNormalDiag(SOURCE_MU, SIGMA)
-    target_distr1 = distrax.MultivariateNormalDiag(TARGET_MU1, SIGMA)
-    target_distr2 = distrax.MultivariateNormalDiag(TARGET_MU2, SIGMA)
+def loader_generator(sample_size, seed=0, ds_name="gaussian"):
     rng = jax.random.key(seed)
 
-    while True:
-        rng, k1, k2, k3 = jax.random.split(rng, 4)
-        source_sample = source_distr.sample(seed=k1, sample_shape=(sample_size,))
-        target_sample1 = target_distr1.sample(seed=k2, sample_shape=(sample_size//2,))
-        target_sample2 = target_distr2.sample(seed=k3, sample_shape=(sample_size//2,))
-        target_sample = jnp.concatenate([target_sample1, target_sample2], axis=0)
-        yield source_sample, target_sample
+    if ds_name == "gaussian":
+        source_distr = distrax.MultivariateNormalDiag(SOURCE_MU, SIGMA)
+        target_distr1 = distrax.MultivariateNormalDiag(TARGET_MU1, SIGMA)
+        target_distr2 = distrax.MultivariateNormalDiag(TARGET_MU2, SIGMA)
+
+        while True:
+            rng, k1, k2, k3 = jax.random.split(rng, 4)
+            source_sample = source_distr.sample(seed=k1, sample_shape=(sample_size,))
+            target_sample1 = target_distr1.sample(seed=k2, sample_shape=(sample_size//2,))
+            target_sample2 = target_distr2.sample(seed=k3, sample_shape=(sample_size//2,))
+            target_sample = jnp.concatenate([target_sample1, target_sample2], axis=0)
+            yield source_sample, target_sample
+    elif ds_name == "lines":
+        ds_size = 20_000
+        ds = jnp.linspace(0, 1, ds_size)
+        while True:
+            rng, k1, k2 = jax.random.split(rng, 3)
+            idcs1 = jax.random.choice(k1, ds_size, shape=(sample_size,))
+            idcs2 = jax.random.choice(k2, ds_size, shape=(sample_size,))
+            source_sample = jnp.stack([ds[idcs1], jnp.zeros(sample_size)], axis=1)
+            target_sample = jnp.stack([ds[idcs2], jnp.ones(sample_size)], axis=1)
+            yield source_sample, target_sample
+    elif ds_name == "lines_double":
+        ds_size = 20_000
+        ds = jnp.linspace(0, 1, ds_size)
+        while True:
+            rng, k1, k2 = jax.random.split(rng, 3)
+            idcs1 = jax.random.choice(k1, ds_size, shape=(sample_size,))
+            idcs2 = jax.random.choice(k2, ds_size, shape=(sample_size,))
+            source_sample1 = jnp.stack([ds[idcs1[:sample_size//2]], -jnp.ones(sample_size//2)], axis=1)
+            source_sample2 = jnp.stack([ds[idcs1[sample_size//2:]] + 1., -2*jnp.ones(sample_size//2)], axis=1)
+            target_sample1 = jnp.stack([ds[idcs1[:sample_size//2]], jnp.ones(sample_size//2)], axis=1)
+            target_sample2 = jnp.stack([ds[idcs1[sample_size//2:]] + 1, 2*jnp.ones(sample_size//2)], axis=1)
+            source_sample = jnp.concatenate([source_sample1, source_sample2], axis=0)
+            target_sample = jnp.concatenate([target_sample1, target_sample2], axis=0)
+            yield source_sample, target_sample
+    elif ds_name == "agent":
+        expert_ds_size = 20_000
+        agent_ds_frac = 0.1
+        agent_ds_size = int(expert_ds_size * agent_ds_frac)
+        expert_ds = jnp.linspace(0, 1, expert_ds_size)
+        agent_ds = jnp.linspace(0, agent_ds_frac, agent_ds_size)
+        while True:
+            rng, k1, k2 = jax.random.split(rng, 3)
+            idcs1 = jax.random.choice(k1, agent_ds_size, shape=(sample_size,))
+            idcs2 = jax.random.choice(k2, expert_ds_size, shape=(sample_size,))
+            source_sample = jnp.stack([agent_ds[idcs1], jnp.zeros(sample_size)], axis=1)
+            target_sample = jnp.stack([expert_ds[idcs2], jnp.ones(sample_size)], axis=1)
+            yield source_sample, target_sample
 
 def evaluate(enot, source, target):
     target_hat = enot(source)
@@ -45,9 +85,9 @@ def main():
     wandb.init(project="test_enot")
 
     config = OmegaConf.load("misc/_tests/enot/run_config.yaml")
-    enot = instantiate(config.enot, source_dim=len(SIGMA), target_dim=len(SIGMA), _recursive_=False)
+    enot = instantiate(config.enot, source_dim=DATA_DIM, target_dim=DATA_DIM, _recursive_=False)
 
-    loader = loader_generator(sample_size=config.batch_size)
+    loader = loader_generator(sample_size=config.batch_size, ds_name=config.ds_name)
     for i, (source_sample, target_sample) in tqdm(enumerate(loader)):
         # evaluate
         if i == 0 or (i + 1) % config.log_every == 0:
