@@ -126,7 +126,7 @@ class GWILAgent(ImitationAgent):
         # update agent
         new_agent, agent_info, agent_stats_info = self.agent.update(batch)
         new_agent = jax.lax.cond(
-            self.actor.step % self.update_agent_every == 0,
+            new_gwil_enot.enot.transport.step % self.update_agent_every == 0,
             lambda: new_agent,
             lambda: self.agent,
         )
