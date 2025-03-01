@@ -16,6 +16,7 @@ from .gwil_enot import GWILENOT
 
 class GWILAgent(ImitationAgent):
     gwil_enot: GWILENOT 
+    update_agent_every: int
 
     @classmethod
     def create(
@@ -33,6 +34,8 @@ class GWILAgent(ImitationAgent):
         source_expert_buffer_state_path: str,
         batch_size: Optional[int],
         sourse_buffer_processor_config: Optional[DictConfig] = None,
+        #
+        update_agent_every: int = 1,
         **kwargs,
     ):
         # agent init
@@ -73,6 +76,7 @@ class GWILAgent(ImitationAgent):
             source_expert_buffer_state=source_expert_buffer_state,
             agent=agent,
             gwil_enot=gwil_enot,
+            update_agent_every=update_agent_every,
             _save_attrs = _save_attrs,
             **kwargs,
         )
@@ -121,6 +125,11 @@ class GWILAgent(ImitationAgent):
 
         # update agent
         new_agent, agent_info, agent_stats_info = self.agent.update(batch)
+        new_agent = jax.lax.cond(
+            self.actor.step % self.update_agent_every == 0,
+            lambda: new_agent,
+            lambda: self.agent,
+        )
 
         self = self.replace(
             rng=new_rng,

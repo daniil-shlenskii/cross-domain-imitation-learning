@@ -31,6 +31,7 @@ replay_buffer:
 
 agent:
   _target_: agents.gwil.GWILAgent.create
+  update_agent_every: 5
   seed: *seed
   batch_size: *batch_size
   source_expert_buffer_state_path: agents/experts/ToyOneDimEnvShiftedY0Size25/config/collected_rollouts/buffer_state.pickle
@@ -76,7 +77,7 @@ agent:
           - _target_: optax.clip
             max_delta: 1.0
           - _target_: optax.adam
-            learning_rate: 1e-5
+            learning_rate: 1e-4
       transport_loss_fn_config:
         _target_: hydra.utils.get_method
         path: misc.enot.losses.transport_loss
@@ -89,7 +90,7 @@ agent:
           - _target_: optax.clip
             max_delta: 1.0
           - _target_: optax.adam
-            learning_rate: 3e-4
+            learning_rate: 5e-4
       g_potential_loss_fn_config:
         _target_: hydra.utils.get_method
         path: misc.enot.losses.g_potential_loss
