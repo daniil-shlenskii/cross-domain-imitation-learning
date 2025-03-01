@@ -34,6 +34,8 @@ agent:
   seed: *seed
   batch_size: *batch_size
   source_expert_buffer_state_path: agents/experts/ToyOneDimEnvShiftedY0Size25/config/collected_rollouts/buffer_state.pickle
+  sourse_buffer_processor_config:
+    _target_: agents.imitation_learning.source_buffer_processors.AddToSecondCoordinate
   agent_config:
     _target_: agents.sac.SACAgent.create
     actor_module_config:
