@@ -9,9 +9,13 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig
 from ott.geometry import costs
 
+import wandb
 from nn.train_state import TrainState
-from utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
+from utils import (SaveLoadFrozenDataclassMixin, convert_figure_to_array,
+                   instantiate_optimizer)
 from utils.custom_types import PRNGKey
+
+from .utils import mapping_scatter
 
 
 class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
@@ -67,6 +71,8 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
 
         cost_fn = instantiate(cost_fn_config, _recursive_=False) if cost_fn_config is not None else costs.SqEuclidean()
 
+        _save_attrs = kwargs.pop("_save_attrs", ("transport", "g_potential", "cost_fn"))
+
         return cls(
             rng=rng,
             transport=transport,
@@ -75,7 +81,7 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             expectile=expectile,
             expectile_loss_coef=expectile_loss_coef,
             target_weight=target_weight,
-            _save_attrs=("transport", "g_potential"),
+            _save_attrs=_save_attrs,
             **kwargs,
         )
 
@@ -90,6 +96,15 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             source=source,
         )
         return enot, info, stats_info
+
+    def evaluate(self, source: jnp.ndarray, target: jnp.ndarray, convert_to_wandb_type: bool=True):
+        target_hat = self(source)
+
+        fig = mapping_scatter(source, target_hat, target)
+        if convert_to_wandb_type:
+            fig = wandb.Image(convert_figure_to_array(fig), caption="")
+
+        return {"enot/mapping_scatter": fig}
 
 @jax.jit
 def _update_jit(

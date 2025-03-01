@@ -114,7 +114,8 @@ def main(
 
     # pre-training
     logger.info("Pre-Training..")
-    for i in tqdm(range(config.get("n_iters_pretraining", 0))):
+    n_iters_pretraining = config.get("n_iters_pretraining", 0)
+    for i in tqdm(range(n_iters_pretraining)):
         # reproducibility
         rng, buffer_sample_key = jax.random.split(rng, 2)
 
@@ -163,7 +164,7 @@ def main(
                 **config.evaluation.get("extra_args", {})
             )
             for k, v in eval_info.items():
-                wandb_run.log({f"evaluation/{k}": v}, step=i)
+                wandb_run.log({f"evaluation/{k}": v}, step=i+n_iters_pretraining)
             returns_history.append(eval_info["return"])
 
         # sample actions
@@ -186,9 +187,9 @@ def main(
         # logging
         if (i + 1) % config.log_every == 0:
             for k, v in update_info.items():
-                wandb_run.log({f"training/{k}": v}, step=i)
+                wandb_run.log({f"training/{k}": v}, step=i+n_iters_pretraining)
             for k, v in stats_info.items():
-                wandb_run.log({f"training_stats/{k}": v}, step=i)
+                wandb_run.log({f"training_stats/{k}": v}, step=i+n_iters_pretraining)
 
         # save model
         if (i + 1) % config.save_every == 0:
