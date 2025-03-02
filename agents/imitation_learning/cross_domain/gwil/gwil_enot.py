@@ -6,13 +6,13 @@ from flax import struct
 from flax.struct import PyTreeNode
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
-from typing_extensions import override
 
 import wandb
 from agents.imitation_learning.in_domain.gail.gail_discriminator.reward_transforms import \
     BaseRewardTransform
 from misc.enot import ENOT
-from utils import SaveLoadFrozenDataclassMixin
+from misc.enot.utils import mapping_scatter
+from utils import SaveLoadFrozenDataclassMixin, convert_figure_to_array
 from utils.custom_types import DataType
 
 
@@ -20,6 +20,7 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     enot: ENOT
     reward_transform: BaseRewardTransform
     process_dict_batch_fn: Callable = struct.field(pytree_node=False)
+    get_state_mapping: Callable = struct.field(pytree_node=False)
     _save_attrs: tuple[str] = struct.field(pytree_node=False)
 
     @classmethod
@@ -38,6 +39,8 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             reward_transform = BaseRewardTransform.create()
 
         if use_pairs:
+            def get_state_mapping(batch_mapped):
+                return jnp.split(batch_mapped, 2, axis=-1)[0]
             def process_dict_batch_fn(dict_batch):
                 return jnp.concatenate([
                     dict_batch["observations"], dict_batch["observations_next"]
@@ -45,6 +48,8 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             source_dim *= 2
             target_dim *= 2
         else:
+            def get_state_mapping(batch_mapped):
+                return batch_mapped
             def process_dict_batch_fn(dict_batch):
                 return dict_batch["observations"]
 
@@ -60,7 +65,14 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             reward_transform=reward_transform,
             _save_attrs=("enot", "reward_transform"),
             process_dict_batch_fn=process_dict_batch_fn,
+            get_state_mapping=get_state_mapping,
         )
+
+    def encode_state(self, batch: DataType) -> DataType:
+        batch = self.process_dict_batch_fn(batch)
+        batch_mapped = self.enot(batch)
+        return self.get_state_mapping(batch_mapped)
+
 
     @jax.jit
     def update(self, *, target_expert_batch: DataType, source_expert_batch: DataType): 
@@ -99,3 +111,22 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             self.enot.g_potential(target_hat) -
             jax.vmap(self.enot.cost_fn)(source, target_hat)
         )
+
+    def evaluate(self, source_pairs: jnp.ndarray, target_pairs: jnp.ndarray, convert_to_wandb_type: bool=True):
+        keys = ["observations", "observations_next"]
+        source_batch  = dict(zip(keys, jnp.split(source_pairs, 2, axis=-1)))
+        target_batch  = dict(zip(keys, jnp.split(target_pairs, 2, axis=-1)))
+
+        source = self.process_dict_batch_fn(source_batch)
+        target = self.process_dict_batch_fn(target_batch)
+        target_hat = self.enot(source)
+
+        source_state = self.get_state_mapping(source)
+        target_state = self.get_state_mapping(target)
+        target_hat_state = self.get_state_mapping(target_hat)
+
+        fig = mapping_scatter(source_state, target_hat_state, target_state)
+        if convert_to_wandb_type:
+            fig = wandb.Image(convert_figure_to_array(fig), caption="")
+
+        return {"enot/mapping_scatter": fig}

@@ -155,9 +155,9 @@ class GWILAgent(ImitationAgent):
         eval_info, trajs, traj_dict = super().evaluate(seed=seed, env=env, num_episodes=num_episodes, return_trajectories=True, return_traj_dict=True)
 
         # enot eval info
-        enot_info = self.gwil_enot.enot.evaluate( # TODO:
-            source=traj_dict["states"]["TE"],
-            target=traj_dict["states"]["SE"],
+        enot_info = self.gwil_enot.evaluate(
+            source_pairs=traj_dict["state_pairs"]["TE"],
+            target_pairs=traj_dict["state_pairs"]["SE"],
             convert_to_wandb_type=convert_to_wandb_type
         )
         eval_info.update(**enot_info)
