@@ -107,7 +107,7 @@ def main():
     )
 
     # save buffer
-    save_path = DEFAULT_RANDOM_BUFFER_STORAGE_DIR / f"{config['env_name']}.pickle"
+    save_path = f"{DEFAULT_RANDOM_BUFFER_STORAGE_DIR}/{config['env_name']}.pickle"
     save_buffer(state, save_path)
 
     print(

@@ -2,9 +2,9 @@ seed: &seed 0
 env_name: &env_name ToyOneDimEnvShiftedY0Size25
 
 n_iters_training: 1_000_000
-n_iters_pretraining: 10_000
+n_iters_pretraining: 5_000
 
-batch_size: &batch_size 256
+batch_size: &batch_size 1024
 precollect_buffer_size: &precollect_buffer_size 5_000
 
 log_every: 1_000
@@ -24,7 +24,7 @@ replay_buffer:
   _target_: utils.instantiate_jitted_fbx_buffer
   fbx_buffer_config:
     _target_: flashbax.make_item_buffer
-    max_length: 1_000_000
+    max_length: 10_000
     min_length: *precollect_buffer_size
     sample_batch_size: *batch_size
     add_batches: False
@@ -65,8 +65,8 @@ agent:
           learning_rate: 0.
   gwil_enot_config:
     _target_: agents.gwil.GWILENOT.create
-    # reward_transform_config:
-    #   _target_: agents.gail.gail_discriminator.reward_transforms.RewardStandartization.create
+    reward_transform_config:
+      _target_: agents.gail.gail_discriminator.reward_transforms.RewardStandartization.create
     enot_config:
       _target_: misc.enot.ENOTGW.create
       seed: *seed
@@ -79,7 +79,7 @@ agent:
           - _target_: optax.clip
             max_delta: 1.0
           - _target_: optax.adam
-            learning_rate: 1e-4
+            learning_rate: 1e-5
       transport_loss_fn_config:
         _target_: hydra.utils.get_method
         path: misc.enot.losses.transport_loss
@@ -92,7 +92,7 @@ agent:
           - _target_: optax.clip
             max_delta: 1.0
           - _target_: optax.adam
-            learning_rate: 5e-4
+            learning_rate: 3e-4
       g_potential_loss_fn_config:
         _target_: hydra.utils.get_method
         path: misc.enot.losses.g_potential_loss
