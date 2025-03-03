@@ -15,7 +15,7 @@ def transport_loss(
     source: jnp.ndarray,
     enot,
 ):
-    cost_fn = jax.vmap(enot.cost_fn)
+    cost_fn = jax.vmap(enot.train_cost_fn)
 
     target_hat = state.apply_fn({"params": params}, source)
     loss = (cost_fn(source, target_hat) - enot.g_potential(target_hat)).mean()
@@ -32,7 +32,7 @@ def g_potential_loss(
     target_hat: jnp.ndarray,
     enot,
 ):
-    cost_fn = jax.vmap(enot.cost_fn)
+    cost_fn = jax.vmap(enot.train_cost_fn)
 
     g_values = state.apply_fn({"params": params}, target)
     g_hat_values = state.apply_fn({"params": params}, target_hat)

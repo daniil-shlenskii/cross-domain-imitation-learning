@@ -23,6 +23,9 @@ class ENOTGW(ENOT):
         proj_matrix = jnp.zeros((target_dim, source_dim))
         kwargs["cost_fn_config"]["source_dim"] = source_dim
         kwargs["cost_fn_config"]["target_dim"] = target_dim
+        if kwargs.get("train_cost_fn_config"):
+            kwargs["train_cost_fn_config"]["source_dim"] = source_dim
+            kwargs["train_cost_fn_config"]["target_dim"] = target_dim
 
         return super().create(
             source_dim=source_dim,

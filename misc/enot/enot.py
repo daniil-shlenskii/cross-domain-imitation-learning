@@ -23,6 +23,7 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     transport: TrainState 
     g_potential: TrainState 
     cost_fn: costs.CostFn
+    train_cost_fn: costs.CostFn
     expectile: float = struct.field(pytree_node=False)
     expectile_loss_coef: float = struct.field(pytree_node=False)
     target_weight: float = struct.field(pytree_node=False)
@@ -41,6 +42,7 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         g_potential_optimizer_config: DictConfig,
         g_potential_loss_fn_config: DictConfig,
         cost_fn_config: DictConfig = None,
+        train_cost_fn_config: DictConfig = None,
         expectile: float = 0.99,
         expectile_loss_coef: float = 1.0,
         target_weight: float = 1.0,
@@ -70,6 +72,7 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         )
 
         cost_fn = instantiate(cost_fn_config, _recursive_=False) if cost_fn_config is not None else costs.SqEuclidean()
+        train_cost_fn = instantiate(train_cost_fn_config, _recursive_=False) if train_cost_fn_config is not None else cost_fn
 
         _save_attrs = kwargs.pop("_save_attrs", ("transport", "g_potential", "cost_fn"))
 
@@ -78,6 +81,7 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             transport=transport,
             g_potential=g_potential,
             cost_fn=cost_fn,
+            train_cost_fn=train_cost_fn,
             expectile=expectile,
             expectile_loss_coef=expectile_loss_coef,
             target_weight=target_weight,
