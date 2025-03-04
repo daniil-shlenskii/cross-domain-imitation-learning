@@ -8,19 +8,17 @@ from tqdm import tqdm
 
 import wandb
 from misc.enot.utils import mapping_scatter
-
-DATA_DIM = 2
-
-SOURCE_MU = jnp.array([0., 0.])
-TARGET_MU1 = jnp.array([5., 5.])
-TARGET_MU2 = jnp.array([-5., -5.])
-SIGMA = jnp.array([.5, .5])
+from utils import load_pickle
 
 
 def loader_generator(sample_size, seed=0, ds_name="gaussian"):
     rng = jax.random.key(seed)
 
     if ds_name == "gaussian":
+        SOURCE_MU = jnp.array([0., 0.])
+        TARGET_MU1 = jnp.array([5., 5.])
+        TARGET_MU2 = jnp.array([-5., -5.])
+        SIGMA = jnp.array([.5, .5])
         source_distr = distrax.MultivariateNormalDiag(SOURCE_MU, SIGMA)
         target_distr1 = distrax.MultivariateNormalDiag(TARGET_MU1, SIGMA)
         target_distr2 = distrax.MultivariateNormalDiag(TARGET_MU2, SIGMA)
@@ -69,6 +67,33 @@ def loader_generator(sample_size, seed=0, ds_name="gaussian"):
             source_sample = jnp.stack([agent_ds[idcs1], jnp.zeros(sample_size)], axis=1)
             target_sample = jnp.stack([expert_ds[idcs2], jnp.ones(sample_size)], axis=1)
             yield source_sample, target_sample
+    elif "from_buffer" in ds_name:
+        source_path = "buffers/Hopper/Hopper_random_buffer.pickle"
+        target_path = "buffers/Hopper/Hopper_expert_buffer.pickle"
+
+        source_buffer = load_pickle(source_path)
+        target_buffer = load_pickle(target_path)
+        if source_buffer.is_full:
+            source_buffer = {k: v[0] for k, v in source_buffer.experience.items()}
+        else:
+            source_buffer = {k: v[0, :source_buffer.current_index] for k, v in source_buffer.experience.items()}
+        if target_buffer.is_full:
+            target_buffer = {k: v[0] for k, v in target_buffer.experience.items()}
+        else:
+            target_buffer = {k: v[0, :target_buffer.current_index] for k, v in target_buffer.experience.items()}
+
+        if ds_name == "from_buffer_states":
+            source_ds = source_buffer["observations"]
+            target_ds = target_buffer["observations"]
+        elif ds_name == "from_buffer_state_pairs":
+            source_ds = jnp.concatenate([source_buffer["observations"], source_buffer["observations_next"]], axis=1)
+            target_ds = jnp.concatenate([target_buffer["observations"], target_buffer["observations_next"]], axis=1)
+
+        while True:
+            rng, k1, k2 = jax.random.split(rng, 3)
+            source_sample = jax.random.choice(k1, source_ds, shape=(sample_size,))
+            target_sample = jax.random.choice(k2, target_ds, shape=(sample_size,))
+            yield source_sample, target_sample
 
 def evaluate(enot, source, target):
     target_hat = enot(source)
@@ -85,9 +110,11 @@ def main():
     wandb.init(project="test_enot")
 
     config = OmegaConf.load("misc/_tests/enot/run_config.yaml")
-    enot = instantiate(config.enot, source_dim=DATA_DIM, target_dim=DATA_DIM, _recursive_=False)
-
     loader = loader_generator(sample_size=config.batch_size, ds_name=config.ds_name)
+
+    source_sample, target_sample = next(loader)
+    enot = instantiate(config.enot, source_dim=source_sample.shape[-1], target_dim=target_sample.shape[-1], _recursive_=False)
+
     for i, (source_sample, target_sample) in tqdm(enumerate(loader)):
         # evaluate
         if i == 0 or (i + 1) % config.log_every == 0:
