@@ -103,9 +103,7 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     @jax.jit
     def get_base_rewards(self, target_expert_batch: jnp.ndarray) -> jnp.ndarray:
         source = target_expert_batch
-
-        source -= self.enot.source_mean
-        target_hat = self.enot.transport(source)
+        target_hat = self.enot(source)
 
         return (
             self.enot.g_potential(target_hat) -
