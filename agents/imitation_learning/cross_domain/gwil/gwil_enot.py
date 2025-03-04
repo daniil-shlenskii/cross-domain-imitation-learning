@@ -107,7 +107,7 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
 
         return (
             self.enot.g_potential(target_hat) -
-            jax.vmap(self.enot.cost_fn)(source, target_hat)
+            self.enot.cost(source, target_hat)
         )
 
     def evaluate(self, source_pairs: jnp.ndarray, target_pairs: jnp.ndarray, convert_to_wandb_type: bool=True):

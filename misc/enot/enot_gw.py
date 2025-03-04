@@ -41,6 +41,9 @@ class ENOTGW(ENOT):
     def __call__(self, source: jnp.ndarray):
         return self.transport(source - self.source_mean) + self.target_mean
 
+    def cost(self, source: jnp.ndarray, target: jnp.ndarray):
+        return jax.vmap(self.cost_fn)(source - self.source_mean, target - self.target_mean)
+
     @jax.jit
     def update(self, target: jnp.ndarray, source: jnp.ndarray):
         # update means and cetralize batches
