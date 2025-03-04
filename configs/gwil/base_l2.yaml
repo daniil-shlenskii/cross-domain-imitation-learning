@@ -1,0 +1,108 @@
+seed: &seed 0
+env_name: &env_name ToyOneDimEnvShiftedY0Size25
+
+n_iters_training: 1_000_000
+n_iters_pretraining: 5_000
+
+batch_size: &batch_size 1024
+precollect_buffer_size: &precollect_buffer_size 5_000
+
+log_every: 1_000
+eval_every: 5_000
+save_every: 5_000
+
+environment:
+  _target_: gymnasium.wrappers.TimeLimit
+  max_episode_steps: &max_episode_steps 200
+  env: &env
+    _target_: gymnasium.make
+    id: custom_envs/ToyOneDimEnvShifted
+    size: 25.
+    y: 0.
+
+replay_buffer:
+  _target_: utils.instantiate_jitted_fbx_buffer
+  fbx_buffer_config:
+    _target_: flashbax.make_item_buffer
+    max_length: 10_000
+    min_length: *precollect_buffer_size
+    sample_batch_size: *batch_size
+    add_batches: False
+
+agent:
+  _target_: agents.gwil.GWILAgent.create
+  update_agent_every: 5
+  seed: *seed
+  batch_size: *batch_size
+  source_expert_buffer_state_path: agents/experts/ToyOneDimEnvShiftedY0Size25/config/collected_rollouts/buffer_state.pickle
+  agent_config:
+    _target_: agents.sac.SACAgent.create
+    actor_module_config:
+      _target_: agents.sac.networks.NormalTanhPolicy
+      model_type: MLP 
+      n_blocks: 2
+      hidden_dim: 128
+    critic_module_config:
+      _target_: agents.sac.networks.Critic
+      model_type: MLP
+      n_blocks: 2
+      hidden_dim: 128
+    temperature_module_config:
+      _target_: agents.sac.networks.Temperature
+      initial_temperature: 0.2
+    actor_optimizer_config: &optimizer_config
+      transforms:
+        - _target_: optax.clip
+          max_delta: 1.0
+        - _target_: optax.adam
+          learning_rate: 3e-4
+    critic_optimizer_config: *optimizer_config
+    temperature_optimizer_config:
+      transforms:
+        - _target_: optax.sgd
+          learning_rate: 0.
+  gwil_enot_config:
+    _target_: agents.gwil.GWILENOT.create
+    use_pairs: True
+    reward_transform_config:
+      _target_: agents.gail.gail_discriminator.reward_transforms.RewardStandartization.create
+    enot_config:
+      _target_: misc.enot.ENOT.create
+      seed: *seed
+      transport_module_config:
+        _target_: agents.imitation_learning.cross_domain.gwil.networks.StatewisePairTransort
+        model_type: MLP
+        n_blocks: 4
+        hidden_dim: 128
+      transport_optimizer_config:
+        transforms:
+          - _target_: optax.clip
+            max_delta: 1.0
+          - _target_: optax.adam
+            learning_rate: 3e-4
+      transport_loss_fn_config:
+        _target_: hydra.utils.get_method
+        path: misc.enot.losses.transport_loss
+      g_potential_module_config:
+        _target_: nn.networks.MLP
+        n_blocks: 4
+        hidden_dim: 128
+      g_potential_optimizer_config:
+        transforms:
+          - _target_: optax.clip
+            max_delta: 1.0
+          - _target_: optax.adam
+            learning_rate: 3e-4
+      g_potential_loss_fn_config:
+        _target_: hydra.utils.get_method
+        path: misc.enot.losses.g_potential_loss
+
+evaluation:
+  seed: 42
+  num_episodes: 25
+  environment:
+    _target_: gymnasium.wrappers.TimeLimit
+    max_episode_steps: *max_episode_steps
+    env: *env
+
+
