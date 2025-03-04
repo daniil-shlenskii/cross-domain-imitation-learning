@@ -48,7 +48,7 @@ class BaseToyEnv(gym.Env, abc.ABC):
         new_x_coord = self._x_location + shift
 
         observation = self._get_observation_with_x_coord(new_x_coord)
-        reward = shift if new_x_coord < 1. else 1000.
+        reward = shift
         terminated = not (-1. < new_x_coord < 1.)
         truncated = False
         info = {}
