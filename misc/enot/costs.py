@@ -23,7 +23,7 @@ class GWCostStable(PyTreeNode):
     def create(cls, source_dim: int, target_dim: int, c: int=None):
         proj_matrix = jnp.zeros((target_dim, source_dim))
         if c is None:
-            c = source_dim**0.5
+            c = source_dim
         return cls(proj_matrix=proj_matrix, c=c)
 
     def __call__(self, x, y):
