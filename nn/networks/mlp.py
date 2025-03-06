@@ -32,3 +32,10 @@ class MLP(nn.Module):
             x = x.squeeze(-1)
 
         return x
+
+class NegativeMLP(MLP):
+    def __call__(
+        self, x: jnp.ndarray, train: bool=False
+    ) -> jnp.ndarray:
+        x = super().__call__(x, train)
+        return -jnp.abs(x)
