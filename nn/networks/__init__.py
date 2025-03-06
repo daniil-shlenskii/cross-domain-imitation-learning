@@ -1,4 +1,4 @@
-from .mlp import MLP
+from .mlp import MLP, NegativeMLP
 from .resnet import ResNet
 from .utils import default_init
 
