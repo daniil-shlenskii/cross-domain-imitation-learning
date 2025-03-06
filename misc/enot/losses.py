@@ -41,7 +41,7 @@ def g_potential_loss(
         diff=(
             cost_fn(source, target_hat) -
             cost_fn(source, target) +
-            g_values * enot.target_weight -
+            g_values -
             g_hat_values
         ),
         expectile=enot.expectile,
