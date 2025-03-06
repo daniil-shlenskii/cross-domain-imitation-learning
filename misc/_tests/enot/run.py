@@ -102,7 +102,7 @@ def evaluate(enot, source, target):
     fig = wandb.log({"scatterplot": wandb.Image(fig)})
 
     return {
-        "cost": jax.vmap(enot.cost_fn)(source, target_hat).mean(),
+        "cost": enot.cost(source, target).mean(),
         "mapping": fig
     }
 

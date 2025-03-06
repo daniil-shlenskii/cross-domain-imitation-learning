@@ -1,9 +1,9 @@
 seed: &seed 0
-log_every: 1_000
+log_every: 2_000
 
 batch_size: 256
 
-ds_name: lines
+ds_name: from_buffer_state_pairs
 n_training_iters: 100_000
 
 enot:
@@ -18,7 +18,9 @@ enot:
       - _target_: optax.clip
         max_delta: 1.0
       - _target_: optax.adam
-        learning_rate: 1e-5
+        learning_rate: 3e-4
+        b1: 0.9
+        b2: 0.999
   transport_loss_fn_config:
     _target_: hydra.utils.get_method
     path: misc.enot.losses.transport_loss
@@ -32,8 +34,12 @@ enot:
         max_delta: 1.0
       - _target_: optax.adam
         learning_rate: 3e-4
+        b1: 0.9
+        b2: 0.999
   g_potential_loss_fn_config:
     _target_: hydra.utils.get_method
     path: misc.enot.losses.g_potential_loss
   cost_fn_config:
-    _target_: misc.enot.costs.GWCostStable.create
+    _target_: misc.enot.costs.InnerGWCost.create
+  train_cost_fn_config:
+    _target_: misc.enot.costs.InnerGWCostStable.create
