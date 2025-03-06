@@ -10,7 +10,7 @@ def mapping_scatter2d(source, target_hat, target):
     plt.scatter(target[:, 0], target[:, 1], color='black', label='Target')
     plt.scatter(target_hat[:, 0], target_hat[:, 1], color='red', label='Target_hat')
 
-    for i in range(len(source)):
+    for i in range(0, len(source), 10):
         plt.plot([source[i, 0], target_hat[i, 0]], [source[i, 1], target_hat[i, 1]], color='blue')
 
     plt.legend()

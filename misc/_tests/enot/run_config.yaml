@@ -36,7 +36,7 @@ enot:
       - _target_: optax.adam
         learning_rate: 3e-4
         b1: 0.9
-        b2: 0.99 j kj
+        b2: 0.99
   g_potential_loss_fn_config:
     _target_: hydra.utils.get_method
     path: misc.enot.losses.g_potential_loss
