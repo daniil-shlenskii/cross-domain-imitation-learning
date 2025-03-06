@@ -117,7 +117,7 @@ def main():
 
     for i, (source_sample, target_sample) in tqdm(enumerate(loader)):
         # evaluate
-        if i == 0 or (i + 1) % config.log_every == 0:
+        if i == 0 or (i + 1) % config.eval_every == 0:
             eval_info = evaluate(enot, source_sample, target_sample)
             for k, v in eval_info.items():
                 wandb.log({f"eval/{k}": v}, step=i)
