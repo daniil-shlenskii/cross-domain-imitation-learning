@@ -24,7 +24,7 @@ replay_buffer:
   _target_: utils.instantiate_jitted_fbx_buffer
   fbx_buffer_config:
     _target_: flashbax.make_item_buffer
-    max_length: 10_000
+    max_length: 100_000
     min_length: *precollect_buffer_size
     sample_batch_size: *batch_size
     add_batches: False
@@ -81,7 +81,9 @@ agent:
           - _target_: optax.clip
             max_delta: 1.0
           - _target_: optax.adam
-            learning_rate: 1e-5
+            learning_rate: 3e-4
+            b1: 0.9
+            b2: 0.99
       transport_loss_fn_config:
         _target_: hydra.utils.get_method
         path: misc.enot.losses.transport_loss
@@ -95,13 +97,15 @@ agent:
             max_delta: 1.0
           - _target_: optax.adam
             learning_rate: 3e-4
+            b1: 0.9
+            b2: 0.99
       g_potential_loss_fn_config:
         _target_: hydra.utils.get_method
         path: misc.enot.losses.g_potential_loss
-      train_cost_fn_config:
-        _target_: misc.enot.costs.GWCostStable.create
       cost_fn_config:
-        _target_: misc.enot.costs.GWCost.create
+        _target_: misc.enot.costs.InnerGWCost.create
+      train_cost_fn_config:
+        _target_: misc.enot.costs.InnerGWCostStable.create
 
 evaluation:
   seed: 42
