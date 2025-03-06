@@ -44,7 +44,7 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         cost_fn_config: DictConfig = None,
         train_cost_fn_config: DictConfig = None,
         expectile: float = 0.99,
-        expectile_loss_coef: float = 1.0,
+        expectile_loss_coef: float = 2.0,
         target_weight: float = 1.0,
         **kwargs,
     ):
