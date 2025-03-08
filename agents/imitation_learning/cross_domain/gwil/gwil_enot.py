@@ -104,7 +104,7 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def get_base_rewards(self, target_expert_batch: jnp.ndarray) -> jnp.ndarray:
         source = target_expert_batch
         target_hat = self.enot(source)
-        return -self.enot.cost(source, target_hat)
+        return -self.enot.cost(source, target_hat) + self.enot.g_potential(target_hat) # TODO:
 
     def evaluate(self, source_pairs: jnp.ndarray, target_pairs: jnp.ndarray, convert_to_wandb_type: bool=True):
         keys = ["observations", "observations_next"]
