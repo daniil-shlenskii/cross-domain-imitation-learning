@@ -2,7 +2,7 @@ seed: &seed 0
 env_name: &env_name ToyOneDimEnvShiftedY0Size25
 
 n_iters_training: 1_000_000
-n_iters_pretraining: 10_000
+n_iters_pretraining: 2_000
 
 batch_size: &batch_size 1024
 precollect_buffer_size: &precollect_buffer_size 5_000
@@ -102,9 +102,7 @@ agent:
         _target_: hydra.utils.get_method
         path: misc.enot.losses.g_potential_loss
       cost_fn_config:
-        _target_: misc.enot.costs.InnerGWCost.create
-      train_cost_fn_config:
-        _target_: misc.enot.costs.InnerGWCostStable.create
+        _target_: misc.enot.costs.GWCostStable.create
 
 evaluation:
   seed: 42

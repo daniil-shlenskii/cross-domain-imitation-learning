@@ -98,7 +98,7 @@ agent:
         _target_: hydra.utils.get_method
         path: misc.enot.losses.g_potential_loss
       cost_fn_config:
-        _target_: misc.enot.costs.InnerGWCostStable.create
+        _target_: misc.enot.costs.GWCostStable.create
 
 evaluation:
   seed: 42
