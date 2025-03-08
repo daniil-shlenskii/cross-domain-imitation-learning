@@ -60,7 +60,7 @@ class CentralizeNormalizePreprocessor(CentralizePreprocessor):
         self, batch, _ = super().update(batch)
         batch_max_norm = jnp.max(jnp.linalg.norm(batch, axis=-1))
         new_max_norm = jnp.maximum(self.max_norm, batch_max_norm)
-        batch = batch / new_max_norm
+        batch /= new_max_norm
         return self.replace(max_norm=new_max_norm), batch, {}
 
     def encode(self, batch: jnp.ndarray):
@@ -68,5 +68,5 @@ class CentralizeNormalizePreprocessor(CentralizePreprocessor):
         return batch / self.max_norm
 
     def decode(self, batch: jnp.ndarray):
-        batch = super().decode(batch)
-        return batch * self.max_norm
+        batch *= self.max_norm
+        return super().decode(batch)

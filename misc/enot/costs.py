@@ -29,7 +29,7 @@ class GWCostStable(GWCost):
     @classmethod
     def create(cls, source_dim: int, target_dim: int, c: int=None):
         if c is None:
-            c = source_dim
+            c = 1.
         return super().create(source_dim=source_dim, target_dim=target_dim, c=c)
 
     def __call__(self, x, y):
