@@ -40,6 +40,16 @@ def loader_generator(sample_size, seed=0, ds_name="gaussian"):
             source_sample = jnp.stack([ds[idcs1], jnp.zeros(sample_size)], axis=1)
             target_sample = jnp.stack([ds[idcs2], jnp.ones(sample_size)], axis=1)
             yield source_sample, target_sample
+    elif ds_name == "temporal":
+        ds_size = 20_000
+        ds = jnp.linspace(0, 1, ds_size)
+        while True:
+            rng, k1, k2 = jax.random.split(rng, 3)
+            idcs1 = jax.random.choice(k1, ds_size//2, shape=(sample_size,))
+            idcs2 = jax.random.choice(k2, ds_size, shape=(sample_size,))
+            source_sample = jnp.stack([jnp.zeros(sample_size), ds[idcs1], idcs1/ds_size], axis=1)
+            target_sample = jnp.stack([-ds[idcs2], jnp.zeros(sample_size), idcs2/ds_size], axis=1)
+            yield source_sample, target_sample
     elif ds_name == "lines_double":
         ds_size = 20_000
         ds = jnp.linspace(0, 1, ds_size)
