@@ -103,6 +103,10 @@ agent:
         path: misc.enot.losses.g_potential_loss
       cost_fn_config:
         _target_: misc.enot.costs.GWCostStable.create
+      source_batch_preprocessor_config:
+        _target_: misc.enot.batch_preprocessors.CentralizeNormalizePreprocessor.create
+      target_batch_preprocessor_config:
+        _target_: misc.enot.batch_preprocessors.CentralizeNormalizePreprocessor.create
 
 evaluation:
   seed: 42
