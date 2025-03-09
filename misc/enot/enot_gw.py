@@ -57,6 +57,9 @@ class ENOTGW(ENOT):
            self.target_batch_preprocessor.encode(target)
         )
 
+    def g_potential_val(self, target: jnp.ndarray):
+        return self.g_potential(self.target_batch_preprocessor.encode(target))
+
     @jax.jit
     def update(self, target: jnp.ndarray, source: jnp.ndarray):
         # preprocess batches

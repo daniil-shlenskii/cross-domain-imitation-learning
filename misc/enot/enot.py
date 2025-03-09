@@ -96,6 +96,9 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def cost(self, source: jnp.ndarray, target: jnp.ndarray):
         return jax.vmap(self.cost_fn)(source, target)
 
+    def g_potential_val(self, target: jnp.ndarray):
+        return self.g_potential(target)
+
     def update(self, target: jnp.ndarray, source: jnp.ndarray):
         enot, info, stats_info = _update_jit(
             enot=self,
