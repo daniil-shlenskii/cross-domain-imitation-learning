@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 import wandb
 from misc.enot.utils import mapping_scatter
-from utils import load_pickle
+from utils import convert_figure_to_array, load_pickle
 
 
 def loader_generator(sample_size, seed=0, ds_name="gaussian"):
@@ -107,13 +107,18 @@ def loader_generator(sample_size, seed=0, ds_name="gaussian"):
 
 def evaluate(enot, source, target):
     target_hat = enot(source)
-
     fig = mapping_scatter(source, target_hat, target)
-    fig = wandb.log({"scatterplot": wandb.Image(fig)})
+    fig = wandb.Image(convert_figure_to_array(fig))
+
+    P = enot.cost_fn.proj_matrix
+    P_source = jax.vmap(lambda x: P @ x)(source)
+    figP = mapping_scatter(source, P_source, target)
+    figP = wandb.Image(convert_figure_to_array(figP))
 
     return {
-        "cost": enot.cost(source, target).mean(),
-        "mapping": fig
+        "cost": enot.cost(source, target_hat).mean(),
+        "mapping": fig,
+        "Pmapping": figP,
     }
 
 def main():
@@ -131,6 +136,7 @@ def main():
             eval_info = evaluate(enot, source_sample, target_sample)
             for k, v in eval_info.items():
                 wandb.log({f"eval/{k}": v}, step=i)
+
         enot, update_info, stats_info = enot.update(target=target_sample, source=source_sample)
 
         # logging
