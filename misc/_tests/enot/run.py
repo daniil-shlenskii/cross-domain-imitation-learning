@@ -105,22 +105,6 @@ def loader_generator(sample_size, seed=0, ds_name="gaussian"):
             target_sample = jax.random.choice(k2, target_ds, shape=(sample_size,))
             yield source_sample, target_sample
 
-def evaluate(enot, source, target):
-    target_hat = enot(source)
-    fig = mapping_scatter(source, target_hat, target)
-    fig = wandb.Image(convert_figure_to_array(fig))
-
-    P = enot.cost_fn.proj_matrix
-    P_source = jax.vmap(lambda x: P @ x)(source)
-    figP = mapping_scatter(source, P_source, target)
-    figP = wandb.Image(convert_figure_to_array(figP))
-
-    return {
-        "cost": enot.cost(source, target_hat).mean(),
-        "mapping": fig,
-        "Pmapping": figP,
-    }
-
 def main():
     wandb.init(project="test_enot")
 
@@ -133,7 +117,7 @@ def main():
     for i, (source_sample, target_sample) in tqdm(enumerate(loader)):
         # evaluate
         if i == 0 or (i + 1) % config.eval_every == 0:
-            eval_info = evaluate(enot, source_sample, target_sample)
+            eval_info = enot.evaluate(source_sample, target_sample)
             for k, v in eval_info.items():
                 wandb.log({f"eval/{k}": v}, step=i)
 

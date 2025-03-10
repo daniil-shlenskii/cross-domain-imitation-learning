@@ -114,7 +114,10 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         if convert_to_wandb_type:
             fig = wandb.Image(convert_figure_to_array(fig), caption="")
 
-        return {"enot/mapping_scatter": fig}
+        return {
+            "enot/mapping_scatter": fig,
+            "enot/cost": self.cost(source, target_hat).mean(),
+        }
 
 @jax.jit
 def _update_jit(
