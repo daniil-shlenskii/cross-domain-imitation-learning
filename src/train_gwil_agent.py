@@ -185,7 +185,7 @@ def main(
 
             s_batch = {k: v[None] for k, v in s.items()}
             reward = agent.gwil_enot.get_rewards(s_batch)
-            s["rewards"] = reward
+            s["rewards"] = reward[0]
 
             # update buffer
             state = buffer.add(state, s)
