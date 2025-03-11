@@ -151,6 +151,7 @@ def main(
     returns_history = []
 
     observation, _  = env.reset(seed=config.seed)
+    actor_step = 0
     for i in tqdm(range(config.n_iters_training)):
         # reproducibility
         rng, agent_sample_key, buffer_sample_key = jax.random.split(rng, 3)
@@ -167,18 +168,20 @@ def main(
                 wandb_run.log({f"evaluation/{k}": v}, step=i+n_iters_pretraining)
             returns_history.append(eval_info["return"])
 
-        # sample actions
-        action = agent.sample_actions(agent_sample_key, observation)
+        if actor_step < agent.actor.step:
+            # sample actions
+            action = agent.sample_actions(agent_sample_key, observation)
 
-        # do step in the environment
-        env, observation, state = do_environment_step_and_update_buffer(
-            env=env,
-            observation=observation,
-            action=action,
-            buffer=buffer,
-            state=state,
-            seed=config.seed+i,
-        )
+            # do step in the environment
+            env, observation, state = do_environment_step_and_update_buffer(
+                env=env,
+                observation=observation,
+                action=action,
+                buffer=buffer,
+                state=state,
+                seed=config.seed+i,
+            )
+            actor_step = agent.actor.step
 
         # update agent
         batch = buffer.sample(state, buffer_sample_key).experience
