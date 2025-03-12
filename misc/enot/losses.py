@@ -18,7 +18,8 @@ def transport_loss(
     cost_fn = jax.vmap(enot.train_cost_fn)
 
     target_hat = state.apply_fn({"params": params}, source)
-    loss = (cost_fn(source, target_hat) - enot.g_potential(target_hat)).mean()
+    fake_loss = -enot.g_potential(target_hat)
+    loss = (cost_fn(source, target_hat) + fake_loss).mean()
     return loss, {
         f"{state.info_key}/loss": loss,
         "target_hat": target_hat,
@@ -36,7 +37,12 @@ def g_potential_loss(
 
     g_values = state.apply_fn({"params": params}, target)
     g_hat_values = state.apply_fn({"params": params}, target_hat)
-    downstream_loss = (g_hat_values - g_values * enot.target_weight).mean()
+
+    real_loss = jax.nn.softplus(-g_values)
+    fake_loss = jax.nn.softplus(g_hat_values)
+    downstream_loss = (real_loss + fake_loss).mean()
+
+    # downstream_loss = (g_hat_values - g_values * enot.target_weight).mean()
     reg_loss = expectile_loss(
         diff=(
             cost_fn(source, target_hat) -

@@ -6,6 +6,9 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
+from ott.tools import sinkhorn_divergence
+from ott.geometry import pointcloud
+
 import wandb
 from misc.enot.utils import mapping_scatter
 from utils import load_pickle
@@ -68,8 +71,8 @@ def loader_generator(sample_size, seed=0, ds_name="gaussian"):
             target_sample = jnp.stack([expert_ds[idcs2], jnp.ones(sample_size)], axis=1)
             yield source_sample, target_sample
     elif "from_buffer" in ds_name:
-        source_path = "buffers/Hopper/Hopper_random_buffer.pickle"
-        target_path = "buffers/Hopper/Hopper_expert_buffer.pickle"
+        source_path = "../buffers/Hopper/Hopper_random_buffer.pickle"
+        target_path = "../buffers/Hopper/Hopper_expert_buffer.pickle"
 
         source_buffer = load_pickle(source_path)
         target_buffer = load_pickle(target_path)
@@ -95,8 +98,30 @@ def loader_generator(sample_size, seed=0, ds_name="gaussian"):
             target_sample = jax.random.choice(k2, target_ds, shape=(sample_size,))
             yield source_sample, target_sample
 
+
+@jax.jit
+def sinkhorn_loss(
+    x: jnp.ndarray, y: jnp.ndarray, epsilon: float = 0.001
+) -> float:
+    """Computes transport between (x, a) and (y, b) via Sinkhorn algorithm."""
+    a = jnp.ones(len(x)) / len(x)
+    b = jnp.ones(len(y)) / len(y)
+
+    sdiv, _ = sinkhorn_divergence.sinkhorn_divergence(
+        pointcloud.PointCloud, x, y, epsilon=epsilon, a=a, b=b
+    )
+    return sdiv
+
+
 def evaluate(enot, source, target):
     target_hat = enot(source)
+
+    print(
+        f"TG sim: {sinkhorn_loss(target_hat, target):.3f}"
+    )
+    sinkhorn_dist = sinkhorn_loss(source, target) 
+    enot_dist = enot.cost(source, target_hat).mean()
+    print(f"Sh Enot dist: {sinkhorn_dist:.3f}, {enot_dist:.3f}")
 
     fig = mapping_scatter(source, target_hat, target)
     fig = wandb.log({"scatterplot": wandb.Image(fig)})

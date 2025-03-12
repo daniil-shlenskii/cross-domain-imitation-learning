@@ -43,7 +43,7 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         g_potential_loss_fn_config: DictConfig,
         cost_fn_config: DictConfig = None,
         train_cost_fn_config: DictConfig = None,
-        expectile: float = 0.99,
+        expectile: float = 0.95,
         expectile_loss_coef: float = 2.0,
         target_weight: float = 1.0,
         **kwargs,

@@ -63,9 +63,11 @@ class ENOTGW(ENOT):
         new_source_batch_preprocessor, source, _ = self.source_batch_preprocessor.update(source)
         new_target_batch_preprocessor, target, _ = self.target_batch_preprocessor.update(target)
 
+        target_hat = self.transport(source)
+
         # update cost fn
-        new_cost_fn = self.cost_fn.update(source=source, target=target)
-        new_train_cost_fn = self.train_cost_fn.update(source=source, target=target)
+        new_cost_fn = self.cost_fn.update(source=source, target_hat=target_hat, target=target)
+        new_train_cost_fn = self.train_cost_fn.update(source=source, target_hat=target_hat, target=target)
         self = self.replace(
             target_batch_preprocessor=new_target_batch_preprocessor,
             source_batch_preprocessor=new_source_batch_preprocessor,

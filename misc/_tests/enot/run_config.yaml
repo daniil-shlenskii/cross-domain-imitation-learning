@@ -4,12 +4,14 @@ eval_every: 5_000
 
 batch_size: 1024 
 
-ds_name: from_buffer_state_pairs
-n_training_iters: 1_000_000
+ds_name: lines_double
+n_training_iters: 100_000
 
 enot:
   _target_: misc.enot.ENOTGW.create
   seed: *seed
+  expectile: 0.95
+  expectile_loss_coef: 4.0
   transport_module_config:
     _target_: nn.networks.MLP
     n_blocks: 4
@@ -19,7 +21,7 @@ enot:
       - _target_: optax.clip
         max_delta: 1.0
       - _target_: optax.adam
-        learning_rate: 3e-4
+        learning_rate: 1e-4
         b1: 0.9
         b2: 0.99
   transport_loss_fn_config:
@@ -34,13 +36,13 @@ enot:
       - _target_: optax.clip
         max_delta: 1.0
       - _target_: optax.adam
-        learning_rate: 3e-4
+        learning_rate: 1e-4
         b1: 0.9
         b2: 0.99
   g_potential_loss_fn_config:
     _target_: hydra.utils.get_method
     path: misc.enot.losses.g_potential_loss
   cost_fn_config:
-    _target_: misc.enot.costs.InnerGWCost.create
-  train_cost_fn_config:
     _target_: misc.enot.costs.InnerGWCostStable.create
+  train_cost_fn_config:
+    _target_: misc.enot.costs.InnerGWCost.create
