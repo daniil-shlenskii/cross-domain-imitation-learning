@@ -4,6 +4,13 @@ from flax import struct
 from flax.struct import PyTreeNode
 
 
+class L2Cost(PyTreeNode):
+    def __call__(self, x, y):
+        return jnp.linalg.norm(x - y)**2
+
+    def update(self, *, source: jnp.ndarray, target: jnp.ndarray):
+        return self
+
 class GWCost(PyTreeNode):
     proj_matrix: jnp.ndarray
     ema_decay: float = struct.field(pytree_node=False)

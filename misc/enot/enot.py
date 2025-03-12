@@ -15,6 +15,8 @@ from utils import (SaveLoadFrozenDataclassMixin, convert_figure_to_array,
                    instantiate_optimizer)
 from utils.custom_types import PRNGKey
 
+from .batch_preprocessors import BatchPreprocessor, IdentityPreprocessor
+from .costs import L2Cost
 from .utils import mapping_scatter
 
 
@@ -24,6 +26,8 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     g_potential: TrainState 
     cost_fn: costs.CostFn
     train_cost_fn: costs.CostFn
+    source_batch_preprocessor: BatchPreprocessor
+    target_batch_preprocessor: BatchPreprocessor
     expectile: float = struct.field(pytree_node=False)
     expectile_loss_coef: float = struct.field(pytree_node=False)
     target_weight: float = struct.field(pytree_node=False)
@@ -43,6 +47,8 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         g_potential_loss_fn_config: DictConfig,
         cost_fn_config: DictConfig = None,
         train_cost_fn_config: DictConfig = None,
+        source_batch_preprocessor_config: DictConfig=None,
+        target_batch_preprocessor_config: DictConfig=None,
         expectile: float = 0.99,
         expectile_loss_coef: float = 2.0,
         target_weight: float = 1.0,
@@ -71,10 +77,26 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             info_key="g_potential",
         )
 
-        cost_fn = instantiate(cost_fn_config, _recursive_=False) if cost_fn_config is not None else costs.SqEuclidean()
+        cost_fn = instantiate(cost_fn_config, _recursive_=False) if cost_fn_config is not None else L2Cost()
         train_cost_fn = instantiate(train_cost_fn_config, _recursive_=False) if train_cost_fn_config is not None else cost_fn
 
-        _save_attrs = kwargs.pop("_save_attrs", ("transport", "g_potential", "cost_fn"))
+        if source_batch_preprocessor_config is not None:
+            source_batch_preprocessor = instantiate(source_batch_preprocessor_config, dim=source_dim)
+        else:
+            source_batch_preprocessor = IdentityPreprocessor.create()
+
+        if target_batch_preprocessor_config is not None:
+            target_batch_preprocessor = instantiate(target_batch_preprocessor_config, dim=target_dim)
+        else:
+            target_batch_preprocessor = IdentityPreprocessor.create()
+
+        _save_attrs = kwargs.pop("_save_attrs", (
+            "transport",
+            "g_potential",
+            "cost_fn",
+            "source_batch_preprocessor",
+            "target_batch_preprocessor",
+        ))
 
         return cls(
             rng=rng,
@@ -82,6 +104,8 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             g_potential=g_potential,
             cost_fn=cost_fn,
             train_cost_fn=train_cost_fn,
+            source_batch_preprocessor=source_batch_preprocessor,
+            target_batch_preprocessor=target_batch_preprocessor,
             expectile=expectile,
             expectile_loss_coef=expectile_loss_coef,
             target_weight=target_weight,
@@ -91,13 +115,19 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
 
     @jax.jit
     def __call__(self, source: jnp.ndarray):
-        return self.transport(source)
+        source_encoded = self.source_batch_preprocessor.encode(source)
+        target_hat_encoded = self.transport(source_encoded)
+        target_hat = self.target_batch_preprocessor.decode(target_hat_encoded)
+        return target_hat
 
     def cost(self, source: jnp.ndarray, target: jnp.ndarray):
-        return jax.vmap(self.cost_fn)(source, target)
+        return jax.vmap(self.cost_fn)(
+           self.source_batch_preprocessor.encode(source),
+           self.target_batch_preprocessor.encode(target)
+        )
 
     def g_potential_val(self, target: jnp.ndarray):
-        return self.g_potential(target)
+        return self.g_potential(self.target_batch_preprocessor.encode(target))
 
     def update(self, target: jnp.ndarray, source: jnp.ndarray):
         enot, info, stats_info = _update_jit(
@@ -125,6 +155,22 @@ def _update_jit(
     target: jnp.ndarray,
     source: jnp.ndarray,
 ) -> Tuple[ENOT, Dict[str, Any], Dict[str, Any]]:
+    # preprocess batches
+    new_source_batch_preprocessor, source, _ = enot.source_batch_preprocessor.update(source)
+    new_target_batch_preprocessor, target, _ = enot.target_batch_preprocessor.update(target)
+
+    # update cost fn
+    target_hat = enot.transport(source)
+    new_cost_fn = enot.cost_fn.update(source=source, target=target_hat)
+    new_train_cost_fn = enot.train_cost_fn.update(source=source, target=target_hat)
+    enot = enot.replace(
+        target_batch_preprocessor=new_target_batch_preprocessor,
+        source_batch_preprocessor=new_source_batch_preprocessor,
+        cost_fn=new_cost_fn,
+        train_cost_fn=new_train_cost_fn
+    )
+
+    # update transport and g_potential
     new_transport, new_transport_info, new_transport_stats_info = enot.transport.update(
         source=source,
         enot=enot
