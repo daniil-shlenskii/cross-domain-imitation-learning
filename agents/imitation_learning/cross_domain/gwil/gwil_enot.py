@@ -17,12 +17,14 @@ from utils import (SaveLoadFrozenDataclassMixin, convert_figure_to_array,
                    sample_batch_jit)
 from utils.custom_types import Buffer, BufferState, DataType, PRNGKey
 
+from .ot_buffer_factory import OTBufferFactory
+
 
 class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     rng: PRNGKey
     enot: ENOT
-    buffer: Buffer = struct.field(pytree_node=False)
-    source_expert_buffer_state: BufferState = struct.field(pytree_node=False)
+    ot_buffer: Buffer = struct.field(pytree_node=False)
+    ot_target_buffer_state: BufferState = struct.field(pytree_node=False)
     reward_transform: BaseRewardTransform
     process_dict_batch_fn: Callable = struct.field(pytree_node=False)
     get_state_mapping: Callable = struct.field(pytree_node=False)
@@ -40,6 +42,8 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         batch_size: Optional[int],
         sourse_buffer_processor_config: Optional[DictConfig] = None,
         #
+        ot_buffer_factory_config: Optional[DictConfig] = None,
+        #
         reward_transform_config: DictConfig = None,
         use_pairs: bool = False,
     ):
@@ -51,6 +55,14 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         )
         target_dim = source_expert_buffer_state.experience["observations"].shape[-1]
 
+        if ot_buffer_factory_config is not None:
+            ot_buffer_factory = instantiate(ot_buffer_factory_config)
+        else:
+            ot_buffer_factory = OTBufferFactory()
+        ot_buffer, ot_target_buffer_state = ot_buffer_factory(
+            expert_state=source_expert_buffer_state,
+            batch_size=batch_size,
+        )
 
         if reward_transform_config is not None:
             reward_transform = instantiate(reward_transform_config)
@@ -82,8 +94,8 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         return cls(
             rng=jax.random.key(seed),
             enot=enot,
-            buffer=buffer,
-            source_expert_buffer_state=source_expert_buffer_state,
+            ot_buffer=ot_buffer,
+            ot_target_buffer_state=ot_target_buffer_state,
             reward_transform=reward_transform,
             _save_attrs=("enot", "reward_transform"),
             process_dict_batch_fn=process_dict_batch_fn,
@@ -100,7 +112,7 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def update(self, *, target_expert_batch: DataType): 
         # sample expert batch
         new_rng, source_expert_batch = sample_batch_jit(
-            self.rng, self.buffer, self.source_expert_buffer_state
+            self.rng, self.ot_buffer, self.ot_target_buffer_state
         )
 
         # process dict batch
