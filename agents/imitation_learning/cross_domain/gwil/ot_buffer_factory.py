@@ -1,3 +1,6 @@
+from copy import deepcopy
+
+import jax.numpy as jnp
 from typing_extensions import override
 
 from utils import get_buffer_state_size, instantiate_jitted_fbx_buffer
@@ -46,6 +49,11 @@ class OTBufferFactory:
 
 class ReverseOTBufferFactory(OTBufferFactory): 
     def get_ot_state_dict(self, expert_state_dict: dict):
-        expert_state_dict["observations"], expert_state_dict["observations_next"] =\
-            expert_state_dict["observations_next"], expert_state_dict["observations"]
-        return expert_state_dict
+        ot_state_dict = deepcopy(expert_state_dict)
+        ot_state_dict["observations"], ot_state_dict["observations_next"] =\
+            ot_state_dict["observations_next"], ot_state_dict["observations"]
+        for k in ot_state_dict:
+            ot_state_dict[k] = jnp.concatenate([
+                ot_state_dict[k], expert_state_dict[k]
+            ])
+        return ot_state_dict
