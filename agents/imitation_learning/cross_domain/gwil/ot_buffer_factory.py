@@ -12,10 +12,8 @@ class OTBufferFactory:
             k: v[0, :expert_state_size] for k, v in expert_state.experience.items()
         }
 
-
         # get ot state dict
         ot_state_dict = self.get_ot_state_dict(expert_state_dict)
-
 
         # init ot buffer
         ot_state_size = ot_state_dict["observations"].shape[0]
@@ -43,4 +41,11 @@ class OTBufferFactory:
 
     @override
     def get_ot_state_dict(self, expert_state_dict: dict):
+        return expert_state_dict
+
+
+class ReverseOTBufferFactory(OTBufferFactory): 
+    def get_ot_state_dict(self, expert_state_dict: dict):
+        expert_state_dict["observations"], expert_state_dict["observations_next"] =\
+            expert_state_dict["observations_next"], expert_state_dict["observations"]
         return expert_state_dict

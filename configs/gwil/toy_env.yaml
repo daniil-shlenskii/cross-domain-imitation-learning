@@ -31,7 +31,7 @@ replay_buffer:
 
 agent:
   _target_: agents.gwil.GWILAgent.create
-  update_agent_every: 5
+  update_agent_every: 1
   seed: *seed
   batch_size: *batch_size
   source_expert_buffer_state_path: agents/experts/ToyOneDimEnvShiftedY0Size25/config/collected_rollouts/buffer_state.pickle
@@ -66,10 +66,13 @@ agent:
   gwil_enot_config:
     _target_: agents.gwil.GWILENOT.create
     use_pairs: True
+    ot_buffer_factory_config:
+      _target_: agents.imitation_learning.cross_domain.gwil.ot_buffer_factory.ReverseOTBufferFactory
     reward_transform_config:
       _target_: agents.gail.gail_discriminator.reward_transforms.RewardStandartization.create
     enot_config:
       _target_: misc.enot.ENOTGW.create
+      target_weight: 16.
       seed: *seed
       transport_module_config:
         _target_: nn.networks.MLP
@@ -87,7 +90,7 @@ agent:
         _target_: hydra.utils.get_method
         path: misc.enot.losses.transport_loss
       g_potential_module_config:
-        _target_: nn.networks.MLP
+        _target_: nn.networks.NegativeMLP
         n_blocks: 4
         hidden_dim: 128
       g_potential_optimizer_config:
@@ -102,7 +105,7 @@ agent:
         _target_: hydra.utils.get_method
         path: misc.enot.losses.g_potential_loss
       cost_fn_config:
-        _target_: misc.enot.costs.GWCostStable.create
+        _target_: misc.enot.costs.InnerGWCostStable.create
       source_batch_preprocessor_config:
         _target_: misc.enot.batch_preprocessors.CentralizeNormalizePreprocessor.create
       target_batch_preprocessor_config:
