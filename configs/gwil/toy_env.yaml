@@ -107,9 +107,9 @@ agent:
       cost_fn_config:
         _target_: misc.enot.costs.InnerGWCostStable.create
       source_batch_preprocessor_config:
-        _target_: misc.enot.batch_preprocessors.CentralizeNormalizePreprocessor.create
+        _target_: misc.enot.batch_preprocessors.CentralizePreprocessor.create
       target_batch_preprocessor_config:
-        _target_: misc.enot.batch_preprocessors.CentralizeNormalizePreprocessor.create
+        _target_: misc.enot.batch_preprocessors.CentralizePreprocessor.create
 
 evaluation:
   seed: 42
