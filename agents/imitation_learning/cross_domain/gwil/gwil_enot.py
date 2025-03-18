@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Optional
 
 import jax
 import jax.numpy as jnp
@@ -10,14 +10,19 @@ from omegaconf.dictconfig import DictConfig
 import wandb
 from agents.imitation_learning.in_domain.gail.gail_discriminator.reward_transforms import \
     BaseRewardTransform
+from agents.imitation_learning.utils import prepare_buffer
 from misc.enot import ENOT
 from misc.enot.utils import mapping_scatter
-from utils import SaveLoadFrozenDataclassMixin, convert_figure_to_array
-from utils.custom_types import DataType
+from utils import (SaveLoadFrozenDataclassMixin, convert_figure_to_array,
+                   sample_batch_jit)
+from utils.custom_types import Buffer, BufferState, DataType, PRNGKey
 
 
 class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
+    rng: PRNGKey
     enot: ENOT
+    buffer: Buffer = struct.field(pytree_node=False)
+    source_expert_buffer_state: BufferState = struct.field(pytree_node=False)
     reward_transform: BaseRewardTransform
     process_dict_batch_fn: Callable = struct.field(pytree_node=False)
     get_state_mapping: Callable = struct.field(pytree_node=False)
@@ -27,12 +32,26 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def create(
         cls,
         *,
+        seed: int,
         enot_config: DictConfig,
         source_dim: int,
-        target_dim: int,
+        #
+        source_expert_buffer_state_path: str,
+        batch_size: Optional[int],
+        sourse_buffer_processor_config: Optional[DictConfig] = None,
+        #
         reward_transform_config: DictConfig = None,
         use_pairs: bool = False,
     ):
+        # expert buffer init
+        buffer, source_expert_buffer_state = prepare_buffer(
+            buffer_state_path=source_expert_buffer_state_path,
+            batch_size=batch_size,
+            sourse_buffer_processor_config=sourse_buffer_processor_config,
+        )
+        target_dim = source_expert_buffer_state.experience["observations"].shape[-1]
+
+
         if reward_transform_config is not None:
             reward_transform = instantiate(reward_transform_config)
         else:
@@ -61,7 +80,10 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         )
 
         return cls(
+            rng=jax.random.key(seed),
             enot=enot,
+            buffer=buffer,
+            source_expert_buffer_state=source_expert_buffer_state,
             reward_transform=reward_transform,
             _save_attrs=("enot", "reward_transform"),
             process_dict_batch_fn=process_dict_batch_fn,
@@ -75,7 +97,12 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
 
 
     @jax.jit
-    def update(self, *, target_expert_batch: DataType, source_expert_batch: DataType): 
+    def update(self, *, target_expert_batch: DataType): 
+        # sample expert batch
+        new_rng, source_expert_batch = sample_batch_jit(
+            self.rng, self.buffer, self.source_expert_buffer_state
+        )
+
         # process dict batch
         target_expert_batch = self.process_dict_batch_fn(target_expert_batch)
         source_expert_batch = self.process_dict_batch_fn(source_expert_batch)
@@ -89,7 +116,7 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         base_rewards = self.get_base_rewards(target_expert_batch)
         new_reward_transform, reward_transform_info = self.reward_transform.update(base_rewards)
 
-        self = self.replace(enot=new_enot, reward_transform=new_reward_transform)
+        self = self.replace(rng=new_rng, enot=new_enot, reward_transform=new_reward_transform)
         info = {**enot_info, **reward_transform_info}
         stats_info = {**enot_stats_info}
         return self, info, stats_info

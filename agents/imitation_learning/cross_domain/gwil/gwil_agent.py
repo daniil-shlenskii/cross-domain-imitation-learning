@@ -8,7 +8,6 @@ from omegaconf.dictconfig import DictConfig
 
 from agents.imitation_learning.base_imitation_agent import ImitationAgent
 from agents.imitation_learning.utils import prepare_buffer
-from utils import sample_batch_jit
 from utils.custom_types import DataType
 
 from .gwil_enot import GWILENOT
@@ -59,8 +58,11 @@ class GWILAgent(ImitationAgent):
         # gwil_enot init
         gwil_enot = instantiate(
             gwil_enot_config,
+            seed=seed,
             source_dim=observation_dim,
-            target_dim=source_expert_buffer_state.experience["observations"].shape[-1],
+            source_expert_buffer_state_path=source_expert_buffer_state_path,
+            batch_size=batch_size,
+            sourse_buffer_processor_config=sourse_buffer_processor_config,
             _recursive_=False,
         )
 
@@ -87,37 +89,21 @@ class GWILAgent(ImitationAgent):
 
     @jax.jit
     def pretrain_update(self, batch: DataType):
-        target_expert_batch = batch # renaming
-
-        # sample expert batch
-        new_rng, source_expert_batch = sample_batch_jit(
-            self.rng, self.buffer, self.source_expert_buffer_state
-        )
-
         # update gwil enot
         new_gwil_enot, gwil_enot_info, gwil_enot_stats_info = self.gwil_enot.update(
-            target_expert_batch=target_expert_batch,
-            source_expert_batch=source_expert_batch,
+            target_expert_batch=batch,
         )
 
-        self = self.replace(rng=new_rng, gwil_enot=new_gwil_enot)
+        self = self.replace(gwil_enot=new_gwil_enot)
         info = {**gwil_enot_info}
         stats_info = {**gwil_enot_stats_info}
         return self, info, stats_info
 
     @jax.jit
     def update(self, batch: DataType):
-        target_expert_batch = batch # renaming
-
-        # sample expert batch
-        new_rng, source_expert_batch = sample_batch_jit(
-            self.rng, self.buffer, self.source_expert_buffer_state
-        )
-
         # update gwil enot
         new_gwil_enot, gwil_enot_info, gwil_enot_stats_info = self.gwil_enot.update(
-            target_expert_batch=target_expert_batch,
-            source_expert_batch=source_expert_batch,
+            target_expert_batch=batch,
         )
 
         # set gwil rewards
@@ -132,7 +118,6 @@ class GWILAgent(ImitationAgent):
         )
 
         self = self.replace(
-            rng=new_rng,
             agent=new_agent,
             gwil_enot=new_gwil_enot,
         )
