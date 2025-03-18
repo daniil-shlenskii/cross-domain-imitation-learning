@@ -46,6 +46,7 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         #
         reward_transform_config: DictConfig = None,
         use_pairs: bool = False,
+        **kwargs,
     ):
         # expert buffer init
         buffer, source_expert_buffer_state = prepare_buffer(
@@ -100,6 +101,7 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             _save_attrs=("enot", "reward_transform"),
             process_dict_batch_fn=process_dict_batch_fn,
             get_state_mapping=get_state_mapping,
+            **kwargs,
         )
 
     def encode_state(self, batch: DataType) -> DataType:
