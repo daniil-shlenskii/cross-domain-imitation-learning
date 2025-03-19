@@ -170,6 +170,8 @@ def main(
 
         if actor_step < agent.actor.step:
             # sample actions
+            if not isinstance(observation, np.ndarray): # UMaze case
+                observation = observation["observation"]
             action = agent.sample_actions(agent_sample_key, observation)
 
             # do step in the environment

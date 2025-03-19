@@ -39,6 +39,8 @@ def buffer_init(fbx_buffer_config: DictConfig, env: gym.Env):
     observation, _ = env.reset()
     action = env.action_space.sample()
     observation, reward, done, truncated, _ = env.step(action)
+    if not isinstance(observation, np.ndarray): # UMaze case
+        observation = observation["observation"]
 
     buffer = instantiate(fbx_buffer_config, _recursive_=False)
     state = buffer.init({

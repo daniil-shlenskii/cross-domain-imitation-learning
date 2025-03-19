@@ -23,8 +23,13 @@ def do_environment_step_and_update_buffer(
     state: BufferState,
     seed: int = 0,
 ):
+    if not isinstance(observation, np.ndarray): # UMaze case
+        observation = observation["observation"]
+
     # do step in the environment
     observation_next, reward, done, truncated, _ = env.step(action)
+    if not isinstance(observation_next, np.ndarray): # UMaze case
+        observation_next = observation_next["observation"]
 
     # update buffer
     state = buffer.add(
@@ -42,6 +47,8 @@ def do_environment_step_and_update_buffer(
     # update env if terminated
     if done or truncated:
         observation_next, _ = env.reset(seed=seed)
+        if not isinstance(observation_next, np.ndarray): # UMaze case
+            observation_next = observation_next["observation"]
 
     return env, observation_next, state
 
@@ -54,6 +61,8 @@ def collect_random_buffer(
     seed: int = 0,
 ):
     observation, _  = env.reset(seed=seed)
+    if not isinstance(observation, np.ndarray): # UMaze case
+        observation = observation["observation"]
     for i in tqdm(range(n_iters)):
         action = env.action_space.sample()
         env, observation, state = do_environment_step_and_update_buffer(
