@@ -87,7 +87,7 @@ class GWILENOTwGAIL(GWILENOT):
         )
 
         # update reward transform
-        base_rewards = self.get_base_rewards(target_expert_batch)
+        base_rewards = self.get_base_rewards(target_hat_expert_batch)
         new_reward_transform, reward_transform_info = self.reward_transform.update(base_rewards)
 
         self = self.replace(
@@ -101,6 +101,11 @@ class GWILENOTwGAIL(GWILENOT):
         return self, info, stats_info
 
     @jax.jit
-    def get_base_rewards(self, target_expert_batch: jnp.ndarray) -> jnp.ndarray:
+    def get_rewards(self, target_expert_batch: DataType) -> jnp.ndarray:
         target_hat_expert_batch = self.get_target_hat_state_pairs(self.enot, target_expert_batch)
+        base_rewards = self.get_base_rewards(target_hat_expert_batch)
+        return self.reward_transform.transform(base_rewards)
+
+    @jax.jit
+    def get_base_rewards(self, target_hat_expert_batch: jnp.ndarray) -> jnp.ndarray:
         return self.policy_discriminator(target_hat_expert_batch)
