@@ -9,15 +9,17 @@ from utils.custom_types import BufferState
 
 
 class OTBufferFactory:
-    def  __init__(self, anchor_types: list[str]=[], seed: int=0, sigma: float=1.):
+    def  __init__(self, anchor_types: list[str]=[], seed: int=0):
         self.seed = seed
         self.anchor_types = anchor_types
         self.type_to_func = {
             "reversed": get_reversed_state_dict,
             "shuffled": get_shuffled_state_dict,
             "stationary": get_stationary_state_dict,
-            "noised": partial(get_noised_state_dict, sigma=sigma),
+            "noised": get_noised_state_dict,
+            "interpolated": get_interpolated_state_dict,
         }
+
 
     def __call__(self, expert_state: BufferState, batch_size: int):
         # extract buffer dict from buffer state
@@ -91,9 +93,22 @@ def get_stationary_state_dict(expert_state_dict: dict, seed: int):
     stationary_state_dict["observations_next"] = expert_state_dict["observations"]
     return stationary_state_dict
 
-def get_noised_state_dict(expert_state_dict: dict, seed: int, sigma: float):
+def get_noised_state_dict(expert_state_dict: dict, seed: int):
+    np.random.seed(seed)
     noised_state_dict = deepcopy(expert_state_dict)
     shape = expert_state_dict["observations"].shape
-    noised_state_dict["observations"] = expert_state_dict["observations"] + np.random.randn(*shape) * sigma
-    noised_state_dict["observations_next"] = expert_state_dict["observations_next"] + np.random.randn(*shape) * sigma
+    dists = np.linalg.norm(expert_state_dict["observations"] - expert_state_dict["observations_next"], axis=-1)
+    sigmas = dists / 6.
+    noised_state_dict["observations"] = expert_state_dict["observations"] + np.random.randn(*shape) * sigmas[:, None]
+    noised_state_dict["observations_next"] = expert_state_dict["observations_next"] + np.random.randn(*shape) * sigmas[:, None]
     return noised_state_dict
+
+def get_interpolated_state_dict(expert_state_dict: dict, seed: int):
+    np.random.seed(seed)
+    interpolated_state_dict = deepcopy(expert_state_dict)
+
+    alpha = np.random.rand() / 2.
+    alpha_next = np.random.rand() / 2.
+    interpolated_state_dict["observations"] = expert_state_dict["observations"] * (1 - alpha) + expert_state_dict["observations_next"] * alpha
+    interpolated_state_dict["observations_next"] = expert_state_dict["observations_next"] * (1 - alpha_next) + expert_state_dict["observations"] * alpha_next
+    return interpolated_state_dict
