@@ -1,13 +1,21 @@
 from copy import deepcopy
 
 import jax.numpy as jnp
-from typing_extensions import override
+import numpy as np
 
 from utils import get_buffer_state_size, instantiate_jitted_fbx_buffer
 from utils.custom_types import BufferState
 
 
 class OTBufferFactory:
+    def  __init__(self, anchor_types: list[str]=[], seed: int=0):
+        self.seed = seed
+        self.anchor_types = anchor_types
+        self.type_to_func = {
+            "reversed": get_reversed_state_dict,
+            "shuffled": get_shuffled_state_dict,
+        }
+
     def __call__(self, expert_state: BufferState, batch_size: int):
         # extract buffer dict from buffer state
         expert_state_size = get_buffer_state_size(expert_state)
@@ -40,20 +48,37 @@ class OTBufferFactory:
             is_full=True,
         )
 
-        return ot_buffer, ot_state 
+        print(f"{get_buffer_state_size(ot_state) = }")
+        return ot_buffer, ot_state
 
-    @override
     def get_ot_state_dict(self, expert_state_dict: dict):
-        return expert_state_dict
+        state_dicts_list = [deepcopy(expert_state_dict)]
+        for i, anchor_type in enumerate(self.anchor_types):
+            state_dicts_list.append(
+               self.type_to_func[anchor_type](expert_state_dict, self.seed + i)
+            )
 
+        ot_state_dict = {}
+        for k in expert_state_dict:
+            ot_state_dict[k] = jnp.concatenate([d[k] for d in state_dicts_list])
 
-class ReverseOTBufferFactory(OTBufferFactory): 
-    def get_ot_state_dict(self, expert_state_dict: dict):
-        ot_state_dict = deepcopy(expert_state_dict)
-        ot_state_dict["observations"], ot_state_dict["observations_next"] =\
-            ot_state_dict["observations_next"], ot_state_dict["observations"]
-        for k in ot_state_dict:
-            ot_state_dict[k] = jnp.concatenate([
-                ot_state_dict[k], expert_state_dict[k]
-            ])
         return ot_state_dict
+
+
+def get_reversed_state_dict(expert_state_dict: dict, seed: int):
+    reversed_state_dict = deepcopy(expert_state_dict)
+    reversed_state_dict["observations"], reversed_state_dict["observations_next"] =\
+        reversed_state_dict["observations_next"], reversed_state_dict["observations"]
+    return reversed_state_dict
+
+def get_shuffled_state_dict(expert_state_dict: dict, seed: int):
+    np.random.seed(seed)
+    shuffled_state_dict = deepcopy(expert_state_dict)
+
+    dict_size = expert_state_dict["observations"].shape[0]
+    obs_next_perm_idcs = np.random.choice(dict_size, size=dict_size)
+
+    shuffled_state_dict["observations_next"] =\
+        expert_state_dict["observations_next"][obs_next_perm_idcs]
+
+    return shuffled_state_dict
