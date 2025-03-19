@@ -42,22 +42,31 @@ class GWILENOTwGAIL(GWILENOT):
 
     @jax.jit
     def update(self, *, target_expert_batch: DataType): 
-        # sample expert batch
-        new_rng, source_expert_batch = sample_batch_jit(
+        ot_source_batch = target_expert_batch
+
+        # sample ot target batch
+        new_rng, ot_target_batch = sample_batch_jit(
             self.rng, self.ot_buffer, self.ot_target_buffer_state
         )
 
+        # sample source expert batch
+        new_rng, source_expert_batch = sample_batch_jit(
+            new_rng, self.source_expert_buffer, self.source_expert_buffer_state
+        )
+
         # process dict batch
+        ot_source_batch = self.process_dict_batch_fn(ot_source_batch)
+        ot_target_batch = self.process_dict_batch_fn(ot_target_batch)
         target_expert_batch = self.process_dict_batch_fn(target_expert_batch)
         source_expert_batch = self.process_dict_batch_fn(source_expert_batch)
 
         # update enot
         new_enot, enot_info, enot_stats_info = self.enot.update(
-            source=target_expert_batch, target=source_expert_batch,
+            source=ot_source_batch, target=ot_target_batch,
         )
 
         # update policy discriminator
-        target_hat_expert_batch = self.enot(target_expert_batch)
+        target_hat_expert_batch = new_enot(target_expert_batch)
         new_policy_discr, policy_discr_info, policy_discr_stats_info = self.policy_discriminator.update(
             real_batch=source_expert_batch,
             fake_batch=target_hat_expert_batch,

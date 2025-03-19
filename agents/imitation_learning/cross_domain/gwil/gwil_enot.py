@@ -25,6 +25,8 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     enot: ENOT
     ot_buffer: Buffer = struct.field(pytree_node=False)
     ot_target_buffer_state: BufferState = struct.field(pytree_node=False)
+    source_expert_buffer: Buffer = struct.field(pytree_node=False)
+    source_expert_buffer_state: BufferState = struct.field(pytree_node=False)
     reward_transform: BaseRewardTransform
     process_dict_batch_fn: Callable = struct.field(pytree_node=False)
     get_state_mapping: Callable = struct.field(pytree_node=False)
@@ -49,7 +51,7 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         **kwargs,
     ):
         # expert buffer init
-        buffer, source_expert_buffer_state = prepare_buffer(
+        source_expert_buffer, source_expert_buffer_state = prepare_buffer(
             buffer_state_path=source_expert_buffer_state_path,
             batch_size=batch_size,
             sourse_buffer_processor_config=sourse_buffer_processor_config,
@@ -97,6 +99,8 @@ class GWILENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
             enot=enot,
             ot_buffer=ot_buffer,
             ot_target_buffer_state=ot_target_buffer_state,
+            source_expert_buffer=source_expert_buffer,
+            source_expert_buffer_state=source_expert_buffer_state,
             reward_transform=reward_transform,
             _save_attrs=("enot", "reward_transform"),
             process_dict_batch_fn=process_dict_batch_fn,
