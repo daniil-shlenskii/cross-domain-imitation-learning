@@ -1,4 +1,5 @@
 from copy import deepcopy
+from functools import partial
 
 import jax.numpy as jnp
 import numpy as np
@@ -8,12 +9,14 @@ from utils.custom_types import BufferState
 
 
 class OTBufferFactory:
-    def  __init__(self, anchor_types: list[str]=[], seed: int=0):
+    def  __init__(self, anchor_types: list[str]=[], seed: int=0, sigma: float=1.):
         self.seed = seed
         self.anchor_types = anchor_types
         self.type_to_func = {
             "reversed": get_reversed_state_dict,
             "shuffled": get_shuffled_state_dict,
+            "stationary": get_stationary_state_dict,
+            "noised": partial(get_noised_state_dict, sigma=sigma),
         }
 
     def __call__(self, expert_state: BufferState, batch_size: int):
@@ -55,7 +58,7 @@ class OTBufferFactory:
         state_dicts_list = [deepcopy(expert_state_dict)]
         for i, anchor_type in enumerate(self.anchor_types):
             state_dicts_list.append(
-               self.type_to_func[anchor_type](expert_state_dict, self.seed + i)
+               self.type_to_func[anchor_type](expert_state_dict, seed=self.seed+i)
             )
 
         ot_state_dict = {}
@@ -82,3 +85,15 @@ def get_shuffled_state_dict(expert_state_dict: dict, seed: int):
         expert_state_dict["observations_next"][obs_next_perm_idcs]
 
     return shuffled_state_dict
+
+def get_stationary_state_dict(expert_state_dict: dict, seed: int):
+    stationary_state_dict = deepcopy(expert_state_dict)
+    stationary_state_dict["observations_next"] = expert_state_dict["observations"]
+    return stationary_state_dict
+
+def get_noised_state_dict(expert_state_dict: dict, seed: int, sigma: float):
+    noised_state_dict = deepcopy(expert_state_dict)
+    shape = expert_state_dict["observations"].shape
+    noised_state_dict["observations"] = expert_state_dict["observations"] + np.random.randn(*shape) * sigma
+    noised_state_dict["observations_next"] = expert_state_dict["observations_next"] + np.random.randn(*shape) * sigma
+    return noised_state_dict
