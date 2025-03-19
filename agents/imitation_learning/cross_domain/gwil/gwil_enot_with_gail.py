@@ -1,8 +1,12 @@
+from typing import Callable
+
 import jax
 import jax.numpy as jnp
+from flax import struct
 from hydra.utils import instantiate
 from omegaconf.dictconfig import DictConfig
 
+from agents.imitation_learning.utils import get_state_pairs
 from misc.gan.discriminator import Discriminator
 from utils import sample_batch_jit
 from utils.custom_types import DataType
@@ -12,6 +16,7 @@ from .gwil_enot import GWILENOT
 
 class GWILENOTwGAIL(GWILENOT):
     policy_discriminator: Discriminator
+    get_target_hat_state_pairs: Callable = struct.field(pytree_node=False)
 
     @classmethod
     def create(
@@ -22,12 +27,22 @@ class GWILENOTwGAIL(GWILENOT):
         use_pairs: bool = True,
         **kwargs,
     ):
-        assert use_pairs
+        if use_pairs:
+            def get_target_hat_state_pairs(enot, target_expert_batch: DataType):
+                target_expert_batch = get_state_pairs(target_expert_batch)
+                return enot(target_expert_batch)
+        else:
+            def get_target_hat_state_pairs(enot, target_expert_batch: DataType):
+                return jnp.concatenate([
+                   enot(target_expert_batch["observations"]), 
+                   enot(target_expert_batch["observations_next"]), 
+                ], axis=1)
 
         gwil_enot = super().create(
             seed=seed,
             use_pairs=use_pairs,
             policy_discriminator=None,
+            get_target_hat_state_pairs=get_target_hat_state_pairs,
             **kwargs,
         )
         target_dim = gwil_enot.ot_target_buffer_state.experience["observations"].shape[-1]
@@ -57,8 +72,6 @@ class GWILENOTwGAIL(GWILENOT):
         # process dict batch
         ot_source_batch = self.process_dict_batch_fn(ot_source_batch)
         ot_target_batch = self.process_dict_batch_fn(ot_target_batch)
-        target_expert_batch = self.process_dict_batch_fn(target_expert_batch)
-        source_expert_batch = self.process_dict_batch_fn(source_expert_batch)
 
         # update enot
         new_enot, enot_info, enot_stats_info = self.enot.update(
@@ -66,7 +79,8 @@ class GWILENOTwGAIL(GWILENOT):
         )
 
         # update policy discriminator
-        target_hat_expert_batch = new_enot(target_expert_batch)
+        target_hat_expert_batch = self.get_target_hat_state_pairs(new_enot, target_expert_batch)
+        source_expert_batch = get_state_pairs(source_expert_batch)
         new_policy_discr, policy_discr_info, policy_discr_stats_info = self.policy_discriminator.update(
             real_batch=source_expert_batch,
             fake_batch=target_hat_expert_batch,
@@ -88,5 +102,5 @@ class GWILENOTwGAIL(GWILENOT):
 
     @jax.jit
     def get_base_rewards(self, target_expert_batch: jnp.ndarray) -> jnp.ndarray:
-        target_hat_expert_batch = self.enot(target_expert_batch)
+        target_hat_expert_batch = self.get_target_hat_state_pairs(self.enot, target_expert_batch)
         return self.policy_discriminator(target_hat_expert_batch)
