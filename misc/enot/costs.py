@@ -16,7 +16,7 @@ class GWCost(PyTreeNode):
     ema_decay: float = struct.field(pytree_node=False)
 
     @classmethod
-    def create(cls, source_dim: int, target_dim: int, ema_decay: float=0.99, **kwargs):
+    def create(cls, source_dim: int, target_dim: int, ema_decay: float=0.999, **kwargs):
         proj_matrix = jnp.eye(target_dim, source_dim)
         return cls(proj_matrix=proj_matrix, ema_decay=ema_decay)
 
@@ -50,7 +50,7 @@ class InnerGWCost(PyTreeNode):
     ema_decay: float = struct.field(pytree_node=False)
 
     @classmethod
-    def create(cls, source_dim: int, target_dim: int, ema_decay: float=0.99, **kwargs):
+    def create(cls, source_dim: int, target_dim: int, ema_decay: float=0.999, **kwargs):
         proj_matrix = jnp.eye(target_dim, source_dim)
         return cls(source_dim=source_dim, proj_matrix=proj_matrix, ema_decay=ema_decay)
 
