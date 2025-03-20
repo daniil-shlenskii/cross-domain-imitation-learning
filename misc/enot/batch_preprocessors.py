@@ -4,6 +4,8 @@ import jax.numpy as jnp
 from flax.struct import PyTreeNode
 from typing_extensions import override
 
+from utils import load_pickle
+
 
 class BatchPreprocessor(PyTreeNode, ABC):
 
@@ -70,3 +72,21 @@ class CentralizeNormalizePreprocessor(CentralizePreprocessor):
     def decode(self, batch: jnp.ndarray):
         batch *= self.max_norm
         return super().decode(batch)
+
+class RolloutStartShiftProcessor(BatchPreprocessor):
+    start_observation: jnp.ndarray
+
+    @classmethod
+    def create(cls, state_path: str, use_pairs: bool=False, **kwargs):
+        rollouts = load_pickle(state_path).experience
+        start_observation = rollouts['observations'][0, 0]
+        if use_pairs:
+            start_observation_next = rollouts['observations_next'][0, 0]
+            start_observation = jnp.concatenate([start_observation, start_observation_next], axis=-1)
+        return cls(start_observation=start_observation)
+
+    def encode(self, batch: jnp.ndarray):
+        return batch - self.start_observation[None]
+
+    def decode(self, batch: jnp.ndarray):
+        return batch + self.start_observation[None]
