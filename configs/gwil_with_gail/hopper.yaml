@@ -1,3 +1,7 @@
+_constants:
+  source_expert_buffer_state_path: &source_expert_buffer_state_path agents/experts/Hopper-v5/config/collected_rollouts/buffer_state.pickle
+  target_random_buffer_state_path: &target_random_buffer_state_path ._tmp_archive_dir/random_buffers/Hopper-v5.pickle
+
 seed: &seed 0
 env_name: &env_name Hopper-v5
 
@@ -63,17 +67,9 @@ agent:
           learning_rate: 0.
   gwil_enot_config:
     _target_: agents.gwil.GWILENOTwGAIL.create
-    use_pairs: True
+    use_pairs: False
     ot_buffer_factory_config:
       _target_: agents.imitation_learning.cross_domain.gwil.ot_buffer_factory.OTBufferFactory
-      sigma: 0.05
-      anchor_types:
-        - reversed
-        - shuffled 
-        - shuffled 
-        - stationary
-        - noised
-        - noised
     reward_transform_config:
       _target_: agents.gail.gail_discriminator.reward_transforms.RewardStandartization.create
     policy_discriminator_config:
@@ -89,7 +85,7 @@ agent:
           - _target_: optax.clip
             max_delta: 1.0
           - _target_: optax.adam
-            learning_rate: 5e-5
+            learning_rate: 6e-5
       loss_config:
         _target_: misc.gan.losses.SoftplusLoss
         is_generator: False
@@ -135,6 +131,12 @@ agent:
         _target_: misc.enot.batch_preprocessors.CentralizePreprocessor.create
       target_batch_preprocessor_config:
         _target_: misc.enot.batch_preprocessors.CentralizePreprocessor.create
+      # source_batch_preprocessor_config:
+      #   _target_: misc.enot.batch_preprocessors.RolloutStartShiftProcessor.create
+      #   state_path: *target_random_buffer_state_path
+      # target_batch_preprocessor_config:
+      #   _target_: misc.enot.batch_preprocessors.RolloutStartShiftProcessor.create
+      #   state_path: *source_expert_buffer_state_path
 
 evaluation:
   seed: 42

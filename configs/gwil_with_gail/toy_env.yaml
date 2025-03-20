@@ -1,3 +1,7 @@
+_constants:
+  source_expert_buffer_state_path: &source_expert_buffer_state_path agents/experts/ToyOneDimEnvShiftedY0Size25/config/collected_rollouts/buffer_state.pickle
+  target_random_buffer_state_path: &target_random_buffer_state_path ._tmp_archive_dir/random_buffers/ToyOneDimEnvShiftedY0Size25.pickle
+
 seed: &seed 0
 env_name: &env_name ToyOneDimEnvShiftedY0Size25
 
@@ -34,7 +38,7 @@ agent:
   update_agent_every: 5
   seed: *seed
   batch_size: *batch_size
-  source_expert_buffer_state_path: agents/experts/ToyOneDimEnvShiftedY0Size25/config/collected_rollouts/buffer_state.pickle
+  source_expert_buffer_state_path: *source_expert_buffer_state_path 
   sourse_buffer_processor_config:
     _target_: agents.imitation_learning.source_buffer_processors.AddToSecondCoordinate
   agent_config:
@@ -65,17 +69,9 @@ agent:
           learning_rate: 0.
   gwil_enot_config:
     _target_: agents.gwil.GWILENOTwGAIL.create
-    use_pairs: True
+    use_pairs: False
     ot_buffer_factory_config:
       _target_: agents.imitation_learning.cross_domain.gwil.ot_buffer_factory.OTBufferFactory
-      sigma: 0.05
-      anchor_types:
-        - reversed
-        - shuffled 
-        - shuffled 
-        - stationary
-        - noised
-        - noised
     reward_transform_config:
       _target_: agents.gail.gail_discriminator.reward_transforms.RewardStandartization.create
     policy_discriminator_config:
@@ -91,7 +87,7 @@ agent:
           - _target_: optax.clip
             max_delta: 1.0
           - _target_: optax.adam
-            learning_rate: 5e-5
+            learning_rate: 6e-5
       loss_config:
         _target_: misc.gan.losses.SoftplusLoss
         is_generator: False
@@ -102,8 +98,8 @@ agent:
       expectile: 0.95
       expectile_loss_coef: 4.
       transport_module_config:
-        _target_: nn.networks.ResNet
-        n_blocks: 3
+        _target_: nn.networks.MLP
+        n_blocks: 4
         hidden_dim: 128
       transport_optimizer_config:
         transforms:
@@ -137,6 +133,12 @@ agent:
         _target_: misc.enot.batch_preprocessors.CentralizePreprocessor.create
       target_batch_preprocessor_config:
         _target_: misc.enot.batch_preprocessors.CentralizePreprocessor.create
+      # source_batch_preprocessor_config:
+      #   _target_: misc.enot.batch_preprocessors.RolloutStartShiftProcessor.create
+      #   state_path: *target_random_buffer_state_path
+      # target_batch_preprocessor_config:
+      #   _target_: misc.enot.batch_preprocessors.RolloutStartShiftProcessor.create
+      #   state_path: *source_expert_buffer_state_path
 
 evaluation:
   seed: 42
@@ -145,4 +147,3 @@ evaluation:
     _target_: gymnasium.wrappers.TimeLimit
     max_episode_steps: *max_episode_steps
     env: *env
-
