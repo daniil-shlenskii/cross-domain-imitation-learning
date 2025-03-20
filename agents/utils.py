@@ -18,12 +18,15 @@ def instantiate_agent(config: DictConfig, env: gym.Env):
     observation_space = env.observation_space
     action_space = env.action_space
 
-    observation_dim = observation_space.sample().shape[-1]
-    action_dim = action_space.sample().shape[-1]
+    observation= observation_space.sample()
+    action = action_space.sample()
+    if not isinstance(observation, np.ndarray): # UMaze case
+        observation = observation["observation"]
+
     agent =  instantiate(
         config,
-        observation_dim=observation_dim,
-        action_dim=action_dim,
+        observation_dim=observation.shape[-1],
+        action_dim=action.shape[-1],
         low=None,
         high=None,
         _recursive_=False,
@@ -43,18 +46,23 @@ def evaluate(
     env = gym.wrappers.RecordEpisodeStatistics(env, buffer_length=num_episodes)
     for i in range(num_episodes):
         observation, _, done, truncated = *env.reset(seed=seed+i), False, False
+        if not isinstance(observation, np.ndarray): # UMaze case
+            observation = observation["observation"]
+
         while not (done or truncated):
             action = agent.eval_actions(observation)
-            next_observation, reward, done, truncated, _ = env.step(action)
+            observation_next, reward, done, truncated, _ = env.step(action)
+            if not isinstance(observation_next, np.ndarray): # UMaze case
+                observation_next = observation_next["observation"]
 
             trajs["observations"].append(observation)
             trajs["actions"].append(action)
             trajs["rewards"].append(reward)
             trajs["dones"].append(done)
             trajs["truncated"].append(done or truncated)
-            trajs["observations_next"].append(next_observation)
+            trajs["observations_next"].append(observation_next)
 
-            observation = next_observation
+            observation = observation_next
 
     stats = {"return": np.mean(env.return_queue), "length": np.mean(env.length_queue)}
     if return_trajectories:
