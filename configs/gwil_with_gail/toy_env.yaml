@@ -72,6 +72,11 @@ agent:
     use_pairs: False
     ot_buffer_factory_config:
       _target_: agents.imitation_learning.cross_domain.gwil.ot_buffer_factory.OTBufferFactory
+      # anchor_types:
+      #   - noised
+      #   - noised
+      #   - interpolated
+      #   - interpolated
     reward_transform_config:
       _target_: agents.gail.gail_discriminator.reward_transforms.RewardStandartization.create
     policy_discriminator_config:
