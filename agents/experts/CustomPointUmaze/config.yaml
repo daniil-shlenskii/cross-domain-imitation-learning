@@ -12,7 +12,7 @@ save_every: 5_000
 
 environment:
   _target_: gymnasium.wrappers.TimeLimit
-  max_episode_steps: 1000
+  max_episode_steps: 300
   env:
     _target_: gymnasium.make
     id: *env_name
