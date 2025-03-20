@@ -9,9 +9,9 @@ class CustomPointUmaze(PointMazeEnv):
     ):
         super().__init__(
             reward_type=reward_type,
-            render_mode = render_mode,
-            continuing_task = True,
-            reset_target = False,
+            render_mode=render_mode,
+            continuing_task=True,
+            reset_target=False,
         )
 
     def reset(self, *args, seed=None, **kwargs):
