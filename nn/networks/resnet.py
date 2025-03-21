@@ -36,3 +36,9 @@ class ResNet(nn.Module):
             x = x.squeeze(-1)
 
         return x
+
+class NegativeResNet(ResNet):
+    def __call__(self, x: jnp.ndarray, train: bool=False) -> jnp.ndarray:
+        x = super().__call__(x, train)
+        return -jnp.abs(x)
+

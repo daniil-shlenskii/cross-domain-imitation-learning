@@ -95,7 +95,7 @@ agent:
           - _target_: optax.adam
             learning_rate: 6e-5
       loss_config:
-        _target_: misc.gan.losses.SoftplusLoss
+        _target_: misc.gan.losses.SoftplusLossGP
         is_generator: False
     enot_config:
       _target_: misc.enot.ENOTGW.create
@@ -104,8 +104,8 @@ agent:
       expectile: 0.95
       expectile_loss_coef: 4.
       transport_module_config:
-        _target_: nn.networks.MLP
-        n_blocks: 4
+        _target_: nn.networks.ResNet
+        n_blocks: 3
         hidden_dim: 128
       transport_optimizer_config:
         transforms:
@@ -119,8 +119,8 @@ agent:
         _target_: hydra.utils.get_method
         path: misc.enot.losses.transport_loss
       g_potential_module_config:
-        _target_: nn.networks.NegativeMLP
-        n_blocks: 4
+        _target_: nn.networks.NegativeResNet
+        n_blocks: 3
         hidden_dim: 128
       g_potential_optimizer_config:
         transforms:
