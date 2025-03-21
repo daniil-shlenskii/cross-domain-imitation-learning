@@ -65,8 +65,9 @@ class OTBufferFactory:
         state_dicts_list = [deepcopy(expert_state_dict)]
         if self.random_buffer_path is not None:
             random_buffer_state = load_pickle(self.random_buffer_path)
+            random_buffer_state_size = get_buffer_state_size(random_buffer_state)
             random_buffer_state_dict = {
-                k: v[0] for k, v in random_buffer_state.experience.items()
+                k: v[0, :random_buffer_state_size] for k, v in random_buffer_state.experience.items()
             }
             state_dicts_list.append(random_buffer_state_dict)
         for i, anchor_type in enumerate(self.anchor_types):
