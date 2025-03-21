@@ -72,6 +72,7 @@ agent:
     use_pairs: False
     ot_buffer_factory_config:
       _target_: agents.imitation_learning.cross_domain.gwil.ot_buffer_factory.OTBufferFactory
+      # random_buffer_path: *target_random_buffer_state_path
       # anchor_types:
       #   - noised
       #   - noised

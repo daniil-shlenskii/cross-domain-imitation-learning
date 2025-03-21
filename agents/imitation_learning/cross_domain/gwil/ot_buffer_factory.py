@@ -1,17 +1,23 @@
 from copy import deepcopy
-from functools import partial
 
 import jax.numpy as jnp
 import numpy as np
 
-from utils import get_buffer_state_size, instantiate_jitted_fbx_buffer
+from utils import (get_buffer_state_size, instantiate_jitted_fbx_buffer,
+                   load_pickle)
 from utils.custom_types import BufferState
 
 
 class OTBufferFactory:
-    def  __init__(self, anchor_types: list[str]=[], seed: int=0):
+    def  __init__(
+        self,
+        anchor_types: list[str]=[],
+        random_buffer_path: str=None,
+        seed: int=0
+    ):
         self.seed = seed
         self.anchor_types = anchor_types
+        self.random_buffer_path = random_buffer_path
         self.type_to_func = {
             "reversed": get_reversed_state_dict,
             "shuffled": get_shuffled_state_dict,
@@ -19,7 +25,6 @@ class OTBufferFactory:
             "noised": get_noised_state_dict,
             "interpolated": get_interpolated_state_dict,
         }
-
 
     def __call__(self, expert_state: BufferState, batch_size: int):
         # extract buffer dict from buffer state
@@ -58,6 +63,12 @@ class OTBufferFactory:
 
     def get_ot_state_dict(self, expert_state_dict: dict):
         state_dicts_list = [deepcopy(expert_state_dict)]
+        if self.random_buffer_path is not None:
+            random_buffer_state = load_pickle(self.random_buffer_path)
+            random_buffer_state_dict = {
+                k: v[0] for k, v in random_buffer_state.experience.items()
+            }
+            state_dicts_list.append(random_buffer_state_dict)
         for i, anchor_type in enumerate(self.anchor_types):
             state_dicts_list.append(
                self.type_to_func[anchor_type](expert_state_dict, seed=self.seed+i)
