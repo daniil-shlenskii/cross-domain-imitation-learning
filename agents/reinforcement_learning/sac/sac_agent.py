@@ -56,6 +56,8 @@ class SACAgent(Agent):
         #
         discount: float = 0.99,
         tau: float = 0.005,
+        #
+        info_key: str = "sac",
     ):
         # reproducibility keys
         rng = jax.random.key(seed)
@@ -91,28 +93,28 @@ class SACAgent(Agent):
             apply_fn=actor_module.apply,
             params=actor_params,
             tx=instantiate_optimizer(actor_optimizer_config),
-            info_key="actor",
+            info_key=f"{info_key}/actor",
         )
         critic1 = TrainState.create(
             loss_fn=critic_loss_fn,
             apply_fn=critic1_module.apply,
             params=critic1_params,
             tx=instantiate_optimizer(critic_optimizer_config),
-            info_key="critic1",
+            info_key=f"{info_key}/critic1",
         )
         critic2 = TrainState.create(
             loss_fn=critic_loss_fn,
             apply_fn=critic2_module.apply,
             params=critic2_params,
             tx=instantiate_optimizer(critic_optimizer_config),
-            info_key="critic2",
+            info_key=f"{info_key}/critic2",
         )
         temperature = TrainState.create(
             loss_fn=temperature_loss_fn,
             apply_fn=temperature_module.apply,
             params=temperature_params,
             tx=instantiate_optimizer(temperature_optimizer_config),
-            info_key="temperature",
+            info_key=f"{info_key}/temperature",
         )
 
         # target entropy init

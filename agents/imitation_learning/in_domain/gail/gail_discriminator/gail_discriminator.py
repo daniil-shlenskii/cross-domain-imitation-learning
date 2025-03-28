@@ -34,7 +34,7 @@ class GAILDiscriminator(Discriminator):
 
         return super().create(
             reward_transform=reward_transform,
-            info_key="policy_discriminator",
+            info_key=discriminator_kwargs.pop("info_key", "gail_discriminator"),
             _save_attrs=_save_attrs,
             **discriminator_kwargs
         )

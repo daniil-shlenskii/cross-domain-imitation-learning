@@ -14,7 +14,7 @@ TRAJ_KEYS = [
     "observations_next",
 ]
 
-def instantiate_agent(config: DictConfig, env: gym.Env):
+def instantiate_agent(config: DictConfig, *, env: gym.Env, **kwargs):
     observation_space = env.observation_space
     action_space = env.action_space
 
@@ -29,6 +29,7 @@ def instantiate_agent(config: DictConfig, env: gym.Env):
         action_dim=action.shape[-1],
         low=None,
         high=None,
+        **kwargs,
         _recursive_=False,
     )
 
