@@ -385,8 +385,8 @@ class GWILAgent(SaveLoadMixin):
         tl_trajs_encoded_mapped = encode_batch(self.ot, tl_trajs_encoded)
         tl_trajs["gail_rewards"] = self.gail_discriminator.get_rewards(tl_trajs_encoded_mapped)
 
-        eval_info["TL_TotalRewards"] = np.mean(tl_trajs["rewards"])
-        eval_info["TL_GAILTotalRewards"] = np.mean(tl_trajs["gail_rewards"])
+        eval_info["TL_TotalRewards"] = np.sum(tl_trajs["rewards"]) / n_episodes
+        eval_info["TL_GAILTotalRewards"] = np.sum(tl_trajs["gail_rewards"]) / n_episodes
 
         ## source learner
         sl_trajs = _collect_rollouts(
@@ -400,8 +400,8 @@ class GWILAgent(SaveLoadMixin):
         sl_trajs_encoded_mapped = encode_batch(self.ot, sl_trajs_encoded)
         sl_trajs["gail_rewards"] = self.gail_discriminator.get_rewards(sl_trajs_encoded_mapped)
 
-        eval_info["SL_TotalRewards"] = np.mean(sl_trajs["rewards"])
-        eval_info["SL_GAILTotalRewards"] = np.mean(sl_trajs["gail_rewards"])
+        eval_info["SL_TotalRewards"] = np.sum(sl_trajs["rewards"]) / n_episodes
+        eval_info["SL_GAILTotalRewards"] = np.sum(sl_trajs["gail_rewards"]) / n_episodes
 
         for k, v in eval_info.items():
             self.wandb_run.log({f"evaluation/{k}": v}, step=self.step)
