@@ -349,9 +349,9 @@ class GWILAgent(SaveLoadMixin):
         self.gail_discriminator, info, stats_info = self.gail_discriminator.update(
             target_expert_batch={
                 k: np.concatenate([
-                    tl_batch_encoded_mapped[k][:, :batch_size//2],
-                    sl_batch_encoded[k][:, :batch_size//2]
-                ]) 
+                    tl_batch_encoded_mapped[k][:batch_size//2],
+                    sl_batch_encoded[k][:batch_size//2]
+                ])
                 for k in sl_batch_encoded
             },
             source_expert_batch=se_batch_encoded,
