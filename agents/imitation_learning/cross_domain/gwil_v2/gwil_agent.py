@@ -1,9 +1,11 @@
 import gymnasium as gym
+import jax
 import numpy as np
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 from tqdm import tqdm
 
+import wandb
 from agents.base_agent import Agent
 from agents.imitation_learning.in_domain.gail import GAILDiscriminator
 from agents.imitation_learning.utils import prepare_buffer
@@ -11,12 +13,11 @@ from agents.utils import instantiate_agent
 from misc.enot import ENOTGW
 from misc.gan.discriminator import Discriminator
 from misc.gan.generator import Generator
-from utils import SaveLoadMixin, buffer_init
-from utils.custom_types import Buffer, BufferState
+from utils import SaveLoadMixin, buffer_init, encode_batch, sample_batch_jit
+from utils.custom_types import Buffer, BufferState, DataType
 
 
 class GWILAgent(SaveLoadMixin):
-# class GWILAgent:
     _save_attrs = (
         "target_learner",
         "source_learner",
@@ -207,6 +208,7 @@ class GWILAgent(SaveLoadMixin):
             state=self.target_learner_buffer_state,
             n_items=n_items,
             seed=self.seed,
+            tqdm_desc="TL random buffer collecting",
         )
 
         # source env
@@ -216,35 +218,124 @@ class GWILAgent(SaveLoadMixin):
             state=self.source_learner_buffer_state,
             n_items=n_items,
             seed=self.seed,
+            tqdm_desc="SL random buffer collecting",
         )
 
-    # def pretrain(self, n_iters: int=0):
-    #     for i in tqdm(range(n_iters)):
-    #         tl_batch, sl_batch, se_batch = self.sample_batches(seed=self.seed+i)
-    #         tl_batch_encoded, sl_batch_encoded, _ =\
-    #             self._update_domain_encoders(tl_batch, sl_batch, se_batch)
-    #         _ = self._update_ot(tl_batch_encoded, sl_batch_encoded)
-    #
-    #
-    # def train(self, n_iters: int):
-    #     for i in tqdm(range(n_iters)):
-    #         tl_batch, sl_batch, se_batch = self.sample_batches(seed=self.seed+i)
-    #
-    #         tl_batch_encoded, sl_batch_encoded, se_batch_encoded =\
-    #             self._update_domain_encoders(tl_batch, sl_batch, se_batch)
-    #
-    #         tl_batch_encoded_mapped = self._update_ot(tl_batch_encoded, sl_batch_encoded)
-    #
-    #         self._update_gail_discriminator(tl_batch_encoded_mapped, sl_batch_encoded, se_batch_encoded)
-    #
-    #         tl_batch["rewards"] = self.gail_discriminator.get_rewards(tl_batch_encoded_mapped)
-    #         self._update_target_learner(tl_batch)
-    #
-    #         sl_batch["rewards"] = self.gail_discriminator.get_rewards(sl_batch_encoded)
-    #         self._update_source_learner(sl_batch)
+    def pretrain(self, n_pretrain_iters: int=0):
+        for i in tqdm(range(n_pretrain_iters)):
+            tl_batch, sl_batch, se_batch = self.sample_batches(seed=self.seed+i)
+            # tl_batch_encoded, sl_batch_encoded, _ =\
+            #     self._update_domain_encoders(tl_batch, sl_batch, se_batch)
+            # _ = self._update_ot(tl_batch_encoded, sl_batch_encoded)
+            self.step += 1
+        self.evaluate(n_episodes=self.n_eval_episodes)
 
-    def evaluate(self):
-        pass
+    def sample_batches(self, seed: int):
+        rng = jax.random.key(seed)
+        rng, tl_batch = sample_batch_jit(rng, self.buffer, self.target_learner_buffer_state)
+        rng, sl_batch = sample_batch_jit(rng, self.buffer, self.source_learner_buffer_state)
+        rng, se_batch = sample_batch_jit(rng, self.buffer, self.source_expert_buffer_state)
+        return tl_batch, sl_batch, se_batch
+
+    def train(
+        self,
+        random_buffer_size: int,
+        n_pretrain_iters: int,
+        n_train_iters: int,
+        n_eval_episodes: int,
+        wandb_run: "wandb.Run",
+    ):
+        # store ...
+        self.wandb_run = wandb_run
+        self.n_eval_episodes = n_eval_episodes
+        self.step = 0
+
+        # collect random buffers
+        self.collect_random_buffer(n_items=random_buffer_size)
+        self.pretrain(n_pretrain_iters=n_pretrain_iters)
+
+        # for i in tqdm(range(n_train_iters)):
+        #     tl_batch, sl_batch, se_batch = self.sample_batches(seed=self.seed+i)
+        #
+        #     tl_batch_encoded, sl_batch_encoded, se_batch_encoded =\
+        #         self._update_domain_encoders(tl_batch, sl_batch, se_batch)
+        #
+        #     tl_batch_encoded_mapped = self._update_ot(tl_batch_encoded, sl_batch_encoded)
+        #
+        #     self._update_gail_discriminator(tl_batch_encoded_mapped, sl_batch_encoded, se_batch_encoded)
+        #
+        #     tl_batch["rewards"] = self.gail_discriminator.get_rewards(tl_batch_encoded_mapped)
+        #     self._update_target_learner(tl_batch)
+        #
+        #     sl_batch["rewards"] = self.gail_discriminator.get_rewards(sl_batch_encoded)
+        #     self._update_source_learner(sl_batch)
+
+    def evaluate(self, n_episodes: int):
+        eval_info = {}
+
+        # process rollouts
+        ## target learner
+        tl_trajs = _collect_rollouts(
+            agent=self.target_learner,
+            env=self.target_env,
+            num_episodes=n_episodes,
+            traj_keys=tuple(self.target_learner_buffer_state.experience.keys()),
+            seed=self.seed,
+        )
+        tl_trajs_encoded = encode_batch(self.target_encoder, tl_trajs)
+        tl_trajs_encoded_mapped = encode_batch(self.ot, tl_trajs_encoded)
+        tl_trajs["gail_rewards"] = self.gail_discriminator.get_rewards(tl_trajs_encoded_mapped)
+
+        eval_info["TL_TotalRewards"] = np.mean(tl_trajs["rewards"])
+        eval_info["TL_GAILTotalRewards"] = np.mean(tl_trajs["gail_rewards"])
+
+        ## source learner
+        sl_trajs = _collect_rollouts(
+            agent=self.source_learner,
+            env=self.source_env,
+            num_episodes=n_episodes,
+            traj_keys=tuple(self.source_learner_buffer_state.experience.keys()),
+            seed=self.seed,
+        )
+        sl_trajs_encoded = encode_batch(self.source_encoder, sl_trajs)
+        sl_trajs_encoded_mapped = encode_batch(self.ot, sl_trajs_encoded)
+        sl_trajs["gail_rewards"] = self.gail_discriminator.get_rewards(sl_trajs_encoded_mapped)
+
+        eval_info["SL_TotalRewards"] = np.mean(sl_trajs["rewards"])
+        eval_info["SL_GAILTotalRewards"] = np.mean(sl_trajs["gail_rewards"])
+
+        for k, v in eval_info.items():
+            self.wandb_run.log({f"evaluation/{k}": v}, step=self.step)
+
+        return eval_info
+
+def _collect_rollouts(
+    agent: Agent,
+    env: gym.Env,
+    num_episodes: int,
+    traj_keys: tuple[str],
+    seed: int = 0,
+):
+    trajs = {traj_key: [] for traj_key in traj_keys}
+    for i in range(num_episodes):
+        observation, _, done, truncated = *env.reset(seed=seed+i), False, False
+        while not (done or truncated):
+            action = agent.eval_actions(observation)
+            observation_next, reward, done, truncated, _ = env.step(action)
+            if not isinstance(observation_next, np.ndarray): # UMaze case
+                observation_next = observation_next["observation"]
+
+            trajs["observations"].append(observation)
+            trajs["actions"].append(action)
+            trajs["rewards"].append(reward)
+            trajs["dones"].append(done)
+            trajs["truncated"].append(done or truncated)
+            trajs["observations_next"].append(observation_next)
+
+            observation = observation_next
+    for k, v in trajs.items():
+        trajs[k] = np.stack(v)
+    return trajs
 
 def _collect_random_buffer(
     *,
@@ -253,9 +344,10 @@ def _collect_random_buffer(
     state: BufferState,
     n_items: int,
     seed: int,
+    tqdm_desc: str="",
 ):
     observation, _  = env.reset(seed=seed)
-    for i in range(n_items):
+    for i in tqdm(range(n_items), desc=tqdm_desc):
         action = env.action_space.sample()
         observation_next, reward, done, truncated, _ = env.step(action)
         state = _update_buffer(

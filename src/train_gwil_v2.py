@@ -54,25 +54,32 @@ def main(
     OmegaConf.save(config, os.path.join(config.archive.agent_save_dir, "config.yaml"))
     logger.info(f"\nCONFIG:\n-------\n{OmegaConf.to_yaml(config)}")
 
-    # # wandb logging init
-    # wandb_run = wandb.init(project=wandb_project, dir=config.archive.agent_save_dir)
+    # wandb logging init
+    wandb_run = wandb.init(project=wandb_project, dir=config.archive.agent_save_dir)
 
     # agent init
     agent = instantiate(config.agent, _recursive_=False)
 
-    # ## load agent params if exist
-    # if not from_scratch and os.path.exists(config.archive.agent_load_dir):
-    #     agent, loaded_keys = agent.load(config.archive.agent_load_dir)
-    #     logger.info(
-    #         f"Agent is initialized with data under the path: {config.archive.agent_load_dir}.\n" + \
-    #         f"Loaded keys:\n----------------\n{OmegaConf.to_yaml(loaded_keys)}"
-    #     )
+    ## load agent params if exist
+    if not from_scratch and os.path.exists(config.archive.agent_load_dir):
+        agent, loaded_keys = agent.load(config.archive.agent_load_dir)
+        logger.info(
+            f"Agent is initialized with data under the path: {config.archive.agent_load_dir}.\n" + \
+            f"Loaded keys:\n----------------\n{OmegaConf.to_yaml(loaded_keys)}"
+        )
 
-    # # training
-    # logger.info("Training..")
-    # agent.collect_random_buffer()
+    # training
+    logger.info("Training..")
+    # agent.collect_random_buffer(n_items=config.train.random_buffer_size)
+    # agent.evaluate(config.eval.n_episodes)
     # agent.pretrain()
-    # agent.train()
+    agent.train(
+        random_buffer_size=config.train.random_buffer_size,
+        n_pretrain_iters=config.train.n_pretrain_iters,
+        n_train_iters=config.train.n_train_iters,
+        n_eval_episodes=config.eval.n_episodes,
+        wandb_run=wandb_run,
+    )
 
 if __name__ == "__main__":
     # parse command line

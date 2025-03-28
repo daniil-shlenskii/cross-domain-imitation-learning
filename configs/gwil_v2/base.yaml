@@ -6,16 +6,19 @@ problem:
   source_env_name: &source_env_name HalfCheetah-v5
   source_expert_buffer_state_path: &source_expert_buffer_state_path agents/experts/HalfCheetah-v5/config/collected_rollouts/buffer_state.pickle
 
-training:
+train:
   seed: &seed 0
-  precollect_buffer_size: &precollect_buffer_size 5_000
-  n_iters_pretraining: 10_000
-  n_iters_training: 1_000_000
+  random_buffer_size: 5_000
+  n_pretrain_iters: 1
+  n_train_iters: 1_000_000
   batch_size: &batch_size 1024
 
   log_every: 1_000
   eval_every: 5_000
   save_every: 5_000
+
+eval:
+  n_episodes: 1
 
 agent:
   _target_: agents.gwil_v2.GWILAgent.create
