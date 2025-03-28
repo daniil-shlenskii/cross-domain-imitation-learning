@@ -277,7 +277,7 @@ class GWILAgent(SaveLoadMixin):
                 observation=source_observation,
                 buffer=self.buffer,
                 state=self.source_learner_buffer_state,
-                seed=self.seed+i,
+                seed=self.seed+i+1,
             )
 
             # sample batches
