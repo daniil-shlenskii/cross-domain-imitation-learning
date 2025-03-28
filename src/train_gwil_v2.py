@@ -70,14 +70,14 @@ def main(
 
     # training
     logger.info("Training..")
-    # agent.collect_random_buffer(n_items=config.train.random_buffer_size)
-    # agent.evaluate(config.eval.n_episodes)
-    # agent.pretrain()
     agent.train(
         random_buffer_size=config.train.random_buffer_size,
         n_pretrain_iters=config.train.n_pretrain_iters,
         n_train_iters=config.train.n_train_iters,
-        n_eval_episodes=config.eval.n_episodes,
+        log_every=config.logging.log_every,
+        save_every=config.logging.save_every,
+        eval_every=config.logging.eval_every,
+        n_eval_episodes=config.logging.n_eval_episodes,
         wandb_run=wandb_run,
     )
 

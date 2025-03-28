@@ -8,7 +8,7 @@ from tqdm import tqdm
 import wandb
 from agents.base_agent import Agent
 from agents.imitation_learning.in_domain.gail import GAILDiscriminator
-from agents.imitation_learning.utils import prepare_buffer
+from agents.imitation_learning.utils import get_state_pairs, prepare_buffer
 from agents.utils import instantiate_agent
 from misc.enot import ENOTGW
 from misc.gan.discriminator import Discriminator
@@ -217,18 +217,142 @@ class GWILAgent(SaveLoadMixin):
             buffer=self.buffer,
             state=self.source_learner_buffer_state,
             n_items=n_items,
-            seed=self.seed,
+            seed=self.seed+1,
             tqdm_desc="SL random buffer collecting",
         )
 
     def pretrain(self, n_pretrain_iters: int=0):
         for i in tqdm(range(n_pretrain_iters)):
             tl_batch, sl_batch, se_batch = self.sample_batches(seed=self.seed+i)
-            # tl_batch_encoded, sl_batch_encoded, _ =\
-            #     self._update_domain_encoders(tl_batch, sl_batch, se_batch)
-            # _ = self._update_ot(tl_batch_encoded, sl_batch_encoded)
+            tl_batch_encoded, sl_batch_encoded, _ =\
+                self._update_domain_encoders(tl_batch, sl_batch, se_batch)
+            _ = self._update_ot(tl_batch_encoded, sl_batch_encoded)
+            if (i + 1) % self.eval_every == 0:
+                self.evaluate(n_episodes=self.n_eval_episodes)
             self.step += 1
         self.evaluate(n_episodes=self.n_eval_episodes)
+
+    def train(
+        self,
+        random_buffer_size: int,
+        n_pretrain_iters: int,
+        n_train_iters: int,
+        #
+        log_every: int,
+        save_every: int,
+        eval_every: int,
+        n_eval_episodes: int,
+        wandb_run: "wandb.Run",
+    ):
+        # store for logging
+        self.step = 0
+        self.save_every = save_every
+        self.log_every = log_every 
+        self.eval_every = eval_every 
+        self.n_eval_episodes = n_eval_episodes
+        self.wandb_run = wandb_run
+
+        # collect random buffers
+        self.collect_random_buffer(n_items=random_buffer_size)
+
+        # pretrain
+        self.pretrain(n_pretrain_iters=n_pretrain_iters)
+
+        # train
+        target_observation, _  = self.target_env.reset(seed=self.seed)
+        source_observation, _  = self.source_env.reset(seed=self.seed+1)
+        for i in tqdm(range(n_train_iters)):
+            # update learners buffers
+            self.target_env, target_observation, self.target_learner_buffer_state  = self._update_learner_buffer(
+                learner=self.target_learner,
+                env=self.target_env,
+                observation=target_observation,
+                buffer=self.buffer,
+                state=self.target_learner_buffer_state,
+                seed=self.seed+i,
+            )
+            self.source_env, source_observation, self.source_learner_buffer_state  = self._update_learner_buffer(
+                learner=self.source_learner,
+                env=self.source_env,
+                observation=source_observation,
+                buffer=self.buffer,
+                state=self.source_learner_buffer_state,
+                seed=self.seed+i,
+            )
+
+            # sample batches
+            tl_batch, sl_batch, se_batch = self.sample_batches(seed=self.seed+i)
+
+            # update domain encoders
+            tl_batch_encoded, sl_batch_encoded, se_batch_encoded =\
+                self._update_domain_encoders(tl_batch, sl_batch, se_batch)
+
+            # update optimal transport solver
+            tl_batch_encoded_mapped = self._update_ot(tl_batch_encoded, sl_batch_encoded)
+
+            # update gail discriminator 
+            gail_discr_info, gail_discr_stats_info = self._update_gail_discriminator(
+                tl_batch_encoded_mapped, sl_batch_encoded, se_batch_encoded
+            )
+
+            # update target learner
+            tl_batch["rewards"] = self.gail_discriminator.get_rewards(tl_batch_encoded_mapped)
+            tl_info, tl_stats_info = self._update_target_learner(tl_batch)
+
+            # update source learner
+            sl_batch["rewards"] = self.gail_discriminator.get_rewards(sl_batch_encoded)
+            sl_info, sl_stats_info = self._update_source_learner(sl_batch)
+
+            # logging
+            if (i + 1) % self.log_every == 0:
+                info = {**gail_discr_info, **tl_info, **sl_info}
+                stats_info = {**gail_discr_stats_info, **tl_stats_info, **sl_stats_info}
+                for k, v in info.items():
+                    wandb_run.log({f"training/{k}": v}, step=self.step)
+                for k, v in stats_info.items():
+                    wandb_run.log({f"training_stats/{k}": v}, step=self.step)
+            if (i + 1) % self.eval_every == 0:
+                self.evaluate(n_episodes=self.n_eval_episodes)
+            self.step += 1
+
+        self.evaluate(n_episodes=self.n_eval_episodes)
+
+
+    def _update_learner_buffer(
+        self,
+        learner: Agent,
+        env: gym.Env,
+        observation: np.ndarray,
+        buffer: Buffer,
+        state: BufferState,
+        seed: int,
+    ):
+        action = learner.sample_actions(key=jax.random.key(seed), observations=observation)
+        observation_next, reward, done, truncated, _ = env.step(action)
+        state = _update_buffer(
+            buffer, state, observation, action, reward, done, truncated, observation_next
+        )
+        if done or truncated:
+            observation_next, _ = env.reset(seed=seed)
+        return env, observation_next, state
+
+    def _update_target_learner(self, batch: DataType):
+        self.target_learner, info, stats_info = self.target_learner.update(batch)
+        return info, stats_info
+
+    def _update_source_learner(self, batch: DataType):
+        self.source_learner, info, stats_info = self.source_learner.update(batch)
+        return info, stats_info
+
+    def _update_gail_discriminator(self, tl_batch_encoded_mapped: DataType, sl_batch_encoded: DataType, se_batch_encoded: DataType):
+        self.gail_discriminator, info, stats_info = self.gail_discriminator.update(
+            target_expert_batch={
+                k: np.concatenate([tl_batch_encoded_mapped[k], sl_batch_encoded[k]]) 
+                for k in sl_batch_encoded
+            },
+            source_expert_batch=se_batch_encoded,
+        )
+        return info, stats_info
 
     def sample_batches(self, seed: int):
         rng = jax.random.key(seed)
@@ -237,38 +361,13 @@ class GWILAgent(SaveLoadMixin):
         rng, se_batch = sample_batch_jit(rng, self.buffer, self.source_expert_buffer_state)
         return tl_batch, sl_batch, se_batch
 
-    def train(
-        self,
-        random_buffer_size: int,
-        n_pretrain_iters: int,
-        n_train_iters: int,
-        n_eval_episodes: int,
-        wandb_run: "wandb.Run",
-    ):
-        # store ...
-        self.wandb_run = wandb_run
-        self.n_eval_episodes = n_eval_episodes
-        self.step = 0
+    def _update_domain_encoders(self, tl_batch: DataType, sl_batch: DataType, se_batch: DataType):
+        # TODO: identity encoders plugin
+        return tl_batch, sl_batch, se_batch
 
-        # collect random buffers
-        self.collect_random_buffer(n_items=random_buffer_size)
-        self.pretrain(n_pretrain_iters=n_pretrain_iters)
-
-        # for i in tqdm(range(n_train_iters)):
-        #     tl_batch, sl_batch, se_batch = self.sample_batches(seed=self.seed+i)
-        #
-        #     tl_batch_encoded, sl_batch_encoded, se_batch_encoded =\
-        #         self._update_domain_encoders(tl_batch, sl_batch, se_batch)
-        #
-        #     tl_batch_encoded_mapped = self._update_ot(tl_batch_encoded, sl_batch_encoded)
-        #
-        #     self._update_gail_discriminator(tl_batch_encoded_mapped, sl_batch_encoded, se_batch_encoded)
-        #
-        #     tl_batch["rewards"] = self.gail_discriminator.get_rewards(tl_batch_encoded_mapped)
-        #     self._update_target_learner(tl_batch)
-        #
-        #     sl_batch["rewards"] = self.gail_discriminator.get_rewards(sl_batch_encoded)
-        #     self._update_source_learner(sl_batch)
+    def _update_ot(self, tl_batch_encoded: DataType, sl_batch_encoded: DataType):
+        # TODO: identity mapping plugin
+        return tl_batch_encoded
 
     def evaluate(self, n_episodes: int):
         eval_info = {}
@@ -322,8 +421,6 @@ def _collect_rollouts(
         while not (done or truncated):
             action = agent.eval_actions(observation)
             observation_next, reward, done, truncated, _ = env.step(action)
-            if not isinstance(observation_next, np.ndarray): # UMaze case
-                observation_next = observation_next["observation"]
 
             trajs["observations"].append(observation)
             trajs["actions"].append(action)
