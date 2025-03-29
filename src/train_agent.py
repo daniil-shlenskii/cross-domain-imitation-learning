@@ -102,7 +102,7 @@ def main(
     logger.info(f"There are {get_buffer_state_size(state)} items in the Buffer.")
 
     # agent init
-    agent = instantiate_agent(config.agent, env)
+    agent = instantiate_agent(config.agent, env=env)
 
     ## load agent params if exist
     if not from_scratch and os.path.exists(config.archive.agent_load_dir):
