@@ -263,19 +263,17 @@ class GWILAgent(SaveLoadMixin):
         source_observation, _  = self.source_env.reset(seed=self.seed+1)
         for i in tqdm(range(n_train_iters)):
             # update learners buffers
-            self.target_env, target_observation, self.target_learner_buffer_state  = self._update_learner_buffer(
+            self.target_env, target_observation, self.target_learner_buffer_state = self._update_learner_buffer(
                 learner=self.target_learner,
                 env=self.target_env,
                 observation=target_observation,
-                buffer=self.buffer,
                 state=self.target_learner_buffer_state,
                 seed=self.seed+i,
             )
-            self.source_env, source_observation, self.source_learner_buffer_state  = self._update_learner_buffer(
+            self.source_env, source_observation, self.source_learner_buffer_state = self._update_learner_buffer(
                 learner=self.source_learner,
                 env=self.source_env,
                 observation=source_observation,
-                buffer=self.buffer,
                 state=self.source_learner_buffer_state,
                 seed=self.seed+i+1,
             )
@@ -290,7 +288,7 @@ class GWILAgent(SaveLoadMixin):
             # update optimal transport solver
             tl_batch_encoded_mapped = self._update_ot(tl_batch_encoded, sl_batch_encoded)
 
-            # update gail discriminator 
+            # update gail discriminator
             gail_discr_info, gail_discr_stats_info = self._update_gail_discriminator(
                 tl_batch_encoded_mapped, sl_batch_encoded, se_batch_encoded
             )
@@ -323,14 +321,13 @@ class GWILAgent(SaveLoadMixin):
         learner: Agent,
         env: gym.Env,
         observation: np.ndarray,
-        buffer: Buffer,
         state: BufferState,
         seed: int,
     ):
         action = learner.sample_actions(key=jax.random.key(seed), observations=observation)
         observation_next, reward, done, truncated, _ = env.step(action)
         state = _update_buffer(
-            buffer, state, observation, action, reward, done, truncated, observation_next
+            self.buffer, state, observation, action, reward, done, truncated, observation_next
         )
         if done or truncated:
             observation_next, _ = env.reset(seed=seed)
