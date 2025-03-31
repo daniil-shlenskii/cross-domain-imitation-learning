@@ -27,7 +27,8 @@ class GWILAgent(SaveLoadMixin):
         "source_encoder",
         "domain_discriminator",
         "policy_discriminator",
-        "gail_discriminator",
+        "target_gail_discriminator",
+        "source_gail_discriminator",
         "ot",
         "target_learner_buffer_state",
         "source_learner_buffer_state",
@@ -45,7 +46,8 @@ class GWILAgent(SaveLoadMixin):
         source_encoder: Generator,
         domain_discriminator: Discriminator,
         policy_discriminator: Discriminator,
-        gail_discriminator: GAILDiscriminator,
+        target_gail_discriminator: GAILDiscriminator,
+        source_gail_discriminator: GAILDiscriminator,
         ot: ENOTGW,
         buffer: Buffer,
         target_learner_buffer_state: BufferState,
@@ -61,7 +63,8 @@ class GWILAgent(SaveLoadMixin):
         self.source_encoder = source_encoder
         self.domain_discriminator = domain_discriminator
         self.policy_discriminator = policy_discriminator
-        self.gail_discriminator = gail_discriminator
+        self.target_gail_discriminator = target_gail_discriminator
+        self.source_gail_discriminator = source_gail_discriminator
         self.ot = ot
         self.buffer = buffer
         self.target_learner_buffer_state = target_learner_buffer_state
@@ -85,7 +88,8 @@ class GWILAgent(SaveLoadMixin):
         domain_discriminator_config: DictConfig,
         policy_discriminator_config: DictConfig,
         #
-        gail_discriminator_config: DictConfig,
+        target_gail_discriminator_config: DictConfig,
+        source_gail_discriminator_config: DictConfig,
         ot_config: DictConfig,
         #
         batch_size: int,
@@ -143,11 +147,18 @@ class GWILAgent(SaveLoadMixin):
         )
 
         # GAIL discriminator init
-        gail_discriminator = instantiate(
-            gail_discriminator_config,
+        target_gail_discriminator = instantiate(
+            target_gail_discriminator_config,
             seed=seed,
             input_dim=encoding_dim*2,
-            info_key="gail_discriminator",
+            info_key="target_gail_discriminator",
+            _recursive_=False,
+        )
+        source_gail_discriminator = instantiate(
+            source_gail_discriminator_config,
+            seed=seed,
+            input_dim=encoding_dim*2,
+            info_key="source_gail_discriminator",
             _recursive_=False,
         )
 
@@ -194,7 +205,8 @@ class GWILAgent(SaveLoadMixin):
             source_encoder=source_encoder,
             domain_discriminator=domain_discriminator,
             policy_discriminator=policy_discriminator,
-            gail_discriminator=gail_discriminator,
+            target_gail_discriminator=target_gail_discriminator,
+            source_gail_discriminator=source_gail_discriminator,
             ot=ot,
             buffer=buffer,
             target_learner_buffer_state=target_learner_buffer_state,
@@ -292,23 +304,26 @@ class GWILAgent(SaveLoadMixin):
             # update optimal transport solver
             tl_batch_encoded_mapped = self._update_ot(tl_batch_encoded, sl_batch_encoded)
 
-            # update gail discriminator
-            gail_discr_info, gail_discr_stats_info = self._update_gail_discriminator(
-                tl_batch_encoded_mapped, sl_batch_encoded, se_batch_encoded
+            # update gail discriminators
+            tl_gail_discr_info, tl_gail_discr_stats_info = self._update_target_gail_discriminator(
+                tl_batch_encoded_mapped, se_batch_encoded
+            )
+            sl_gail_discr_info, sl_gail_discr_stats_info = self._update_source_gail_discriminator(
+                sl_batch_encoded, se_batch_encoded
             )
 
             # update target learner
-            tl_batch["rewards"] = self.gail_discriminator.get_rewards(tl_batch_encoded_mapped)
+            tl_batch["rewards"] = self.target_gail_discriminator.get_rewards(tl_batch_encoded_mapped)
             tl_info, tl_stats_info = self._update_target_learner(tl_batch)
 
             # update source learner
-            sl_batch["rewards"] = self.gail_discriminator.get_rewards(sl_batch_encoded)
+            sl_batch["rewards"] = self.source_gail_discriminator.get_rewards(sl_batch_encoded)
             sl_info, sl_stats_info = self._update_source_learner(sl_batch)
 
             # logging
             if (i + 1) % self.log_every == 0:
-                info = {**gail_discr_info, **tl_info, **sl_info}
-                stats_info = {**gail_discr_stats_info, **tl_stats_info, **sl_stats_info}
+                info = {**tl_gail_discr_info, **sl_gail_discr_info, **tl_info, **sl_info}
+                stats_info = {**tl_gail_discr_stats_info, **sl_gail_discr_stats_info, **tl_stats_info, **sl_stats_info}
                 for k, v in info.items():
                     wandb_run.log({f"training/{k}": v}, step=self.step)
                 for k, v in stats_info.items():
@@ -345,16 +360,16 @@ class GWILAgent(SaveLoadMixin):
         self.source_learner, info, stats_info = self.source_learner.update(batch)
         return info, stats_info
 
-    def _update_gail_discriminator(self, tl_batch_encoded_mapped: DataType, sl_batch_encoded: DataType, se_batch_encoded: DataType):
-        batch_size = tl_batch_encoded_mapped["observations"].shape[0]
-        self.gail_discriminator, info, stats_info = self.gail_discriminator.update(
-            target_expert_batch={
-                k: np.concatenate([
-                    tl_batch_encoded_mapped[k][:batch_size//2],
-                    sl_batch_encoded[k][:batch_size//2]
-                ])
-                for k in sl_batch_encoded
-            },
+    def _update_target_gail_discriminator(self, tl_batch_encoded_mapped: DataType, se_batch_encoded: DataType):
+        self.target_gail_discriminator, info, stats_info = self.target_gail_discriminator.update(
+            target_expert_batch=tl_batch_encoded_mapped,
+            source_expert_batch=se_batch_encoded,
+        )
+        return info, stats_info
+
+    def _update_source_gail_discriminator(self, sl_batch_encoded: DataType, se_batch_encoded: DataType):
+        self.source_gail_discriminator, info, stats_info = self.source_gail_discriminator.update(
+            target_expert_batch=sl_batch_encoded,
             source_expert_batch=se_batch_encoded,
         )
         return info, stats_info
@@ -388,7 +403,7 @@ class GWILAgent(SaveLoadMixin):
         )
         tl_trajs_encoded = encode_batch(self.target_encoder, tl_trajs)
         tl_trajs_encoded_mapped = encode_batch(self.ot, tl_trajs_encoded)
-        tl_trajs["gail_rewards"] = self.gail_discriminator.get_rewards(tl_trajs_encoded_mapped)
+        tl_trajs["gail_rewards"] = self.target_gail_discriminator.get_rewards(tl_trajs_encoded_mapped)
 
         eval_info["TL_TotalRewards"] = np.sum(tl_trajs["rewards"]) / n_episodes
         eval_info["TL_GAILTotalRewards"] = np.sum(tl_trajs["gail_rewards"]) / n_episodes
@@ -403,7 +418,7 @@ class GWILAgent(SaveLoadMixin):
         )
         sl_trajs_encoded = encode_batch(self.source_encoder, sl_trajs)
         sl_trajs_encoded_mapped = encode_batch(self.ot, sl_trajs_encoded)
-        sl_trajs["gail_rewards"] = self.gail_discriminator.get_rewards(sl_trajs_encoded_mapped)
+        sl_trajs["gail_rewards"] = self.source_gail_discriminator.get_rewards(sl_trajs_encoded_mapped)
 
         eval_info["SL_TotalRewards"] = np.sum(sl_trajs["rewards"]) / n_episodes
         eval_info["SL_GAILTotalRewards"] = np.sum(sl_trajs["gail_rewards"]) / n_episodes

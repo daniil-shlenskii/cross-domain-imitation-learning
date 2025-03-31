@@ -76,7 +76,7 @@ agent:
       is_generator: False
   policy_discriminator_config: *discrimiantor_config
   # GAIL Discriminator
-  gail_discriminator_config:
+  target_gail_discriminator_config: &gail_discriminator_config
     _target_: agents.gail.GAILDiscriminator.create
     module_config:
       _target_: nn.networks.MLP
@@ -95,6 +95,7 @@ agent:
       is_generator: False
     reward_transform_config:
       _target_: agents.gail.gail_discriminator.reward_transforms.RewardStandartization.create
+  source_gail_discriminator_config: *gail_discriminator_config
   # Optimal Transport Solver
   ot_config:
     _target_: misc.enot.ENOTGW.create
