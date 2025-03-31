@@ -267,14 +267,14 @@ class GWILAgent(SaveLoadMixin):
         source_observation, _  = source_env.reset(seed=self.seed+1)
         for i in tqdm(range(n_train_iters)):
             # update learners buffers
-            self.target_env, target_observation, self.target_learner_buffer_state = self._update_learner_buffer(
+            target_env, target_observation, self.target_learner_buffer_state = self._update_learner_buffer(
                 learner=self.target_learner,
                 env=target_env,
                 observation=target_observation,
                 state=self.target_learner_buffer_state,
                 seed=self.seed+i,
             )
-            self.source_env, source_observation, self.source_learner_buffer_state = self._update_learner_buffer(
+            source_env, source_observation, self.source_learner_buffer_state = self._update_learner_buffer(
                 learner=self.source_learner,
                 env=source_env,
                 observation=source_observation,
