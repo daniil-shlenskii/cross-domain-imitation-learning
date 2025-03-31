@@ -60,7 +60,7 @@ agent:
       hidden_dim: 256
     temperature_module_config:
       _target_: agents.sac.networks.Temperature
-      initial_temperature: 0.2
+      initial_temperature: 1.0
     actor_optimizer_config: &source_optimizer_config
       transforms:
         - _target_: optax.clip
@@ -71,7 +71,7 @@ agent:
     temperature_optimizer_config:
       transforms:
         - _target_: optax.sgd
-          learning_rate: 0.
+          learning_rate: 1e-5
   source_gail_discriminator_config:
     _target_: agents.gail.GAILDiscriminator.create
     module_config:
