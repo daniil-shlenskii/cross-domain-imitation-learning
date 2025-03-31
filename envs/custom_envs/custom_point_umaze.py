@@ -14,6 +14,7 @@ class CustomPointUmaze(PointMazeEnv):
             reset_target=False,
         )
 
+
     def reset(self, *args, seed=None, **kwargs):
         options = {"goal_cell": (1, 1), "reset_cell": (3, 1)}
         return super().reset(seed=seed, options=options)

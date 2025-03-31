@@ -2,16 +2,16 @@ _constants:
   gan_loss: &gan_loss misc.gan.losses.SoftplusLoss
 
 problem:
-  target_env_name: &target_env_name Hopper-v5
-  source_env_name: &source_env_name Hopper-v5
-  source_expert_buffer_state_path: &source_expert_buffer_state_path agents/experts/Hopper-v5/config/collected_rollouts/buffer_state.pickle
+  target_env_name: &target_env_name CustomPointUmaze
+  source_env_name: &source_env_name CustomPointUmaze
+  source_expert_buffer_state_path: &source_expert_buffer_state_path agents/experts/CustomPointUmaze/config/collected_rollouts/buffer_state.pickle
 
 train:
   seed: &seed 0
   random_buffer_size: 5_000
   n_pretrain_iters: 10_000
   n_train_iters: 1_000_000
-  batch_size: &batch_size 1024
+  batch_size: &batch_size 256
 
 logging:
   log_every: 1_000
@@ -39,7 +39,7 @@ agent:
       id: *source_env_name
   source_expert_buffer_state_path: *source_expert_buffer_state_path
   # Domain Encoders
-  encoding_dim: 11
+  encoding_dim: 4
   target_encoder_config: &encoder_config
     _target_: misc.gan.Generator.create
     module_config:
