@@ -426,6 +426,15 @@ class GWILAgent(SaveLoadMixin):
         eval_info["SL_TotalRewards"] = np.sum(sl_trajs["rewards"]) / n_episodes
         eval_info["SL_GAILTotalRewards"] = np.sum(sl_trajs["gail_rewards"]) / n_episodes
 
+        # OT solver
+        size = 1000 # TODO:
+        ot_eval_info = self.ot.evaluate(
+            source=tl_trajs["observations"][:size],
+            target=sl_trajs["observations"][:size],
+        )
+        eval_info.update(ot_eval_info)
+
+
         for k, v in eval_info.items():
             self.wandb_run.log({f"evaluation/{k}": v}, step=self.step)
 
