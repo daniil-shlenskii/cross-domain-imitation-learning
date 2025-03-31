@@ -421,6 +421,7 @@ class GWILAgent(SaveLoadMixin):
         tl_trajs["gail_rewards"] = self.target_gail_discriminator.get_rewards(tl_trajs_encoded_mapped)
 
         eval_info["TL_TotalRewards"] = np.sum(tl_trajs["rewards"]) / n_episodes
+        eval_info["TL_length"] = tl_trajs["rewards"].shape[0] / n_episodes
         eval_info["TL_GAILTotalRewards"] = np.sum(tl_trajs["gail_rewards"]) / n_episodes
 
         ## source learner
@@ -436,6 +437,7 @@ class GWILAgent(SaveLoadMixin):
         sl_trajs["gail_rewards"] = self.source_gail_discriminator.get_rewards(sl_trajs_encoded_mapped)
 
         eval_info["SL_TotalRewards"] = np.sum(sl_trajs["rewards"]) / n_episodes
+        eval_info["SL_length"] = sl_trajs["rewards"].shape[0] / n_episodes
         eval_info["SL_GAILTotalRewards"] = np.sum(sl_trajs["gail_rewards"]) / n_episodes
 
         # OT solver
