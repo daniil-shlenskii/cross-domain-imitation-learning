@@ -237,6 +237,7 @@ class GWILAgent(SaveLoadMixin):
         )
 
     def pretrain(self, n_pretrain_iters: int=0):
+        self.evaluate(n_episodes=self.n_eval_episodes)
         for i in tqdm(range(n_pretrain_iters)):
             tl_batch, sl_batch, se_batch = self.sample_batches(seed=self.seed+i)
             tl_batch_encoded, sl_batch_encoded, _ =\
@@ -250,10 +251,8 @@ class GWILAgent(SaveLoadMixin):
                     self.wandb_run.log({f"pretraining/{k}": v}, step=self.step)
                 for k, v in stats_info.items():
                     self.wandb_run.log({f"pretraining_stats/{k}": v}, step=self.step)
-            if (i + 1) % self.eval_every == 0:
-                self.evaluate(n_episodes=self.n_eval_episodes)
-            self.step += 1
-        self.evaluate(n_episodes=self.n_eval_episodes)
+        if n_pretrain_iters > 0:
+            self.evaluate(n_episodes=self.n_eval_episodes)
 
     def train(
         self,
