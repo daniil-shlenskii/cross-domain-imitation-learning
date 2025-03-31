@@ -4,6 +4,7 @@ import gymnasium as gym
 import jax
 import numpy as np
 from hydra.utils import instantiate
+from loguru import logger
 from omegaconf import DictConfig
 from tqdm import tqdm
 
@@ -241,6 +242,14 @@ class GWILAgent(SaveLoadMixin):
             tl_batch_encoded, sl_batch_encoded, _ =\
                 self._update_domain_encoders(tl_batch, sl_batch, se_batch)
             _ = self._update_ot(tl_batch_encoded, sl_batch_encoded)
+            ot_info, ot_stats_info, _ = self._update_ot(tl_batch_encoded, sl_batch_encoded)
+            if (i + 1) % self.log_every == 0:
+                info = {**ot_info}
+                stats_info = {**ot_stats_info}
+                for k, v in info.items():
+                    self.wandb_run.log({f"pretraining/{k}": v}, step=self.step)
+                for k, v in stats_info.items():
+                    self.wandb_run.log({f"pretraining_stats/{k}": v}, step=self.step)
             if (i + 1) % self.eval_every == 0:
                 self.evaluate(n_episodes=self.n_eval_episodes)
             self.step += 1
@@ -267,12 +276,15 @@ class GWILAgent(SaveLoadMixin):
         self.wandb_run = wandb_run
 
         # collect random buffers
+        logger.info("Collecting Random Buffer..")
         self.collect_random_buffer(n_items=random_buffer_size)
 
         # pretrain
+        logger.info("Pretraining..")
         self.pretrain(n_pretrain_iters=n_pretrain_iters)
 
         # train
+        logger.info("Training..")
         target_env = deepcopy(self.target_env)
         source_env = deepcopy(self.source_env)
         target_observation, _  = target_env.reset(seed=self.seed)

@@ -9,7 +9,7 @@ problem:
 train:
   seed: &seed 0
   random_buffer_size: 5_000
-  n_pretrain_iters: 0
+  n_pretrain_iters: 10_000
   n_train_iters: 1_000_000
   batch_size: &batch_size 1024
 
