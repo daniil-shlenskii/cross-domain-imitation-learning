@@ -166,8 +166,8 @@ class GWILAgent(SaveLoadMixin):
         ot = instantiate(
             ot_config,
             seed=seed,
-            source_dim=target_env.observation_space.shape[0],
-            target_dim=source_env.observation_space.shape[0],
+            source_dim=encoding_dim,
+            target_dim=encoding_dim,
             _recursive_=False,
         )
 
@@ -302,7 +302,7 @@ class GWILAgent(SaveLoadMixin):
                 self._update_domain_encoders(tl_batch, sl_batch, se_batch)
 
             # update optimal transport solver
-            tl_batch_encoded_mapped = self._update_ot(tl_batch_encoded, sl_batch_encoded)
+            ot_info, ot_stats_info, tl_batch_encoded_mapped = self._update_ot(tl_batch_encoded, sl_batch_encoded)
 
             # update gail discriminators
             tl_gail_discr_info, tl_gail_discr_stats_info = self._update_target_gail_discriminator(
@@ -322,8 +322,8 @@ class GWILAgent(SaveLoadMixin):
 
             # logging
             if (i + 1) % self.log_every == 0:
-                info = {**tl_gail_discr_info, **sl_gail_discr_info, **tl_info, **sl_info}
-                stats_info = {**tl_gail_discr_stats_info, **sl_gail_discr_stats_info, **tl_stats_info, **sl_stats_info}
+                info = {**ot_info, **tl_gail_discr_info, **sl_gail_discr_info, **tl_info, **sl_info}
+                stats_info = {**ot_stats_info, **tl_gail_discr_stats_info, **sl_gail_discr_stats_info, **tl_stats_info, **sl_stats_info}
                 for k, v in info.items():
                     wandb_run.log({f"training/{k}": v}, step=self.step)
                 for k, v in stats_info.items():
@@ -386,8 +386,11 @@ class GWILAgent(SaveLoadMixin):
         return tl_batch, sl_batch, se_batch
 
     def _update_ot(self, tl_batch_encoded: DataType, sl_batch_encoded: DataType):
-        # TODO: identity mapping plugin
-        return tl_batch_encoded
+        tl_batch_encoded_mapped = encode_batch(self.ot, tl_batch_encoded)
+        self.ot, info, stats_info = self.ot.update(
+            target=sl_batch_encoded["observations"], source=tl_batch_encoded["observations"]
+        )
+        return info, stats_info, tl_batch_encoded_mapped
 
     def evaluate(self, n_episodes: int):
         eval_info = {}
