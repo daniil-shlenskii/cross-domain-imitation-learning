@@ -54,6 +54,8 @@ class GWILAgent(SaveLoadMixin):
         target_learner_buffer_state: BufferState,
         source_learner_buffer_state: BufferState,
         source_expert_buffer_state: BufferState,
+        target_start_state: np.ndarray,
+        source_start_state: np.ndarray,
     ):
         self.seed = seed
         self.target_env = target_env
@@ -71,6 +73,8 @@ class GWILAgent(SaveLoadMixin):
         self.target_learner_buffer_state = target_learner_buffer_state
         self.source_learner_buffer_state = source_learner_buffer_state
         self.source_expert_buffer_state = source_expert_buffer_state
+        self.target_start_state = target_start_state
+        self.source_start_state = source_start_state
 
     @classmethod
     def create(
@@ -96,10 +100,19 @@ class GWILAgent(SaveLoadMixin):
         batch_size: int,
         max_buffer_size: int,
         source_expert_buffer_state_path: str,
+        #
+        n_start_state_samples: int = 25,
     ):
         # Envs init
         target_env = instantiate(target_env_config)
         source_env = instantiate(source_env_config)
+
+        # collect averaged start states
+        target_start_state = target_env.reset(seed=seed)[0]
+        source_start_state = source_env.reset(seed=seed+1)[0]
+        for i in range(1, n_start_state_samples):
+            target_start_state += target_env.reset(seed=seed+i)[0] / n_start_state_samples
+            source_start_state += source_env.reset(seed=seed+i+1)[0] / n_start_state_samples
 
         # RL agents init
         target_learner = instantiate_agent(
@@ -124,6 +137,7 @@ class GWILAgent(SaveLoadMixin):
             info_key="target_encoder",
             _recursive_=False,
         )
+        target_start_state = target_encoder(target_start_state)
         source_encoder = instantiate(
             source_encoder_config,
             seed=seed,
@@ -132,6 +146,7 @@ class GWILAgent(SaveLoadMixin):
             info_key="source_encoder",
             _recursive_=False,
         )
+        source_start_state = source_encoder(source_start_state)
         domain_discriminator = instantiate(
             domain_discriminator_config,
             seed=seed,
@@ -164,11 +179,22 @@ class GWILAgent(SaveLoadMixin):
         )
 
         # OT solver init
+        target_batch_preprocessor_config = {
+            "_target_": "misc.enot.batch_preprocessors.RolloutStartShiftProcessor.create",
+            "start_observation": target_start_state,
+        }
+        source_batch_preprocessor_config = {
+            "_target_": "misc.enot.batch_preprocessors.RolloutStartShiftProcessor.create",
+            "start_observation": source_start_state,
+        }
+
         ot = instantiate(
             ot_config,
             seed=seed,
             source_dim=encoding_dim,
             target_dim=encoding_dim,
+            target_batch_preprocessor_config=target_batch_preprocessor_config,
+            source_batch_preprocessor_config=source_batch_preprocessor_config,
             _recursive_=False,
         )
 
@@ -184,7 +210,7 @@ class GWILAgent(SaveLoadMixin):
           }
         }
 
-        ## Taret Learner Buffer
+        ## Target Learner Buffer
         buffer, target_learner_buffer_state = buffer_init(buffer_config, target_env)
 
         ## Source Learner Buffer
@@ -212,7 +238,9 @@ class GWILAgent(SaveLoadMixin):
             buffer=buffer,
             target_learner_buffer_state=target_learner_buffer_state,
             source_learner_buffer_state=source_learner_buffer_state,
-            source_expert_buffer_state=source_expert_buffer_state
+            source_expert_buffer_state=source_expert_buffer_state,
+            target_start_state=target_start_state,
+            source_start_state=source_start_state,
         )
 
     def collect_random_buffer(self, n_items: int):
@@ -314,6 +342,8 @@ class GWILAgent(SaveLoadMixin):
             tl_batch_encoded, sl_batch_encoded, se_batch_encoded =\
                 self._update_domain_encoders(tl_batch, sl_batch, se_batch)
 
+            # TODO: encoded batch processing
+
             # update optimal transport solver
             ot_info, ot_stats_info, tl_batch_encoded_mapped = self._update_ot(tl_batch_encoded, sl_batch_encoded)
 
@@ -396,6 +426,7 @@ class GWILAgent(SaveLoadMixin):
 
     def _update_domain_encoders(self, tl_batch: DataType, sl_batch: DataType, se_batch: DataType):
         # TODO: identity encoders plugin
+        # TODO: update ot start shift preprocessor
         return tl_batch, sl_batch, se_batch
 
     def _update_ot(self, tl_batch_encoded: DataType, sl_batch_encoded: DataType):

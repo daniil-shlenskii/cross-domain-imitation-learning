@@ -5,9 +5,9 @@ import jax.numpy as jnp
 from flax import struct
 from flax.struct import PyTreeNode
 from hydra.utils import instantiate
-from nn.train_state import TrainState
 from omegaconf.dictconfig import DictConfig
 
+from nn.train_state import TrainState
 from utils import SaveLoadFrozenDataclassMixin, instantiate_optimizer
 
 
@@ -58,5 +58,6 @@ class Generator(PyTreeNode, SaveLoadFrozenDataclassMixin):
         new_state, info, stats_info = self.state.update(**kwargs)
         return self.replace(state=new_state), info, stats_info
 
+    @jax.jit
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.state(x, *args, **kwargs)
