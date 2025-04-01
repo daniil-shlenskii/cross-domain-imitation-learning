@@ -537,6 +537,7 @@ def _collect_random_buffer(
         )
         if done or truncated:
             observation_next, _ = env.reset(seed=seed+i)
+        observation = observation_next
     return state
 
 def _update_buffer(
