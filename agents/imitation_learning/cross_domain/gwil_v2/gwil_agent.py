@@ -34,6 +34,8 @@ class GWILAgent(SaveLoadMixin):
         "target_learner_buffer_state",
         "source_learner_buffer_state",
         "source_expert_buffer_state",
+        "target_start_state",
+        "source_start_state",
     )
 
     def __init__(
@@ -56,6 +58,7 @@ class GWILAgent(SaveLoadMixin):
         source_expert_buffer_state: BufferState,
         target_start_state: np.ndarray,
         source_start_state: np.ndarray,
+        domain_seed_shift: int,
     ):
         self.seed = seed
         self.target_env = target_env
@@ -75,6 +78,7 @@ class GWILAgent(SaveLoadMixin):
         self.source_expert_buffer_state = source_expert_buffer_state
         self.target_start_state = target_start_state
         self.source_start_state = source_start_state
+        self.domain_seed_shift = domain_seed_shift
 
     @classmethod
     def create(
@@ -102,6 +106,7 @@ class GWILAgent(SaveLoadMixin):
         source_expert_buffer_state_path: str,
         #
         n_start_state_samples: int = 25,
+        domain_seed_shift: int = 0,
     ):
         # Envs init
         target_env = instantiate(target_env_config)
@@ -109,10 +114,10 @@ class GWILAgent(SaveLoadMixin):
 
         # collect averaged start states
         target_start_state = target_env.reset(seed=seed)[0]
-        source_start_state = source_env.reset(seed=seed+1)[0]
+        source_start_state = source_env.reset(seed=seed+domain_seed_shift)[0]
         for i in range(1, n_start_state_samples):
             target_start_state += target_env.reset(seed=seed+i)[0] / n_start_state_samples
-            source_start_state += source_env.reset(seed=seed+i+1)[0] / n_start_state_samples
+            source_start_state += source_env.reset(seed=seed+i+domain_seed_shift)[0] / n_start_state_samples
 
         # RL agents init
         target_learner = instantiate_agent(
@@ -241,6 +246,7 @@ class GWILAgent(SaveLoadMixin):
             source_expert_buffer_state=source_expert_buffer_state,
             target_start_state=target_start_state,
             source_start_state=source_start_state,
+            domain_seed_shift=domain_seed_shift,
         )
 
     def collect_random_buffer(self, n_items: int):
@@ -260,7 +266,7 @@ class GWILAgent(SaveLoadMixin):
             buffer=self.buffer,
             state=self.source_learner_buffer_state,
             n_items=n_items,
-            seed=self.seed+1,
+            seed=self.seed+self.domain_seed_shift,
             tqdm_desc="SL random buffer collecting",
         )
 
@@ -318,7 +324,7 @@ class GWILAgent(SaveLoadMixin):
         target_env = deepcopy(self.target_env)
         source_env = deepcopy(self.source_env)
         target_observation, _  = target_env.reset(seed=self.seed)
-        source_observation, _  = source_env.reset(seed=self.seed+1)
+        source_observation, _  = source_env.reset(seed=self.seed+self.domain_seed_shift)
         for i in tqdm(range(n_train_iters)):
             # update learners buffers
             target_env, target_observation, self.target_learner_buffer_state = self._update_learner_buffer(
@@ -333,7 +339,7 @@ class GWILAgent(SaveLoadMixin):
                 env=source_env,
                 observation=source_observation,
                 state=self.source_learner_buffer_state,
-                seed=self.seed+i+1,
+                seed=self.seed+i+self.domain_seed_shift,
             )
 
             # sample batches
