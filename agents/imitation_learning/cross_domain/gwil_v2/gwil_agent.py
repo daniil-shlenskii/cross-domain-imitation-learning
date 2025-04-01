@@ -281,6 +281,7 @@ class GWILAgent(SaveLoadMixin):
                     self.wandb_run.log({f"pretraining_stats/{k}": v}, step=self.step)
             if (i + 1) % self.eval_every == 0:
                 self.evaluate(n_episodes=self.n_eval_episodes)
+            self.step += 1
         if n_pretrain_iters > 0:
             self.evaluate(n_episodes=self.n_eval_episodes)
 
@@ -473,7 +474,7 @@ class GWILAgent(SaveLoadMixin):
         eval_info["SL_GAILTotalRewards"] = np.sum(sl_trajs["gail_rewards"]) / n_episodes
 
         # OT solver
-        size = 1000 # TODO:
+        size = 300 # TODO:
         ot_eval_info = self.ot.evaluate(
             source=tl_trajs["observations"][:size],
             target=sl_trajs["observations"][:size],
