@@ -9,7 +9,7 @@ problem:
 train:
   seed: &seed 0
   random_buffer_size: 5_000
-  n_pretrain_iters: 30_000
+  n_pretrain_iters: 100_000
   n_train_iters: 1_000_000
   batch_size: &batch_size 256
 
@@ -82,7 +82,7 @@ agent:
     transport_module_config:
       # _target_: nn.networks._tmp.Identity
       _target_: nn.networks.ResNet
-      n_blocks: 4
+      n_blocks: 6
       hidden_dim: 256
     transport_optimizer_config: &ot_optimizer_config
       transforms:
@@ -96,15 +96,15 @@ agent:
       _target_: hydra.utils.get_method
       path: misc.enot.losses.transport_loss
     g_potential_module_config:
-      _target_: nn.networks.NegativeMLP
-      n_blocks: 4
+      _target_: nn.networks.NegativeResNet
+      n_blocks: 6
       hidden_dim: 256
     g_potential_optimizer_config:
       transforms:
         - _target_: optax.clip
           max_delta: 1.0
         - _target_: optax.adam
-          learning_rate: 1e-4
+          learning_rate: 3e-4
           b1: 0.9
           b2: 0.99
     g_potential_loss_fn_config:
@@ -112,7 +112,3 @@ agent:
       path: misc.enot.losses.g_potential_loss
     cost_fn_config:
       _target_: misc.enot.costs.InnerGWCostStable.create
-    # source_batch_preprocessor_config:
-    #   _target_: misc.enot.batch_preprocessors.CentralizePreprocessor.create
-    # target_batch_preprocessor_config:
-    #   _target_: misc.enot.batch_preprocessors.CentralizePreprocessor.create
