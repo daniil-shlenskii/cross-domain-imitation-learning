@@ -11,8 +11,6 @@ from hydra.utils import instantiate
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from omegaconf.dictconfig import DictConfig
 
-from nn.train_state import TrainState
-
 from .custom_types import DataType, Params
 
 
@@ -27,7 +25,7 @@ def encode_batch(encoder, batch: DataType):
     return batch
 
 @jax.jit
-def encode_states_given_params(params: Params, state: TrainState, states: jnp.ndarray, states_next: jnp.ndarray):
+def encode_states_given_params(params: Params, state, states: jnp.ndarray, states_next: jnp.ndarray):
     batch_size = states.shape[0]
     observations = jnp.concatenate([states, states_next])
     encoded_observations = state.apply_fn({"params": params}, observations)
