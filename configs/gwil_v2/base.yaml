@@ -100,6 +100,7 @@ agent:
       n_blocks: 4
       hidden_dim: 256
     g_potential_optimizer_config:
+      transforms:
         - _target_: optax.clip
           max_delta: 1.0
         - _target_: optax.adam
