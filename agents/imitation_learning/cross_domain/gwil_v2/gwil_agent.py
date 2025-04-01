@@ -251,6 +251,8 @@ class GWILAgent(SaveLoadMixin):
                     self.wandb_run.log({f"pretraining/{k}": v}, step=self.step)
                 for k, v in stats_info.items():
                     self.wandb_run.log({f"pretraining_stats/{k}": v}, step=self.step)
+            if (i + 1) % self.eval_every == 0:
+                self.evaluate(n_episodes=self.n_eval_episodes)
         if n_pretrain_iters > 0:
             self.evaluate(n_episodes=self.n_eval_episodes)
 
