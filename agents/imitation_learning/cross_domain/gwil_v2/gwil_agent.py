@@ -186,11 +186,11 @@ class GWILAgent(SaveLoadMixin):
         # OT solver init
         target_batch_preprocessor_config = {
             "_target_": "misc.enot.batch_preprocessors.RolloutStartShiftProcessor.create",
-            "start_observation": target_start_state,
+            "start_observation": source_start_state,
         }
         source_batch_preprocessor_config = {
             "_target_": "misc.enot.batch_preprocessors.RolloutStartShiftProcessor.create",
-            "start_observation": source_start_state,
+            "start_observation": target_start_state,
         }
 
         ot = instantiate(

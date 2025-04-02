@@ -138,9 +138,7 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
         return enot, info, stats_info
 
     def evaluate(self, source: jnp.ndarray, target: jnp.ndarray, convert_to_wandb_type: bool=True):
-        source_encoded = self.source_batch_preprocessor.encode(source)
         target_hat_encoded = self(source_encoded)
-        target_hat = self.target_batch_preprocessor.decode(target_hat_encoded)
 
         fig = mapping_scatter(source, target_hat, target)
         if convert_to_wandb_type:
