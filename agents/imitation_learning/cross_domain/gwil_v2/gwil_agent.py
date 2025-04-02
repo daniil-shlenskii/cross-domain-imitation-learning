@@ -296,6 +296,7 @@ class GWILAgent(SaveLoadMixin):
         random_buffer_size: int,
         n_pretrain_iters: int,
         n_train_iters: int,
+        update_learner_every: int,
         #
         log_every: int,
         save_every: int,
@@ -326,22 +327,6 @@ class GWILAgent(SaveLoadMixin):
         target_observation, _  = target_env.reset(seed=self.seed)
         source_observation, _  = source_env.reset(seed=self.seed+self.domain_seed_shift)
         for i in tqdm(range(n_train_iters)):
-            # update learners buffers
-            target_env, target_observation, self.target_learner_buffer_state = self._update_learner_buffer(
-                learner=self.target_learner,
-                env=target_env,
-                observation=target_observation,
-                state=self.target_learner_buffer_state,
-                seed=self.seed+i,
-            )
-            source_env, source_observation, self.source_learner_buffer_state = self._update_learner_buffer(
-                learner=self.source_learner,
-                env=source_env,
-                observation=source_observation,
-                state=self.source_learner_buffer_state,
-                seed=self.seed+i+self.domain_seed_shift,
-            )
-
             # sample batches
             tl_batch, sl_batch, se_batch = self.sample_batches(seed=self.seed+i)
 
@@ -362,13 +347,32 @@ class GWILAgent(SaveLoadMixin):
                 sl_batch_encoded, se_batch_encoded
             )
 
-            # update target learner
-            tl_batch["rewards"] = self.target_gail_discriminator.get_rewards(tl_batch_encoded_mapped)
-            tl_info, tl_stats_info = self._update_target_learner(tl_batch)
+            if self.step % update_learner_every == 0:
+                # update target learner
+                tl_batch["rewards"] = self.target_gail_discriminator.get_rewards(tl_batch_encoded_mapped)
+                tl_info, tl_stats_info = self._update_target_learner(tl_batch)
 
-            # update source learner
-            sl_batch["rewards"] = self.source_gail_discriminator.get_rewards(sl_batch_encoded)
-            sl_info, sl_stats_info = self._update_source_learner(sl_batch)
+                # update source learner
+                sl_batch["rewards"] = self.source_gail_discriminator.get_rewards(sl_batch_encoded)
+                sl_info, sl_stats_info = self._update_source_learner(sl_batch)
+
+                # update learners buffers
+                target_env, target_observation, self.target_learner_buffer_state = self._update_learner_buffer(
+                    learner=self.target_learner,
+                    env=target_env,
+                    observation=target_observation,
+                    state=self.target_learner_buffer_state,
+                    seed=self.seed+i,
+                )
+                source_env, source_observation, self.source_learner_buffer_state = self._update_learner_buffer(
+                    learner=self.source_learner,
+                    env=source_env,
+                    observation=source_observation,
+                    state=self.source_learner_buffer_state,
+                    seed=self.seed+i+self.domain_seed_shift,
+                )
+            else:
+                tl_info, sl_info, tl_stats_info, sl_stats_info = {}, {}, {}, {}
 
             # logging
             if (i + 1) % self.log_every == 0:

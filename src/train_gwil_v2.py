@@ -74,6 +74,7 @@ def main(
         random_buffer_size=config.train.random_buffer_size,
         n_pretrain_iters=config.train.n_pretrain_iters,
         n_train_iters=config.train.n_train_iters,
+        update_learner_every=config.train.update_learner_every,
         log_every=config.logging.log_every,
         save_every=config.logging.save_every,
         eval_every=config.logging.eval_every,

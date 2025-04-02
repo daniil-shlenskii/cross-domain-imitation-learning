@@ -12,6 +12,7 @@ train:
   n_pretrain_iters: 50_000
   n_train_iters: 1_000_000
   batch_size: &batch_size 256
+  update_learner_every: 3
 
 logging:
   log_every: 1_000
@@ -78,7 +79,7 @@ agent:
   # Optimal Transport Solver
   ot_config:
     _target_: misc.enot.ENOTGW.create
-    target_weight: 2.
+    target_weight: 4.
     transport_module_config:
       # _target_: nn.networks._tmp.Identity
       _target_: nn.networks.ResNet
