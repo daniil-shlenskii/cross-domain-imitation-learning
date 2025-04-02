@@ -94,6 +94,10 @@ class RolloutStartShiftProcessor(BatchPreprocessor):
                 start_observation = jnp.concatenate([start_observation, start_observation_next], axis=-1)
         return cls(start_observation=start_observation)
 
+    def update(self, batch: jnp.ndarray):
+        batch = batch - self.start_observation
+        return self, batch, {}
+
     def encode(self, batch: jnp.ndarray):
         return batch - self.start_observation
 
