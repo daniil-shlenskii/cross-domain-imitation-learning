@@ -252,6 +252,7 @@ class GWILAgent(SaveLoadMixin):
     def collect_random_buffer(self, n_items: int):
         # target env
         self.target_learner_buffer_state = _collect_random_buffer(
+            learner=self.target_learner,
             env=self.target_env,
             buffer=self.buffer,
             state=self.target_learner_buffer_state,
@@ -262,6 +263,7 @@ class GWILAgent(SaveLoadMixin):
 
         # source env
         self.source_learner_buffer_state = _collect_random_buffer(
+            learner=self.source_learner,
             env=self.source_env,
             buffer=self.buffer,
             state=self.source_learner_buffer_state,
@@ -524,6 +526,7 @@ def _collect_rollouts(
 
 def _collect_random_buffer(
     *,
+    learner: Agent,
     env: gym.Env,
     buffer: Buffer,
     state: BufferState,
@@ -533,7 +536,7 @@ def _collect_random_buffer(
 ):
     observation, _  = env.reset(seed=seed)
     for i in tqdm(range(n_items), desc=tqdm_desc):
-        action = env.action_space.sample()
+        action = learner.sample_actions(key=jax.random.key(seed+i), observations=observation)
         observation_next, reward, done, truncated, _ = env.step(action)
         state = _update_buffer(
             buffer, state, observation, action, reward, done, truncated, observation_next
