@@ -276,7 +276,6 @@ class GWILAgent(SaveLoadMixin):
             tl_batch, sl_batch, se_batch = self.sample_batches(seed=self.seed+i)
             tl_batch_encoded, sl_batch_encoded, _ =\
                 self._update_domain_encoders(tl_batch, sl_batch, se_batch)
-            _ = self._update_ot(tl_batch_encoded, sl_batch_encoded)
             ot_info, ot_stats_info, _ = self._update_ot(tl_batch_encoded, sl_batch_encoded)
             if (i + 1) % self.log_every == 0:
                 info = {**ot_info}
