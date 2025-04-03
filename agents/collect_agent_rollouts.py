@@ -34,7 +34,7 @@ def main(args: argparse.Namespace):
     env = instantiate_environment(eval_config.environment)
 
     # agent init
-    agent = instantiate_agent(config.agent, env)
+    agent = instantiate_agent(config.agent, env=env)
 
     agent, loaded_keys = agent.load(agent_dir)
     logger.info(
