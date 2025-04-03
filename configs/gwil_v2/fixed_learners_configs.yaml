@@ -1,7 +1,7 @@
 _constants:
   target_learner_lr: &tl_lr 3e-4
   source_learner_lr: &sl_lr 3e-4 # Must be not worse than target learner
-  gan_loss: &gan_loss misc.gan.losses.SoftplusLoss
+  gan_loss: &gan_loss misc.gan.losses.SoftplusLossCGAILReg
   reg_scale: &reg_scale 0.1
 
 agent:
