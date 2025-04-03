@@ -59,6 +59,7 @@ class GWILAgent(SaveLoadMixin):
         target_start_state: np.ndarray,
         source_start_state: np.ndarray,
         domain_seed_shift: int,
+        source_random_action_prob: float = 0.0,
     ):
         self.seed = seed
         self.target_env = target_env
@@ -79,6 +80,7 @@ class GWILAgent(SaveLoadMixin):
         self.target_start_state = target_start_state
         self.source_start_state = source_start_state
         self.domain_seed_shift = domain_seed_shift
+        self.source_random_action_prob = source_random_action_prob
 
     @classmethod
     def create(
@@ -107,6 +109,7 @@ class GWILAgent(SaveLoadMixin):
         #
         n_start_state_samples: int = 25,
         domain_seed_shift: int = 0,
+        source_random_action_prob: float = 0.0,
     ):
         # Envs init
         target_env = instantiate(target_env_config)
@@ -247,6 +250,7 @@ class GWILAgent(SaveLoadMixin):
             target_start_state=target_start_state,
             source_start_state=source_start_state,
             domain_seed_shift=domain_seed_shift,
+            source_random_action_prob=source_random_action_prob,
         )
 
     def collect_random_buffer(self, n_items: int):
@@ -371,6 +375,7 @@ class GWILAgent(SaveLoadMixin):
                     observation=source_observation,
                     state=self.source_learner_buffer_state,
                     seed=self.seed+i+self.domain_seed_shift,
+                    random_action_prob=self.source_random_action_prob,
                 )
             else:
                 tl_info, sl_info, tl_stats_info, sl_stats_info = {}, {}, {}, {}
@@ -397,8 +402,15 @@ class GWILAgent(SaveLoadMixin):
         observation: np.ndarray,
         state: BufferState,
         seed: int,
+        random_action_prob: float=0.0,
     ):
-        action = learner.sample_actions(key=jax.random.key(seed), observations=observation)
+        # sample action
+        np.random.seed(seed)
+        if np.random.rand() < random_action_prob:
+            action = env.action_space.sample()
+        else:
+            action = learner.sample_actions(key=jax.random.key(seed), observations=observation)
+
         observation_next, reward, done, truncated, _ = env.step(action)
         state = _update_buffer(
             self.buffer, state, observation, action, reward, done, truncated, observation_next
