@@ -60,9 +60,6 @@ class InnerGWCost(PyTreeNode):
     def update(self, *, source: jnp.ndarray, target: jnp.ndarray):
         proj_matrix_opt = jax.vmap(lambda x, y: x[:, None] * y[None, :])(target, source).mean(0)
 
-        # proj_norm = jax.vmap(lambda x, y: x[:, None] * y[None, :])(source, source).mean(0)
-        # proj_matrix_opt =  proj_matrix_opt @ jnp.linalg.inv(proj_norm + 1e-5 * jnp.eye(proj_norm.shape[0]))
-
         proj_matrix_opt = self.source_dim**0.5 * proj_matrix_opt / jnp.linalg.norm(proj_matrix_opt)
         new_proj_matrix = self.proj_matrix * self.ema_decay + proj_matrix_opt * (1 - self.ema_decay)
         new_proj_matrix = self.source_dim**0.5 * new_proj_matrix / jnp.linalg.norm(new_proj_matrix)
@@ -71,6 +68,30 @@ class InnerGWCost(PyTreeNode):
 class InnerGWCostStable(InnerGWCost):
     def __call__(self, x, y):
         return jnp.linalg.norm(self.proj_matrix @ x - y)**2
+
+class InvOTCost(PyTreeNode):
+    proj_matrix: jnp.ndarray
+    source_dim: int
+    ema_decay: float = struct.field(pytree_node=False)
+
+    @classmethod
+    def create(cls, source_dim: int, target_dim: int, ema_decay: float=0.999, **kwargs):
+        proj_matrix = jnp.eye(target_dim, source_dim)
+        return cls(source_dim=source_dim, proj_matrix=proj_matrix, ema_decay=ema_decay)
+
+    def __call__(self, x, y):
+        return jnp.linalg.norm(self.proj_matrix @ x - y)**2
+
+    def update(self, *, source: jnp.ndarray, target: jnp.ndarray):
+        proj_matrix_opt = jax.vmap(lambda x, y: x[:, None] * y[None, :])(target, source).mean(0)
+
+        proj_norm = jax.vmap(lambda x, y: x[:, None] * y[None, :])(source, source).mean(0)
+        proj_matrix_opt =  proj_matrix_opt @ jnp.linalg.inv(proj_norm + 1e-5 * jnp.eye(proj_norm.shape[0]))
+
+        proj_matrix_opt = self.source_dim**0.5 * proj_matrix_opt / jnp.linalg.norm(proj_matrix_opt)
+        new_proj_matrix = self.proj_matrix * self.ema_decay + proj_matrix_opt * (1 - self.ema_decay)
+        new_proj_matrix = self.source_dim**0.5 * new_proj_matrix / jnp.linalg.norm(new_proj_matrix)
+        return self.replace(proj_matrix=new_proj_matrix)
 
 class PairsCost(PyTreeNode):
     state_cost: InnerGWCostStable
