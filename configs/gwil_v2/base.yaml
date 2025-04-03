@@ -9,9 +9,9 @@ problem:
 train:
   seed: &seed 0
   random_buffer_size: 5_000
-  n_pretrain_iters: 50_000
+  n_pretrain_iters: 10_000
   n_train_iters: 1_000_000
-  batch_size: &batch_size 256
+  batch_size: &batch_size 512
   update_learner_every: 3
 
 logging:
@@ -80,11 +80,11 @@ agent:
   ot_config:
     # _target_: misc.enot.ENOT.create
     _target_: misc.enot.ENOTGW.create
-    target_weight: 2.
+    target_weight: 4.
     transport_module_config:
       # _target_: nn.networks._tmp.Identity
-      _target_: nn.networks.ResNet
-      n_blocks: 6
+      _target_: nn.networks.MLP
+      n_blocks: 8
       hidden_dim: 512
     transport_optimizer_config: &ot_optimizer_config
       transforms:
@@ -98,8 +98,8 @@ agent:
       _target_: hydra.utils.get_method
       path: misc.enot.losses.transport_loss
     g_potential_module_config:
-      _target_: nn.networks.NegativeResNet
-      n_blocks: 6
+      _target_: nn.networks.NegativeMLP
+      n_blocks: 8
       hidden_dim: 512
     g_potential_optimizer_config:
       transforms:
@@ -114,5 +114,6 @@ agent:
       path: misc.enot.losses.g_potential_loss
     cost_fn_config:
       # _target_: misc.enot.costs.L2Cost
-      _target_: misc.enot.costs.InnerGWCostStable.create
+      _target_: misc.enot.costs.InvOTCost.create
+      # _target_: misc.enot.costs.InnerGWCostStable.create
 
