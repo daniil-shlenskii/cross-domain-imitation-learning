@@ -26,7 +26,6 @@ class ENOTGW(ENOT):
         return super().create(
             source_dim=source_dim,
             target_dim=target_dim,
-            use_projection=use_projection,
             **kwargs
         )
 
