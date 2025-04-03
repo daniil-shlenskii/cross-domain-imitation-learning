@@ -12,7 +12,7 @@ train:
   n_pretrain_iters: 10_000
   n_train_iters: 1_000_000
   batch_size: &batch_size 512
-  update_learner_every: 3
+  update_learner_every: 5
 
 logging:
   log_every: 1_000
