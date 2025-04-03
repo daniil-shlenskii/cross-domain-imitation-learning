@@ -352,16 +352,26 @@ class GWILAgent(SaveLoadMixin):
                 sl_batch_encoded, se_batch_encoded
             )
 
+            # update source learner
+            sl_batch["rewards"] = self.source_gail_discriminator.get_rewards(sl_batch_encoded)
+            sl_info, sl_stats_info = self._update_source_learner(sl_batch)
+
+            # update source learner buffer
+            source_env, source_observation, self.source_learner_buffer_state = self._update_learner_buffer(
+                learner=self.source_learner,
+                env=source_env,
+                observation=source_observation,
+                state=self.source_learner_buffer_state,
+                seed=self.seed+i+self.domain_seed_shift,
+                random_action_prob=self.source_random_action_prob,
+            )
+
             if self.step % update_learner_every == 0:
                 # update target learner
                 tl_batch["rewards"] = self.target_gail_discriminator.get_rewards(tl_batch_encoded_mapped)
                 tl_info, tl_stats_info = self._update_target_learner(tl_batch)
 
-                # update source learner
-                sl_batch["rewards"] = self.source_gail_discriminator.get_rewards(sl_batch_encoded)
-                sl_info, sl_stats_info = self._update_source_learner(sl_batch)
-
-                # update learners buffers
+                # update learner buffer
                 target_env, target_observation, self.target_learner_buffer_state = self._update_learner_buffer(
                     learner=self.target_learner,
                     env=target_env,
@@ -369,16 +379,8 @@ class GWILAgent(SaveLoadMixin):
                     state=self.target_learner_buffer_state,
                     seed=self.seed+i,
                 )
-                source_env, source_observation, self.source_learner_buffer_state = self._update_learner_buffer(
-                    learner=self.source_learner,
-                    env=source_env,
-                    observation=source_observation,
-                    state=self.source_learner_buffer_state,
-                    seed=self.seed+i+self.domain_seed_shift,
-                    random_action_prob=self.source_random_action_prob,
-                )
             else:
-                tl_info, sl_info, tl_stats_info, sl_stats_info = {}, {}, {}, {}
+                tl_info, tl_stats_info = {}, {}
 
             # logging
             if (i + 1) % self.log_every == 0:
