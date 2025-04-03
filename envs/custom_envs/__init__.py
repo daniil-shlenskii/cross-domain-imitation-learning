@@ -8,8 +8,16 @@ from .toy_one_dim_env import ToyOneDimEnv, ToyOneDimEnvShifted
 
 
 def register_envs():
-    gym.register(id="custom_envs/ToyOneDimEnv", entry_point=ToyOneDimEnv)
-    gym.register(id="custom_envs/ToyOneDimEnvShifted", entry_point=ToyOneDimEnvShifted)
+    gym.register(
+        id="ToyOneDimEnv-S25",
+        entry_point=ToyOneDimEnv,
+        kwargs={"size": 25.},
+    )
+    gym.register(
+        id="ToyOneDimEnvShifted-S25-Y1",
+        entry_point=ToyOneDimEnvShifted,
+        kwargs={"size": 25., "y": 1.},
+    )
     gym.register(
         id="CustomPointUmaze",
         entry_point="envs.custom_envs.custom_point_umaze:CustomPointUmaze",
