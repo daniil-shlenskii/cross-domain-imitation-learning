@@ -178,7 +178,9 @@ class CGAILReguluarizationDecorator:
         )
 
         real_logits, fake_logits = info["real_logits"], info["fake_logits"]
-        reg = ((real_logits**2 + fake_logits**2) * 0.5).mean()
+        logits = jnp.concatenate([real_logits, fake_logits])
+        probs = jax.nn.sigmoid(logits)
+        reg = (0.5 * (probs - 0.5)**2).mean()
 
         loss_with_cgail_reg = d_loss + self.reg_scale * reg
 
