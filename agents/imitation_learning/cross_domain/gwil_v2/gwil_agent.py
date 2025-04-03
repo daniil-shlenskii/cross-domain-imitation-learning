@@ -499,10 +499,11 @@ class GWILAgent(SaveLoadMixin):
         eval_info["SL_GAILTotalRewards"] = np.sum(sl_trajs["gail_rewards"]) / n_episodes
 
         # OT solver
-        size = 300 # TODO:
+        target_size = np.argmax(tl_trajs["truncated"])
+        source_size = np.argmax(sl_trajs["truncated"])
         ot_eval_info = self.ot.evaluate(
-            source=tl_trajs["observations"][:size],
-            target=sl_trajs["observations"][:size],
+            source=tl_trajs["observations"][:target_size],
+            target=sl_trajs["observations"][:source_size],
         )
         eval_info.update(ot_eval_info)
 
