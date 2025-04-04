@@ -38,5 +38,25 @@ def register_envs():
             )
         ],
     )
+    gym.register(
+        id="CustomPointUmazeInverse",
+        entry_point="envs.custom_envs.custom_point_umaze:CustomPointUmazeInverse",
+        max_episode_steps=300,
+        kwargs={
+            "reward_type": "dense",
+            "continuing_task": True,
+            "reset_target": False,
+        },
+        additional_wrappers=[
+            gym.envs.registration.WrapperSpec(
+                name="TransformObservation",
+                entry_point="gymnasium.wrappers:TransformObservation",
+                kwargs={
+                    "func": lambda obs: obs["observation"],
+                    "observation_space": gym.spaces.Box(-np.inf, np.inf, shape=(4,)),
+                },
+            )
+        ],
+    )
 
 register_envs()
