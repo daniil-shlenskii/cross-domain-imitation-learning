@@ -1,8 +1,9 @@
 _constants:
   gan_loss: &gan_loss misc.gan.losses.SoftplusLoss
+  source_random_action_prob: &source_random_action_prob 0.25
 
 problem:
-  target_env_name: &target_env_name CustomPointUmaze
+  target_env_name: &target_env_name CustomPointUmazeInverse
   source_env_name: &source_env_name CustomPointUmaze
   source_expert_buffer_state_path: &source_expert_buffer_state_path agents/experts/CustomPointUmaze/config/collected_rollouts/buffer_state.pickle
 
@@ -10,9 +11,9 @@ train:
   seed: &seed 0
   random_buffer_size: 5_000
   n_pretrain_iters: 10_000
-  n_train_iters: 1_000_000
+  n_train_iters: 2_000_000
   batch_size: &batch_size 512
-  update_learner_every: 5
+  update_learner_every: 10
 
 logging:
   log_every: 1_000
@@ -23,6 +24,7 @@ logging:
 agent:
   _target_: agents.gwil_v2.GWILAgent.create
   seed: *seed
+  source_random_action_prob: *source_random_action_prob
   # Environments
   batch_size: *batch_size
   max_buffer_size: 1_000_000
