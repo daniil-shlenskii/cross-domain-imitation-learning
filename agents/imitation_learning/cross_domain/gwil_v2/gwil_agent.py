@@ -301,7 +301,8 @@ class GWILAgent(SaveLoadMixin):
         random_buffer_size: int,
         n_pretrain_iters: int,
         n_train_iters: int,
-        update_learner_every: int,
+        update_target_learner_every: int,
+        update_source_learner_every: int,
         #
         log_every: int,
         save_every: int,
@@ -339,39 +340,40 @@ class GWILAgent(SaveLoadMixin):
             tl_batch_encoded, sl_batch_encoded, se_batch_encoded =\
                 self._update_domain_encoders(tl_batch, sl_batch, se_batch)
 
-            # TODO: encoded batch processing
-
             # update optimal transport solver
             ot_info, ot_stats_info, tl_batch_encoded_mapped = self._update_ot(tl_batch_encoded, sl_batch_encoded)
 
-            # update gail discriminators
-            tl_gail_discr_info, tl_gail_discr_stats_info = self._update_target_gail_discriminator(
-                tl_batch_encoded_mapped, se_batch_encoded
-            )
-            sl_gail_discr_info, sl_gail_discr_stats_info = self._update_source_gail_discriminator(
-                sl_batch_encoded, se_batch_encoded
-            )
+            if (self.step + 1) % update_source_learner_every == 0:
+                # update source gail discriminator
+                sl_gail_discr_info, sl_gail_discr_stats_info = self._update_source_gail_discriminator(
+                    sl_batch_encoded, se_batch_encoded
+                )
 
-            # update source learner
-            sl_batch["rewards"] = self.source_gail_discriminator.get_rewards(sl_batch_encoded)
-            sl_info, sl_stats_info = self._update_source_learner(sl_batch)
+                # update source learner
+                sl_batch["rewards"] = self.source_gail_discriminator.get_rewards(sl_batch_encoded)
+                sl_info, sl_stats_info = self._update_source_learner(sl_batch)
 
-            # update source learner buffer
-            source_env, source_observation, self.source_learner_buffer_state = self._update_learner_buffer(
-                learner=self.source_learner,
-                env=source_env,
-                observation=source_observation,
-                state=self.source_learner_buffer_state,
-                seed=self.seed+i+self.domain_seed_shift,
-                random_action_prob=self.source_random_action_prob,
-            )
+                # update source learner buffer
+                source_env, source_observation, self.source_learner_buffer_state = self._update_learner_buffer(
+                    learner=self.source_learner,
+                    env=source_env,
+                    observation=source_observation,
+                    state=self.source_learner_buffer_state,
+                    seed=self.seed+i+self.domain_seed_shift,
+                    random_action_prob=self.source_random_action_prob,
+                )
 
-            if self.step % update_learner_every == 0:
+            if (self.step + 1) % update_target_learner_every == 0:
+                # update target gail discriminator
+                tl_gail_discr_info, tl_gail_discr_stats_info = self._update_target_gail_discriminator(
+                    tl_batch_encoded_mapped, se_batch_encoded
+                )
+
                 # update target learner
                 tl_batch["rewards"] = self.target_gail_discriminator.get_rewards(tl_batch_encoded_mapped)
                 tl_info, tl_stats_info = self._update_target_learner(tl_batch)
 
-                # update learner buffer
+                # update target learner buffer
                 target_env, target_observation, self.target_learner_buffer_state = self._update_learner_buffer(
                     learner=self.target_learner,
                     env=target_env,
@@ -380,7 +382,8 @@ class GWILAgent(SaveLoadMixin):
                     seed=self.seed+i,
                 )
             else:
-                tl_info, tl_stats_info = {}, {}
+                tl_info, tl_gail_discr_info = {}, {}
+                tl_stats_info, tl_gail_discr_stats_info = {}, {}
 
             # logging
             if (i + 1) % self.log_every == 0:

@@ -1,5 +1,5 @@
 _constants:
-  target_learner_lr: &tl_lr 1e-4
+  target_learner_lr: &tl_lr 3e-4
   source_learner_lr: &sl_lr 3e-4 # Must be not worse than target learner
   #
   gan_loss: &gan_loss misc.gan.losses.SoftplusLossCGAILReg
