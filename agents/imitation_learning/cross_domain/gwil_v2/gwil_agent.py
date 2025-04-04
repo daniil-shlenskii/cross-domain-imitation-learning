@@ -458,7 +458,9 @@ class GWILAgent(SaveLoadMixin):
     def _update_ot(self, tl_batch_encoded: DataType, sl_batch_encoded: DataType):
         tl_batch_encoded_mapped = encode_batch(self.ot, tl_batch_encoded)
         self.ot, info, stats_info = self.ot.update(
-            target=sl_batch_encoded["observations"], source=tl_batch_encoded["observations"]
+            target=sl_batch_encoded["observations"],
+            source=tl_batch_encoded["observations"],
+            source_next=tl_batch_encoded["observations_next"],
         )
         return info, stats_info, tl_batch_encoded_mapped
 

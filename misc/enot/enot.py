@@ -129,7 +129,7 @@ class ENOT(PyTreeNode, SaveLoadFrozenDataclassMixin):
     def g_potential_val(self, target: jnp.ndarray):
         return self.g_potential(self.target_batch_preprocessor.encode(target))
 
-    def update(self, target: jnp.ndarray, source: jnp.ndarray):
+    def update(self, target: jnp.ndarray, source: jnp.ndarray, **kwargs):
         enot, info, stats_info = _update_jit(
             enot=self,
             target=target,

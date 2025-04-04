@@ -4,11 +4,13 @@ eval_every: 5_000
 
 batch_size: 1024 
 
-ds_name: from_buffer_state_pairs
+ds_name: from_buffer_states
 n_training_iters: 1_000_000
 
 enot:
-  _target_: misc.enot.ENOTGW.create
+  # _target_: misc.enot.ENOT.create
+  # _target_: misc.enot.ENOTGW.create
+  _target_: agents.imitation_learning.cross_domain.gwil_v2.enot_continuous.ENOTGWContinuous.create
   seed: *seed
   transport_module_config:
     _target_: nn.networks.MLP
@@ -23,8 +25,9 @@ enot:
         b1: 0.9
         b2: 0.99
   transport_loss_fn_config:
-    _target_: hydra.utils.get_method
-    path: misc.enot.losses.transport_loss
+    _target_: agents.imitation_learning.cross_domain.gwil_v2.enot_continuous.ContinuityRegularizedTransportLoss
+    # _target_: hydra.utils.get_method
+    # path: misc.enot.losses.transport_loss
   g_potential_module_config:
     _target_: nn.networks.MLP
     n_blocks: 4
@@ -41,6 +44,6 @@ enot:
     _target_: hydra.utils.get_method
     path: misc.enot.losses.g_potential_loss
   cost_fn_config:
-    _target_: misc.enot.costs.InnerGWCost.create
-  train_cost_fn_config:
-    _target_: misc.enot.costs.InnerGWCostStable.create
+    # _target_: misc.enot.costs.L2Cost
+    # _target_: misc.enot.costs.InnerGWCost.create
+    _target_: misc.enot.costs.InvOTCost.create

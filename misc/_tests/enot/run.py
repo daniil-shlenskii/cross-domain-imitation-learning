@@ -29,7 +29,7 @@ def loader_generator(sample_size, seed=0, ds_name="gaussian"):
             target_sample1 = target_distr1.sample(seed=k2, sample_shape=(sample_size//2,))
             target_sample2 = target_distr2.sample(seed=k3, sample_shape=(sample_size//2,))
             target_sample = jnp.concatenate([target_sample1, target_sample2], axis=0)
-            yield source_sample, target_sample
+            yield source_sample, target_sample, None
     elif ds_name == "lines":
         ds_size = 20_000
         ds = jnp.linspace(0, 1, ds_size)
@@ -39,7 +39,8 @@ def loader_generator(sample_size, seed=0, ds_name="gaussian"):
             idcs2 = jax.random.choice(k2, ds_size, shape=(sample_size,))
             source_sample = jnp.stack([ds[idcs1], jnp.zeros(sample_size)], axis=1)
             target_sample = jnp.stack([ds[idcs2], jnp.ones(sample_size)], axis=1)
-            yield source_sample, target_sample
+            source_sample_next = jnp.stack([ds[jnp.clip(idcs1+1, max=ds_size-1)], jnp.zeros(sample_size)], axis=1)
+            yield source_sample, target_sample, source_sample_next
     elif ds_name == "temporal":
         ds_size = 20_000
         ds = jnp.linspace(0, 1, ds_size)
@@ -49,7 +50,7 @@ def loader_generator(sample_size, seed=0, ds_name="gaussian"):
             idcs2 = jax.random.choice(k2, ds_size, shape=(sample_size,))
             source_sample = jnp.stack([jnp.zeros(sample_size), ds[idcs1], idcs1/ds_size], axis=1)
             target_sample = jnp.stack([-ds[idcs2], jnp.zeros(sample_size), idcs2/ds_size], axis=1)
-            yield source_sample, target_sample
+            yield source_sample, target_sample, None
     elif ds_name == "lines_double":
         ds_size = 20_000
         ds = jnp.linspace(0, 1, ds_size)
@@ -63,7 +64,7 @@ def loader_generator(sample_size, seed=0, ds_name="gaussian"):
             target_sample2 = jnp.stack([ds[idcs1[sample_size//2:]] + 1, 2*jnp.ones(sample_size//2)], axis=1)
             source_sample = jnp.concatenate([source_sample1, source_sample2], axis=0)
             target_sample = jnp.concatenate([target_sample1, target_sample2], axis=0)
-            yield source_sample, target_sample
+            yield source_sample, target_sample, None
     elif ds_name == "agent":
         expert_ds_size = 20_000
         agent_ds_frac = 0.1
@@ -76,10 +77,10 @@ def loader_generator(sample_size, seed=0, ds_name="gaussian"):
             idcs2 = jax.random.choice(k2, expert_ds_size, shape=(sample_size,))
             source_sample = jnp.stack([agent_ds[idcs1], jnp.zeros(sample_size)], axis=1)
             target_sample = jnp.stack([expert_ds[idcs2], jnp.ones(sample_size)], axis=1)
-            yield source_sample, target_sample
+            yield source_sample, target_sample, None
     elif "from_buffer" in ds_name:
-        source_path = "buffers/Hopper/Hopper_random_buffer.pickle"
-        target_path = "buffers/Hopper/Hopper_expert_buffer.pickle"
+        source_path = "agents/experts/Hopper-v5/config/collected_rollouts/buffer_state.pickle"
+        target_path = "agents/experts/Hopper-v5/config/collected_rollouts/buffer_state.pickle"
 
         source_buffer = load_pickle(source_path)
         target_buffer = load_pickle(target_path)
@@ -95,15 +96,18 @@ def loader_generator(sample_size, seed=0, ds_name="gaussian"):
         if ds_name == "from_buffer_states":
             source_ds = source_buffer["observations"]
             target_ds = target_buffer["observations"]
+            source_ds_next = source_buffer["observations_next"]
         elif ds_name == "from_buffer_state_pairs":
             source_ds = jnp.concatenate([source_buffer["observations"], source_buffer["observations_next"]], axis=1)
             target_ds = jnp.concatenate([target_buffer["observations"], target_buffer["observations_next"]], axis=1)
+            source_ds_next = source_buffer["observations_next"]
 
         while True:
             rng, k1, k2 = jax.random.split(rng, 3)
             source_sample = jax.random.choice(k1, source_ds, shape=(sample_size,))
             target_sample = jax.random.choice(k2, target_ds, shape=(sample_size,))
-            yield source_sample, target_sample
+            source_sample_next = jax.random.choice(k1, source_ds_next, shape=(sample_size,))
+            yield source_sample, target_sample, source_sample_next
 
 def main():
     wandb.init(project="test_enot")
@@ -111,17 +115,17 @@ def main():
     config = OmegaConf.load("misc/_tests/enot/run_config.yaml")
     loader = loader_generator(sample_size=config.batch_size, ds_name=config.ds_name)
 
-    source_sample, target_sample = next(loader)
+    source_sample, target_sample, source_sample_next = next(loader)
     enot = instantiate(config.enot, source_dim=source_sample.shape[-1], target_dim=target_sample.shape[-1], _recursive_=False)
 
-    for i, (source_sample, target_sample) in tqdm(enumerate(loader)):
+    for i, (source_sample, target_sample, source_sample_next) in tqdm(enumerate(loader)):
         # evaluate
         if i == 0 or (i + 1) % config.eval_every == 0:
             eval_info = enot.evaluate(source_sample, target_sample)
             for k, v in eval_info.items():
                 wandb.log({f"eval/{k}": v}, step=i)
 
-        enot, update_info, stats_info = enot.update(target=target_sample, source=source_sample)
+        enot, update_info, stats_info = enot.update(target=target_sample, source=source_sample, source_next=source_sample_next)
 
         # logging
         if (i + 1) % config.log_every == 0:
