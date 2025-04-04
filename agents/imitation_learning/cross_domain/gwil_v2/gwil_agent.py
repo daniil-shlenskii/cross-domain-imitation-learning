@@ -553,7 +553,8 @@ def _collect_random_buffer(
 ):
     observation, _  = env.reset(seed=seed)
     for i in tqdm(range(n_items), desc=tqdm_desc):
-        action = learner.sample_actions(key=jax.random.key(seed+i), observations=observation)
+        # action = learner.sample_actions(key=jax.random.key(seed+i), observations=observation)
+        action = env.action_space.sample()
         observation_next, reward, done, truncated, _ = env.step(action)
         state = _update_buffer(
             buffer, state, observation, action, reward, done, truncated, observation_next
